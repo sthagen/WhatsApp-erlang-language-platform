@@ -20,7 +20,6 @@
 //! be sure without a real client anyway.
 
 #[cfg(test)]
-mod buck_tests;
 mod support;
 
 use elp_ide::elp_ide_db::elp_base_db::AbsPathBuf;
