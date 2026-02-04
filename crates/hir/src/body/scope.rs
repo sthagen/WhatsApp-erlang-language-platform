@@ -602,12 +602,15 @@ fn compute_expr_scopes(
             compute_expr_scopes(*arity, body, scopes, scope, vt);
         }
         crate::Expr::Closure { clauses, name } => {
-            if let Some(name) = name {
-                scopes.add_bindings(body, scope, *name, vt, AddBinding::Always);
-            }
             for clause in clauses.iter() {
                 let mut sub_vt = vt.clone();
                 let mut scope = scopes.new_scope(*scope);
+                // For named funs, add the name to the closure's nested scope (not the outer scope)
+                // This ensures the name is only visible inside the closure for recursion,
+                // while the LHS of any containing match becomes the defining binding in outer scope
+                if let Some(name) = name {
+                    scopes.add_bindings(body, &mut scope, *name, &mut sub_vt, AddBinding::Always);
+                }
                 scopes.add_params_bindings(body, &mut scope, &clause.pats, &mut sub_vt);
 
                 for guards in &clause.guards {

@@ -155,6 +155,21 @@ mod test {
     }
 
     #[test]
+    fn bound_variable_no_false_positive_for_named_fun() {
+        check_diagnostics(
+            r#"
+             //- /src/bound.erl
+             -module(bound).
+
+             foo() ->
+                 F = fun
+                     F(X) -> X
+                 end.
+            "#,
+        )
+    }
+
+    #[test]
     fn bound_variable_ignore_fix() {
         check_fix(
             r#"
