@@ -1,5 +1,5 @@
 AST
-{attribute,{0,0},file,{"fixtures/misplaced_comment_error.erl",0}}.
+{attribute,{0,0},file,{"misplaced_comment_error.erl",0}}.
 {attribute,{0,32},module,misplaced_comment_error}.
 {function,{35,111},
           bad_hint_arg,0,
@@ -47,7 +47,7 @@ AST
 WARNINGS
 [
     ParseError {
-        path: "fixtures/misplaced_comment_error.erl",
+        path: "misplaced_comment_error.erl",
         location: Some(
             Normal(
                 35..111,
@@ -57,7 +57,7 @@ WARNINGS
         code: "L1230",
     },
     ParseError {
-        path: "fixtures/misplaced_comment_error.erl",
+        path: "misplaced_comment_error.erl",
         location: Some(
             Normal(
                 114..248,

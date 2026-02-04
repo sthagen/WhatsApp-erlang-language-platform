@@ -7,7 +7,7 @@ WARNINGS
 ERRORS
 [
     ParseError {
-        path: "fixtures/unsupported_extension.yrl",
+        path: "unsupported_extension.yrl",
         location: None,
         msg: "*removed*",
         code: "L0002",

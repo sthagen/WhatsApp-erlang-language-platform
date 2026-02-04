@@ -1,5 +1,5 @@
 AST
-{attribute,{0,0},file,{"fixtures/structured_comment.erl",0}}.
+{attribute,{0,0},file,{"structured_comment.erl",0}}.
 {attribute,{0,27},module,structured_comment}.
 {function,{30,74},
           test,1,
@@ -13,7 +13,7 @@ AST
 WARNINGS
 [
     ParseError {
-        path: "fixtures/structured_comment.erl",
+        path: "structured_comment.erl",
         location: Some(
             Normal(
                 30..74,
@@ -23,7 +23,7 @@ WARNINGS
         code: "L1230",
     },
     ParseError {
-        path: "fixtures/structured_comment.erl",
+        path: "structured_comment.erl",
         location: Some(
             Normal(
                 77..126,

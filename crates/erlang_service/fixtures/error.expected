@@ -1,5 +1,5 @@
 AST
-{attribute,{0,0},file,{"fixtures/error.erl",0}}.
+{attribute,{0,0},file,{"error.erl",0}}.
 {attribute,{0,14},module,error}.
 {attribute,{17,46},
            spec,
@@ -71,7 +71,7 @@ AST
 WARNINGS
 [
     ParseError {
-        path: "fixtures/error.erl",
+        path: "error.erl",
         location: Some(
             Normal(
                 48..122,
@@ -81,7 +81,7 @@ WARNINGS
         code: "L1230",
     },
     ParseError {
-        path: "fixtures/error.erl",
+        path: "error.erl",
         location: Some(
             Normal(
                 156..239,
@@ -91,7 +91,7 @@ WARNINGS
         code: "L1230",
     },
     ParseError {
-        path: "fixtures/error.erl",
+        path: "error.erl",
         location: Some(
             Normal(
                 273..374,
@@ -101,7 +101,7 @@ WARNINGS
         code: "L1230",
     },
     ParseError {
-        path: "fixtures/error.erl",
+        path: "error.erl",
         location: Some(
             Normal(
                 408..483,

@@ -1,5 +1,5 @@
 AST
-{attribute,{0,0},file,{"fixtures/unused_record.erl",0}}.
+{attribute,{0,0},file,{"unused_record.erl",0}}.
 {attribute,{0,22},module,unused_record}.
 {attribute,{25,55},
            record,
@@ -10,7 +10,7 @@ AST
 WARNINGS
 [
     ParseError {
-        path: "fixtures/unused_record.erl",
+        path: "unused_record.erl",
         location: Some(
             Normal(
                 25..55,

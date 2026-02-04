@@ -48,6 +48,7 @@ use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use regex::Regex;
 use stdx::JodChild;
+#[cfg(not(buck_build))]
 use tempfile::Builder;
 use tempfile::TempPath;
 use text_size::TextRange;
@@ -81,7 +82,7 @@ struct SharedState {
     _writer_for_drop: JoinHandle,
     _reader_for_drop: JoinHandle,
     _child_for_drop: JodChild,
-    _file_for_drop: TempPath,
+    _file_for_drop: Option<TempPath>,
 }
 
 #[derive(Clone, Debug)]
@@ -316,29 +317,60 @@ pub type ResolveInclude<'a> = dyn Fn(IncludeType, &str) -> Option<String>;
 
 impl Connection {
     pub fn start() -> Result<Connection> {
-        let escript_src =
-            include_bytes!(concat!(env!("OUT_DIR"), "/erlang_service/erlang_service"));
-        let mut escript = Builder::new().prefix("erlang_service").tempfile()?;
-        escript.write_all(escript_src)?;
+        #[cfg(buck_build)]
+        fn get_erlang_service_path() -> Result<std::path::PathBuf> {
+            Ok(
+                buck_resources::get("whatsapp/elp/crates/erlang_service/erlang_service")
+                    .map(|p| p.to_path_buf())?,
+            )
+        }
 
-        let escript_bin = ESCRIPT.read().unwrap();
+        #[cfg(not(buck_build))]
+        fn get_erlang_service_path() -> Result<tempfile::TempPath> {
+            let escript_src =
+                include_bytes!(concat!(env!("OUT_DIR"), "/erlang_service/erlang_service"));
+            let mut escript = Builder::new().prefix("erlang_service").tempfile()?;
+            escript.write_all(escript_src)?;
+            Ok(escript.into_temp_path())
+        }
 
-        let mut cmd = Command::new(&*escript_bin);
-        cmd.arg(escript.path());
+        #[cfg(buck_build)]
+        fn get_escript_path() -> Result<std::path::PathBuf> {
+            Ok(
+                buck_resources::get("whatsapp/elp/crates/erlang_service/escript")
+                    .map(|p| p.to_path_buf())?,
+            )
+        }
+
+        #[cfg(not(buck_build))]
+        fn get_escript_path() -> Result<std::path::PathBuf> {
+            Ok(PathBuf::from(ESCRIPT.read().unwrap().clone()))
+        }
+
+        let erlang_service_path = get_erlang_service_path()?;
+        let escript_path = get_escript_path()?;
+
+        let mut cmd = Command::new(&escript_path);
+        cmd.arg(&erlang_service_path);
 
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
 
         let mut proc = cmd.spawn()?;
-        let escript = escript.into_temp_path();
+
+        #[cfg(not(buck_build))]
+        let file_for_drop = Some(erlang_service_path);
+
+        #[cfg(buck_build)]
+        let file_for_drop: Option<TempPath> = None;
 
         let (sender, writer, reader) = stdio_transport(&mut proc);
 
         Ok(Connection {
             sender,
             _for_drop: Arc::new(SharedState {
-                _file_for_drop: escript,
+                _file_for_drop: file_for_drop,
                 _child_for_drop: JodChild(proc),
                 _writer_for_drop: writer,
                 _reader_for_drop: reader,
@@ -877,170 +909,196 @@ mod tests {
     use std::fs;
     use std::str;
 
+    use elp_base_db::AbsPathBuf;
     use elp_project_model::otp::supports_eep59_doc_attributes;
     use expect_test::ExpectFile;
     use expect_test::expect;
     use expect_test::expect_file;
     use lazy_static::lazy_static;
+    #[cfg(not(buck_build))]
+    use paths::Utf8PathBuf;
 
     use super::*;
 
+    #[cfg(buck_build)]
+    fn get_fixtures_dir() -> AbsPathBuf {
+        // Use buck_resources for Buck builds (works with remote execution)
+        // The resource points to the filegroup output root, which contains
+        // the fixtures/ directory preserving the original path structure
+        let resource_path =
+            buck_resources::get("whatsapp/elp/crates/erlang_service/fixtures").unwrap();
+        let fixtures_path = resource_path.join("fixtures");
+        let canonical = fs::canonicalize(&fixtures_path).unwrap_or_else(|_| {
+            panic!(
+                "Failed to canonicalize fixtures path: {}",
+                fixtures_path.display()
+            )
+        });
+        AbsPathBuf::assert_utf8(canonical)
+    }
+
+    #[cfg(not(buck_build))]
+    fn get_fixtures_dir() -> AbsPathBuf {
+        // Compile-time for Cargo
+        AbsPathBuf::assert(Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"))).join("fixtures")
+    }
+
+    macro_rules! fixture_file {
+        ($filename:expr) => {
+            expect_file![get_fixtures_dir().join($filename)]
+        };
+    }
+
     #[test]
     fn regular_module() {
-        expect_module(
-            "fixtures/regular.erl".into(),
-            expect_file!["../fixtures/regular.expected"],
-        );
+        expect_module("regular.erl".into(), fixture_file!("regular.expected"));
     }
 
     #[test]
     fn unsupported_extension() {
         expect_module_filtered_error(
-            "fixtures/unsupported_extension.yrl".into(),
-            expect_file!["../fixtures/unsupported_extension.expected"],
+            "unsupported_extension.yrl".into(),
+            fixture_file!("unsupported_extension.expected"),
         );
     }
 
     #[test]
     fn structured_comment() {
         expect_module(
-            "fixtures/structured_comment.erl".into(),
-            expect_file!["../fixtures/structured_comment.expected"],
+            "structured_comment.erl".into(),
+            fixture_file!("structured_comment.expected"),
         );
     }
 
     #[test]
     fn errors() {
-        expect_module(
-            "fixtures/error.erl".into(),
-            expect_file!["../fixtures/error.expected"],
-        );
+        expect_module("error.erl".into(), fixture_file!("error.expected"));
 
         expect_module(
-            "fixtures/misplaced_comment_error.erl".into(),
-            expect_file!["../fixtures/misplaced_comment_error.expected"],
+            "misplaced_comment_error.erl".into(),
+            fixture_file!("misplaced_comment_error.expected"),
         );
     }
 
     #[test]
     fn warnings() {
         expect_module(
-            "fixtures/error_attr.erl".into(),
-            expect_file!["../fixtures/error_attr.expected"],
+            "error_attr.erl".into(),
+            fixture_file!("error_attr.expected"),
         );
     }
 
     #[test]
     fn unused_record() {
         expect_module(
-            "fixtures/unused_record.erl".into(),
-            expect_file!["../fixtures/unused_record.expected"],
+            "unused_record.erl".into(),
+            fixture_file!("unused_record.expected"),
         );
     }
 
     #[test]
     fn unused_record_in_header() {
         expect_module(
-            "fixtures/unused_record_in_header.hrl".into(),
-            expect_file!["../fixtures/unused_record_in_header.expected"],
+            "unused_record_in_header.hrl".into(),
+            fixture_file!("unused_record_in_header.expected"),
         );
     }
 
     #[test]
     fn edoc_scan_errors() {
         expect_docs(
-            "fixtures/edoc_scan_errors.erl".into(),
-            expect_file!["../fixtures/edoc_scan_errors.expected"],
+            "edoc_scan_errors.erl".into(),
+            fixture_file!("edoc_scan_errors.expected"),
         );
     }
 
     #[test]
     fn edoc_warnings() {
         expect_docs(
-            "fixtures/edoc_warnings.erl".into(),
-            expect_file!["../fixtures/edoc_warnings.expected"],
+            "edoc_warnings.erl".into(),
+            fixture_file!("edoc_warnings.expected"),
         );
     }
 
     #[test]
     fn edoc_errors() {
         expect_docs(
-            "fixtures/edoc_errors.erl".into(),
-            expect_file!["../fixtures/edoc_errors.expected"],
+            "edoc_errors.erl".into(),
+            fixture_file!("edoc_errors.expected"),
         );
     }
 
     #[test]
     fn edoc_include() {
         expect_docs(
-            "fixtures/edoc_include.erl".into(),
-            expect_file!["../fixtures/edoc_include.expected"],
+            "edoc_include.erl".into(),
+            fixture_file!("edoc_include.expected"),
         );
     }
 
     #[test]
     fn edoc_doc_attribute() {
         expect_eep59_docs(
-            "fixtures/edoc_doc_attribute.erl".into(),
-            expect_file!["../fixtures/edoc_doc_attribute_eep059.expected"],
-            expect_file!["../fixtures/edoc_doc_attribute.expected"],
+            "edoc_doc_attribute.erl".into(),
+            fixture_file!("edoc_doc_attribute_eep059.expected"),
+            fixture_file!("edoc_doc_attribute.expected"),
         );
     }
 
     #[test]
     fn edoc_doc_attribute_missing_moduledoc() {
         expect_eep59_docs(
-            "fixtures/edoc_doc_attribute_missing_moduledoc.erl".into(),
-            expect_file!["../fixtures/edoc_doc_attribute_missing_moduledoc_eep059.expected"],
-            expect_file!["../fixtures/edoc_doc_attribute_missing_moduledoc.expected"],
+            "edoc_doc_attribute_missing_moduledoc.erl".into(),
+            fixture_file!("edoc_doc_attribute_missing_moduledoc_eep059.expected"),
+            fixture_file!("edoc_doc_attribute_missing_moduledoc.expected"),
         );
     }
 
     #[test]
     fn ct_info() {
         expect_ct_info(
-            "fixtures/ct_info_SUITE.erl".into(),
-            expect_file!["../fixtures/ct_info_SUITE.expected"],
+            "ct_info_SUITE.erl".into(),
+            fixture_file!("ct_info_SUITE.expected"),
         );
     }
 
     #[test]
     fn ct_info_exception() {
         expect_ct_info(
-            "fixtures/ct_info_exception_SUITE.erl".into(),
-            expect_file!["../fixtures/ct_info_exception_SUITE.expected"],
+            "ct_info_exception_SUITE.erl".into(),
+            fixture_file!("ct_info_exception_SUITE.expected"),
         );
     }
 
     #[test]
     fn ct_info_incomplete() {
         expect_ct_info(
-            "fixtures/ct_info_incomplete_SUITE.erl".into(),
-            expect_file!["../fixtures/ct_info_incomplete_SUITE.expected"],
+            "ct_info_incomplete_SUITE.erl".into(),
+            fixture_file!("ct_info_incomplete_SUITE.expected"),
         );
     }
 
     #[test]
     fn ct_info_dynamic_all() {
         expect_ct_info(
-            "fixtures/ct_info_dynamic_SUITE.erl".into(),
-            expect_file!["../fixtures/ct_info_dynamic_SUITE.expected"],
+            "ct_info_dynamic_SUITE.erl".into(),
+            fixture_file!("ct_info_dynamic_SUITE.expected"),
         );
     }
 
     #[test]
     fn ct_info_infinite_loop() {
         expect_ct_info(
-            "fixtures/ct_info_infinite_loop_SUITE.erl".into(),
-            expect_file!["../fixtures/ct_info_infinite_loop_SUITE.expected"],
+            "ct_info_infinite_loop_SUITE.erl".into(),
+            fixture_file!("ct_info_infinite_loop_SUITE.expected"),
         );
     }
 
     #[test]
     fn doc_attributes_stripped() {
         expect_module(
-            "fixtures/doc_attributes_stripped.erl".into(),
-            expect_file!["../fixtures/doc_attributes_stripped.expected"],
+            "doc_attributes_stripped.erl".into(),
+            fixture_file!("doc_attributes_stripped.expected"),
         );
     }
 
@@ -1048,8 +1106,9 @@ mod tests {
         lazy_static! {
             static ref CONN: Connection = Connection::start().unwrap();
         }
+        let actual_path = get_fixtures_dir().join(path.to_string_lossy().as_ref());
         let file_text = Arc::from(
-            fs::read_to_string(path.clone()).expect("Should have been able to read the file"),
+            fs::read_to_string(&actual_path).expect("Should have been able to read the file"),
         );
         let request = ParseRequest {
             options,
@@ -1075,8 +1134,9 @@ mod tests {
         lazy_static! {
             static ref CONN: Connection = Connection::start().unwrap();
         }
+        let actual_path = get_fixtures_dir().join(path.to_string_lossy().as_ref());
         let file_text = Arc::from(
-            fs::read_to_string(path.clone()).expect("Should have been able to read the file"),
+            fs::read_to_string(&actual_path).expect("Should have been able to read the file"),
         );
         let request = ParseRequest {
             options: vec![],
@@ -1106,12 +1166,12 @@ mod tests {
     fn expect_eep59_docs(
         path: PathBuf,
         with_eep59_support: ExpectFile,
-        wuthout_eep59_support: ExpectFile,
+        without_eep59_support: ExpectFile,
     ) {
         if supports_eep59_doc_attributes() {
             expect_docs(path, with_eep59_support);
         } else {
-            expect_docs(path, wuthout_eep59_support);
+            expect_docs(path, without_eep59_support);
         }
     }
 
@@ -1119,20 +1179,22 @@ mod tests {
         lazy_static! {
             static ref CONN: Connection = Connection::start().unwrap();
         }
+        let actual_path = get_fixtures_dir().join(path.to_string_lossy().as_ref());
         let file_text = Arc::from(
-            fs::read_to_string(path.clone()).expect("Should have been able to read the file"),
+            fs::read_to_string(&actual_path).expect("Should have been able to read the file"),
         );
         let request = ParseRequest {
             options: vec![],
             file_id: FileId::from_raw(0),
-            path: path.clone(),
+            path,
             file_text,
             format: Format::OffsetEtf,
         };
         let parse_response = CONN.request_parse(request, || (), &|_, _, _| None);
+        // For DocRequest, pass the actual path since the Erlang service needs to read the file
         let request = DocRequest {
             doc_origin: DocOrigin::Edoc,
-            src_path: path,
+            src_path: actual_path.into(),
             ast: Some(parse_response.ast),
         };
         let response = CONN.request_doc(request, || ()).unwrap();
@@ -1148,19 +1210,19 @@ mod tests {
             static ref CONN: Connection = Connection::start().unwrap();
         }
         let file_id = FileId::from_raw(0);
+        let actual_path = get_fixtures_dir().join(path.to_string_lossy().as_ref());
         let file_text = Arc::from(
-            fs::read_to_string(path.clone()).expect("Should have been able to read the file"),
+            fs::read_to_string(&actual_path).expect("Should have been able to read the file"),
         );
+        let name = ModuleName::new(&path.file_stem().unwrap().to_string_lossy());
         let req = ParseRequest {
             options: vec![],
             file_id,
-            path: path.clone(),
+            path,
             format: Format::OffsetEtf,
             file_text,
         };
         let module_ast = CONN.request_parse(req, || (), &|_, _, _| None);
-
-        let name = ModuleName::new(&path.file_stem().unwrap().to_string_lossy());
         let request = CTInfoRequest {
             should_request_groups: true,
             file_abstract_forms: module_ast.ast.clone(),

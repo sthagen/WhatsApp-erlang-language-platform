@@ -1,5 +1,5 @@
 AST
-{attribute,{0,0},file,{"fixtures/error_attr.erl",0}}.
+{attribute,{0,0},file,{"error_attr.erl",0}}.
 {attribute,{0,19},module,error_attr}.
 {error,{{23,28},elp_epp,{error,"alamakota"}}}.
 {error,{{45,50},elp_epp,{bad,error}}}.
@@ -13,7 +13,7 @@ WARNINGS
 ERRORS
 [
     ParseError {
-        path: "fixtures/error_attr.erl",
+        path: "error_attr.erl",
         location: Some(
             Normal(
                 23..28,
@@ -23,7 +23,7 @@ ERRORS
         code: "E1522",
     },
     ParseError {
-        path: "fixtures/error_attr.erl",
+        path: "error_attr.erl",
         location: Some(
             Normal(
                 45..50,
@@ -33,7 +33,7 @@ ERRORS
         code: "E1501",
     },
     ParseError {
-        path: "fixtures/error_attr.erl",
+        path: "error_attr.erl",
         location: Some(
             Normal(
                 70..75,
