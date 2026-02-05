@@ -1617,7 +1617,6 @@ pub fn diagnostics_descriptors<'a>() -> Vec<&'a DiagnosticDescriptor<'a>> {
         &equality_check_with_unnecessary_operator::DESCRIPTOR,
         &map_insertion_to_syntax::DESCRIPTOR,
         &nonstandard_integer_formatting::DESCRIPTOR,
-        &unnecessary_map_from_list_around_comprehension::DESCRIPTOR,
         &map_find_to_syntax::DESCRIPTOR,
         &expression_can_be_simplified::DESCRIPTOR,
         &application_env::DESCRIPTOR,
@@ -1696,6 +1695,7 @@ const SSR_PATTERN_LINTERS: &[&dyn SsrPatternsDiagnostics] = &[
     &unnecessary_fold_to_build_map::LINTER,
     &binary_string_to_sigil::LINTER,
     &unnecessary_map_to_list_in_comprehension::LINTER,
+    &unnecessary_map_from_list_around_comprehension::LINTER,
     &could_be_a_string_literal::LINTER,
     &lists_reverse_append::LINTER,
 ];
