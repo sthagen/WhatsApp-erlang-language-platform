@@ -24,8 +24,8 @@ use fxhash::FxHashMap;
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use serde::Serialize;
+use strum::EnumIter;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 use crate::DiagnosticCode;
 use crate::source_change::SourceChange;

@@ -17,8 +17,8 @@ use regex::Regex;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::de;
+use strum::EnumIter;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 // @fb-only: use crate::meta_only::MetaOnlyDiagnosticCode;
 
@@ -599,13 +599,30 @@ impl fmt::Display for DiagnosticCode {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use expect_test::expect;
+    #[cfg(not(buck_build))]
+    use paths::Utf8PathBuf;
     use serde::Deserialize;
     use strum::IntoEnumIterator;
 
     use super::DiagnosticCode;
+
+    #[cfg(buck_build)]
+    fn get_doc_path(doc_path: &str) -> std::path::PathBuf {
+        let resource_path =
+            buck_resources::get("whatsapp/elp/crates/ide_db/error_index_docs").unwrap();
+        let canonical = std::fs::canonicalize(&resource_path)
+            .expect("Failed to canonicalize resource path. Check test_resources in BUCK file.");
+        canonical.join(doc_path)
+    }
+
+    #[cfg(not(buck_build))]
+    fn get_doc_path(doc_path: &str) -> std::path::PathBuf {
+        // Compile-time for Cargo - use CARGO_MANIFEST_DIR to find ELP root
+        let manifest_dir = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let elp_root = manifest_dir.parent().unwrap().parent().unwrap();
+        elp_root.join(doc_path).into_std_path_buf()
+    }
 
     #[test]
     fn from_string_1() {
@@ -736,9 +753,7 @@ mod tests {
 
         for code in DiagnosticCode::iter() {
             if let Some(doc_path) = code.as_doc_path() {
-                let manifest_dir = env!("CARGO_MANIFEST_DIR");
-                let elp_root = Path::new(manifest_dir).parent().unwrap().parent().unwrap();
-                let absolute_path = elp_root.join(doc_path);
+                let absolute_path = get_doc_path(&doc_path);
 
                 if !absolute_path.exists() {
                     missing_docs.push(format!("{}: {}", code.as_code(), absolute_path.display()));

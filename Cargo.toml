@@ -101,8 +101,7 @@ smallvec = { version = "1.13.2", features = ["const_new", "union", "const_generi
 smol_str = "0.1.24"
 stdx = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-01-12" }
 strsim = { version = "0.10.0" }
-strum = "0.25.0"
-strum_macros = "0.25.3"
+strum = { version = "0.27.2", features = ["derive"] }
 tempfile = "3.12.0"
 test-case = "2.2.2"
 text-size = "1.1.1"
