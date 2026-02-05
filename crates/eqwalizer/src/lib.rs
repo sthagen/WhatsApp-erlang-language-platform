@@ -10,9 +10,11 @@
 
 use std::env;
 use std::ffi::OsString;
+#[cfg(not(buck_build))]
 use std::fs;
+#[cfg(not(buck_build))]
 use std::io::Write;
-#[cfg(unix)]
+#[cfg(all(unix, not(buck_build)))]
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -30,6 +32,7 @@ pub use elp_types_db::eqwalizer::EqwalizerDiagnostic;
 use elp_types_db::eqwalizer::types::Type;
 use fxhash::FxHashMap;
 use parking_lot::Mutex;
+#[cfg(not(buck_build))]
 use tempfile::Builder;
 use tempfile::TempPath;
 
@@ -174,11 +177,16 @@ static EQWALIZER_EXE: LazyLock<Mutex<EqwalizerExe>> =
     LazyLock::new(|| Mutex::new(EqwalizerExe::ensure_exe()));
 
 impl EqwalizerExe {
-    // Identify the required Eqwalizer executable, and ensure it is
-    // available on the file system
-    fn ensure_exe() -> Self {
-        let env = env::var("ELP_EQWALIZER_PATH");
-        let (path, ext, temp_file) = if let Ok(path) = env {
+    #[cfg(buck_build)]
+    fn get_eqwalizer_path() -> (PathBuf, String, Option<TempPath>) {
+        let path =
+            buck_resources::get("whatsapp/elp/crates/eqwalizer/eqwalizer").expect("bad eqwalizer");
+        (path.to_path_buf(), String::new(), None)
+    }
+
+    #[cfg(not(buck_build))]
+    fn get_eqwalizer_path() -> (PathBuf, String, Option<TempPath>) {
+        if let Ok(path) = env::var("ELP_EQWALIZER_PATH") {
             let path = PathBuf::from(path);
             let ext = path
                 .extension()
@@ -216,7 +224,13 @@ impl EqwalizerExe {
             fs::set_permissions(&temp_file, perm).expect("can't create eqwalizer temp executable");
 
             (temp_file.to_path_buf(), extension, Some(temp_file))
-        };
+        }
+    }
+
+    // Identify the required Eqwalizer executable, and ensure it is
+    // available on the file system
+    fn ensure_exe() -> Self {
+        let (path, ext, temp_file) = Self::get_eqwalizer_path();
 
         let (cmd, args) = match ext.as_str() {
             "jar" => (
