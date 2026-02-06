@@ -96,8 +96,7 @@ pub(crate) fn check_filtered_ct_fix_with_config(
     let diagnostic = diagnostics
         .diagnostics_for(pos.file_id)
         .into_iter()
-        .filter(diagnostic_filter)
-        .next_back()
+        .rfind(diagnostic_filter)
         .expect("no diagnostics")
         .clone();
     let fixes = &diagnostic
