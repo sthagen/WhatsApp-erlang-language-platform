@@ -84,7 +84,10 @@ impl ProjectFolders {
         let kind = None;
         let watch: Vec<_> = watch_paths
             .into_iter()
-            .map(|glob_pattern| lsp_types::FileSystemWatcher { glob_pattern, kind })
+            .map(|glob_pattern| lsp_types::FileSystemWatcher {
+                glob_pattern: lsp_types::GlobPattern::String(glob_pattern),
+                kind,
+            })
             .collect();
 
         ProjectFolders {

@@ -552,6 +552,7 @@ pub(crate) fn folding_range(line_index: &LineIndex, fold: FoldingRange) -> lsp_t
         end_line: range.end.line,
         end_character: Some(range.end.character),
         kind: Some(kind),
+        collapsed_text: None,
     }
 }
 

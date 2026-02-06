@@ -706,7 +706,7 @@ impl Server {
             .on::<request::Completion>(handlers::handle_completion)
             .on::<request::ResolveCompletionItem>(handlers::handle_completion_resolve)
             .on::<request::DocumentSymbolRequest>(handlers::handle_document_symbol)
-            .on::<request::WorkspaceSymbol>(handlers::handle_workspace_symbol)
+            .on::<lsp_types::request::WorkspaceSymbolRequest>(handlers::handle_workspace_symbol)
             .on::<request::Rename>(handlers::handle_rename)
             .on::<lsp_ext::HoverRequest>(handlers::handle_hover)
             .on::<request::FoldingRangeRequest>(handlers::handle_folding_range)

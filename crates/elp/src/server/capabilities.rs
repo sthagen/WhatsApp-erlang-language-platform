@@ -118,6 +118,8 @@ pub fn compute(client: &ClientCapabilities) -> ServerCapabilities {
             },
         ))),
         linked_editing_range_provider: None,
+        inline_value_provider: None,
+        diagnostic_provider: None,
         experimental: None,
     }
 }

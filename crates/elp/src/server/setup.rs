@@ -74,7 +74,6 @@ impl ServerSetup {
         let result = InitializeResult {
             capabilities: server_capabilities,
             server_info: Some(server_info),
-            offset_encoding: None,
         };
 
         self.connection

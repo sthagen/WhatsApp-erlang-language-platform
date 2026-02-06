@@ -520,7 +520,7 @@ pub(crate) fn handle_document_symbol(
 pub(crate) fn handle_workspace_symbol(
     snap: Snapshot,
     params: lsp_types::WorkspaceSymbolParams,
-) -> Result<Option<Vec<SymbolInformation>>> {
+) -> Result<Option<lsp_types::WorkspaceSymbolResponse>> {
     let _p = tracing::info_span!("handle_workspace_symbol").entered();
 
     let mut res = Vec::new();
@@ -540,7 +540,7 @@ pub(crate) fn handle_workspace_symbol(
         }
     }
     res.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(Some(res))
+    Ok(Some(lsp_types::WorkspaceSymbolResponse::Flat(res)))
 }
 
 pub(crate) fn handle_rename(snap: Snapshot, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
