@@ -30,8 +30,20 @@ pub struct Otp {
     pub lib_dir: AbsPathBuf,
 }
 
+#[cfg(buck_build)]
+fn get_default_erl_path() -> String {
+    buck_resources::get("whatsapp/elp/crates/project_model/erl")
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "erl".to_string())
+}
+
+#[cfg(not(buck_build))]
+fn get_default_erl_path() -> String {
+    "erl".to_string()
+}
+
 lazy_static! {
-    pub static ref ERL: RwLock<String> = RwLock::new("erl".to_string());
+    pub static ref ERL: RwLock<String> = RwLock::new(get_default_erl_path());
 }
 
 lazy_static! {
