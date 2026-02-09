@@ -55,7 +55,7 @@ pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
 };
 
 fn redundant_assignment(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    if sema.db.is_generated(file_id) {
+    if sema.db.generated_status(file_id).is_generated() {
         // No point asking for changes to generated files
         return;
     }

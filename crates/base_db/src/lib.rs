@@ -22,6 +22,7 @@ use elp_syntax::TextSize;
 use elp_syntax::ast::SourceFile;
 use fxhash::FxHashMap;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 mod change;
 mod include;
@@ -60,7 +61,6 @@ pub use paths::AbsPath;
 pub use paths::AbsPathBuf;
 pub use paths::RelPath;
 pub use paths::RelPathBuf;
-use regex::Regex;
 pub use salsa;
 pub use vfs::AnchoredPath;
 pub use vfs::AnchoredPathBuf;
@@ -126,6 +126,36 @@ pub enum FileKind {
     Escript,
     Other,
     OutsideProjectModel,
+}
+
+/// Status indicating whether a file is generated, partially-generated, or regular.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum GeneratedStatus {
+    /// File contains the `generated` marker.
+    /// This has precedence over `@partially-generated`.
+    Generated,
+    /// File contains the `partially-generated` marker.
+    /// The file contains a number of manual and generated sections.
+    PartiallyGenerated,
+    /// Regular file without any generation markers.
+    Regular,
+}
+
+impl GeneratedStatus {
+    /// Returns true if the file is fully generated (no manual sections).
+    pub fn is_generated(self) -> bool {
+        matches!(self, GeneratedStatus::Generated)
+    }
+
+    /// Returns true if the file is partially generated (has manual sections).
+    pub fn is_partially_generated(self) -> bool {
+        matches!(self, GeneratedStatus::PartiallyGenerated)
+    }
+
+    /// Returns true if the file is a regular (non-generated) file.
+    pub fn is_regular(self) -> bool {
+        matches!(self, GeneratedStatus::Regular)
+    }
 }
 
 impl FileKind {
@@ -203,7 +233,16 @@ pub trait SourceDatabase: FileLoader + salsa::Database {
     /// Parse the file_id to AST
     fn parse(&self, file_id: FileId) -> Parse<SourceFile>;
 
-    fn is_generated(&self, file_id: FileId) -> bool;
+    /// Returns the generation status of the file.
+    /// - `Generated`: File has `generated` marker (no manual sections)
+    /// - `PartiallyGenerated`: File has `partially-generated` marker
+    /// - `Regular`: No generation markers
+    fn generated_status(&self, file_id: FileId) -> GeneratedStatus;
+
+    /// Returns the ranges of manual sections in a partially-generated file.
+    /// Manual sections are delimited by `% BEGIN MANUAL SECTION` and
+    /// `% END MANUAL SECTION` comment markers.
+    fn manual_section_ranges(&self, file_id: FileId) -> Arc<Vec<TextRange>>;
 
     /// The top level items are expressions, not forms.  Typically
     /// when parsing e.g. a `rebar.config` file.
@@ -405,16 +444,81 @@ pub fn path_for_file(db: &dyn SourceDatabase, file_id: FileId) -> Option<VfsPath
     source_root.path_for_file(&file_id).cloned()
 }
 
-fn is_generated(db: &dyn SourceDatabase, file_id: FileId) -> bool {
+fn generated_status(db: &dyn SourceDatabase, file_id: FileId) -> GeneratedStatus {
     lazy_static! {
-        // We operate a byte level via a regex (as opposed to use .contains)
+        // We operate at byte level via a regex (as opposed to use .contains)
         // to avoid issues with UTF8 character boundaries.
         // See https://github.com/WhatsApp/erlang-language-platform/issues/24
-        // The format macro is used to avoid marking the whole file as generated
-        static ref RE: regex::bytes::Regex = regex::bytes::Regex::new(&format!("{}generated", "@")).unwrap();
+        // The format macro is used to avoid marking the whole file as generated.
+        static ref RE_GENERATED: regex::bytes::Regex = regex::bytes::Regex::new(&format!("{}generated", "@")).unwrap();
+        static ref RE_PARTIALLY_GENERATED: regex::bytes::Regex = regex::bytes::Regex::new(&format!("{}partially-generated", "@")).unwrap();
     }
     let contents = db.file_text(file_id);
-    RE.is_match(&contents.as_bytes()[0..(2001.min(contents.len()))])
+    let header = &contents.as_bytes()[0..(2001.min(contents.len()))];
+
+    // Check generated first - it takes precedence over partially-generated
+    if RE_GENERATED.is_match(header) {
+        GeneratedStatus::Generated
+    } else if RE_PARTIALLY_GENERATED.is_match(header) {
+        GeneratedStatus::PartiallyGenerated
+    } else {
+        GeneratedStatus::Regular
+    }
+}
+
+fn manual_section_ranges(db: &dyn SourceDatabase, file_id: FileId) -> Arc<Vec<TextRange>> {
+    lazy_static! {
+        static ref RE_BEGIN_MANUAL: regex::bytes::Regex =
+            regex::bytes::Regex::new(r"% BEGIN MANUAL SECTION").unwrap();
+        static ref RE_END_MANUAL: regex::bytes::Regex =
+            regex::bytes::Regex::new(r"% END MANUAL SECTION").unwrap();
+    }
+
+    let contents = db.file_text(file_id);
+    let bytes = contents.as_bytes();
+    let mut ranges = Vec::new();
+
+    // Find all BEGIN markers
+    let begin_positions: Vec<usize> = RE_BEGIN_MANUAL.find_iter(bytes).map(|m| m.end()).collect();
+
+    // Find all END markers
+    let end_positions: Vec<usize> = RE_END_MANUAL.find_iter(bytes).map(|m| m.start()).collect();
+
+    // Match BEGIN/END pairs in order
+    for (begin, end) in begin_positions.iter().zip(end_positions.iter()) {
+        if begin < end {
+            let start = TextSize::new(*begin as u32);
+            let end = TextSize::new(*end as u32);
+            ranges.push(TextRange::new(start, end));
+        }
+    }
+
+    Arc::new(ranges)
+}
+
+/// Returns true if the given range is within a manual section of a
+/// partially-generated file.
+///
+/// # Arguments
+///
+/// * `db` - The source database providing file contents and metadata
+/// * `file_id` - The identifier of the file to check
+/// * `range` - The text range to check for manual section containment
+///
+/// # Returns
+///
+/// `true` if the file is partially-generated and the given range falls within
+/// a manual section (between `% BEGIN MANUAL SECTION` and `% END MANUAL SECTION`
+/// markers), `false` otherwise.
+pub fn is_in_manual_section(db: &dyn SourceDatabase, file_id: FileId, range: TextRange) -> bool {
+    if !db.generated_status(file_id).is_partially_generated() {
+        return false;
+    }
+
+    let manual_ranges = db.manual_section_ranges(file_id);
+    manual_ranges
+        .iter()
+        .any(|manual_range| manual_range.contains_range(range))
 }
 
 fn is_erlang_config_file(db: &dyn SourceDatabase, file_id: FileId) -> bool {

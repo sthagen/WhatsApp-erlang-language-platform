@@ -1636,23 +1636,57 @@ pub fn diagnostics_from_descriptors(
     config: &DiagnosticsConfig,
     descriptors: &[&DiagnosticDescriptor],
 ) {
-    let is_generated = sema.db.is_generated(file_id);
+    let generated_status = sema.db.generated_status(file_id);
     let is_test = sema
         .db
         .is_test_suite_or_test_helper(file_id)
         .unwrap_or(false);
     let app_name = sema.db.file_app_name(file_id);
+
+    // For partially-generated files, always get the manual section ranges
+    // (we need them to strip fixes from generated sections even when include_generated is true)
+    let manual_ranges = if generated_status.is_partially_generated() {
+        Some(sema.db.manual_section_ranges(file_id))
+    } else {
+        None
+    };
+
     descriptors.iter().for_each(|descriptor| {
-        if descriptor.conditions.enabled(config, is_generated, is_test) {
+        // For partially-generated files, always run the linter (we'll filter results later)
+        let should_run = if generated_status.is_partially_generated() {
+            descriptor.conditions.enabled(config, false, is_test)
+        } else {
+            descriptor
+                .conditions
+                .enabled(config, generated_status.is_generated(), is_test)
+        };
+
+        if should_run {
             let mut diags: Vec<Diagnostic> = Vec::default();
             (descriptor.checker)(&mut diags, sema, file_id, file_kind);
-            for diag in diags {
+            for mut diag in diags {
                 // Check if this diagnostic is enabled (for default_disabled descriptors)
                 // and if the app is not excluded for this diagnostic code
                 let is_enabled =
                     !descriptor.conditions.default_disabled || config.enabled.contains(&diag.code);
                 let app_allowed = should_process_app(&app_name, config, &diag.code);
-                if is_enabled && app_allowed {
+
+                // For partially-generated files, check if diagnostic is in a manual section
+                let in_manual_section = if let Some(ref ranges) = manual_ranges {
+                    ranges.iter().any(|r| r.contains_range(diag.range))
+                } else {
+                    true
+                };
+
+                // Include diagnostic if it's in a manual section, or if include_generated is true
+                let should_include = in_manual_section || config.include_generated;
+
+                // Strip fixes from diagnostics in generated code (outside manual sections)
+                if !in_manual_section {
+                    diag.fixes = None;
+                }
+
+                if is_enabled && app_allowed && should_include {
                     res.push(diag);
                 }
             }
@@ -1763,17 +1797,33 @@ fn diagnostics_from_linters(
     config: &DiagnosticsConfig,
     linters: Vec<DiagnosticLinter>,
 ) {
-    let is_generated = sema.db.is_generated(file_id);
+    let generated_status = sema.db.generated_status(file_id);
     let is_test = sema
         .db
         .is_test_suite_or_test_helper(file_id)
         .unwrap_or(false);
     let app_name = sema.db.file_app_name(file_id);
 
+    // For partially-generated files, always get the manual section ranges
+    // (we need them to strip fixes from generated sections even when include_generated is true)
+    let manual_ranges = if generated_status.is_partially_generated() {
+        Some(sema.db.manual_section_ranges(file_id))
+    } else {
+        None
+    };
+
     for l in linters {
         let linter = l.as_linter();
+
+        // For partially-generated files, always run the linter (we'll filter results later)
+        let effective_is_generated = if generated_status.is_partially_generated() {
+            false
+        } else {
+            generated_status.is_generated()
+        };
+
         if linter.should_process_file_id(sema, file_id)
-            && should_run(linter, config, &app_name, is_generated, is_test)
+            && should_run(linter, config, &app_name, effective_is_generated, is_test)
         {
             let severity = if let Some(lint_config) = config.lint_config.as_ref() {
                 lint_config
@@ -1789,6 +1839,33 @@ fn diagnostics_from_linters(
             } else {
                 linter.cli_severity(sema, file_id)
             };
+
+            let filter_for_manual_section = |diagnostics: Vec<Diagnostic>| -> Vec<Diagnostic> {
+                if let Some(ref ranges) = manual_ranges {
+                    diagnostics
+                        .into_iter()
+                        .filter_map(|mut diag| {
+                            let in_manual_section =
+                                ranges.iter().any(|r| r.contains_range(diag.range));
+                            if in_manual_section {
+                                // Diagnostic is in manual section, keep as-is
+                                Some(diag)
+                            } else if config.include_generated {
+                                // Diagnostic is in generated section but include_generated is true
+                                // Include it but strip fixes
+                                diag.fixes = None;
+                                Some(diag)
+                            } else {
+                                // Diagnostic is in generated section, filter it out
+                                None
+                            }
+                        })
+                        .collect()
+                } else {
+                    diagnostics
+                }
+            };
+
             match l {
                 DiagnosticLinter::FunctionCall(function_linter) => {
                     let linter_config = if let Some(lint_config) = config.lint_config.as_ref() {
@@ -1805,7 +1882,7 @@ fn diagnostics_from_linters(
                         cli_severity,
                         &linter_config,
                     );
-                    res.extend(diagnostics);
+                    res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::SsrPatterns(ssr_linter) => {
                     let linter_config = if let Some(lint_config) = config.lint_config.as_ref() {
@@ -1822,12 +1899,12 @@ fn diagnostics_from_linters(
                         cli_severity,
                         &linter_config,
                     );
-                    res.extend(diagnostics);
+                    res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::Generic(generic_linter) => {
                     let diagnostics =
                         generic_linter.diagnostics(sema, file_id, severity, cli_severity);
-                    res.extend(diagnostics);
+                    res.extend(filter_for_manual_section(diagnostics));
                 }
             }
         }
@@ -2175,7 +2252,9 @@ pub fn erlang_service_diagnostics(
     let file_kind = db.file_kind(file_id);
     let report_diagnostics = EXTENSIONS.contains(&file_kind);
 
-    if report_diagnostics && (config.include_generated || !db.is_generated(file_id)) {
+    if report_diagnostics
+        && (config.include_generated || !db.generated_status(file_id).is_generated())
+    {
         let res = db.module_ast(file_id);
 
         // We use a BTreeSet of a tuple because neither ParseError nor
@@ -2421,7 +2500,7 @@ pub fn edoc_diagnostics(
     file_id: FileId,
     config: &DiagnosticsConfig,
 ) -> Vec<(FileId, Vec<Diagnostic>)> {
-    if !config.include_generated && db.is_generated(file_id) {
+    if !config.include_generated && db.generated_status(file_id).is_generated() {
         return vec![];
     }
 
@@ -4344,5 +4423,247 @@ main(X) ->
 foo() -> ?UNDEFINED_MACRO.
 "#,
         );
+    }
+
+    #[test]
+    fn test_partially_generated_files_lint_manual_sections_only() {
+        // Test that partially-generated files only emit diagnostics for manual sections
+        // We use the expression_can_be_simplified diagnostic (W0019) as our test case
+        let config = DiagnosticsConfig::default()
+            .set_experimental(true)
+            .disable(DiagnosticCode::UndefinedFunction);
+        check_diagnostics_with_config(
+            config,
+            &format!(
+                r#"
+            //- /src/partial.erl
+            % This file is partially generated
+            % @{}
+            -module(partial).
+
+            %% Generated section - no diagnostics should be reported
+            generated_fun() ->
+                0 + 42.
+
+            % BEGIN MANUAL SECTION handlers
+
+            %% Manual section - diagnostics SHOULD be reported
+            manual_fun() ->
+                0 + 123.
+             %% ^^^^^^^ 💡 warning: W0019: Can be simplified to `123`.
+
+            % END MANUAL SECTION
+
+            %% Back to generated - no diagnostics
+            another_generated_fun() ->
+                0 + 456.
+            "#,
+                "partially-generated"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_partially_generated_files_with_include_generated() {
+        // Test that when include_generated is true, ALL diagnostics are reported
+        // (not just those in manual sections), but only manual section diagnostics
+        // have fixes (indicated by 💡)
+        let config = DiagnosticsConfig::default()
+            .set_experimental(true)
+            .set_include_generated(true)
+            .disable(DiagnosticCode::UndefinedFunction);
+        check_diagnostics_with_config(
+            config,
+            &format!(
+                r#"
+            //- /src/partial.erl
+            % This file is partially generated
+            % @{}
+            -module(partial).
+
+            %% Generated section - diagnostics reported but WITHOUT fixes (no 💡)
+            generated_fun() ->
+                0 + 42.
+             %% ^^^^^^ warning: W0019: Can be simplified to `42`.
+
+            % BEGIN MANUAL SECTION handlers
+
+            %% Manual section - diagnostics reported WITH fixes (💡)
+            manual_fun() ->
+                0 + 123.
+             %% ^^^^^^^ 💡 warning: W0019: Can be simplified to `123`.
+
+            % END MANUAL SECTION
+
+            %% Back to generated - diagnostics reported but WITHOUT fixes (no 💡)
+            another_generated_fun() ->
+                0 + 456.
+             %% ^^^^^^^ warning: W0019: Can be simplified to `456`.
+            "#,
+                "partially-generated"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_partially_generated_file_no_manual_sections() {
+        // Test that partially-generated files with no manual sections emit no diagnostics
+        let config = DiagnosticsConfig::default()
+            .set_experimental(true)
+            .disable(DiagnosticCode::UndefinedFunction);
+        check_diagnostics_with_config(
+            config,
+            &format!(
+                r#"
+            //- /src/partial_no_sections.erl
+            % @{}
+            -module(partial_no_sections).
+
+            %% No manual sections, so no diagnostics should be reported
+            some_fun() ->
+                0 + 42.
+            "#,
+                "partially-generated"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_fully_generated_file_no_diagnostics() {
+        // Test that fully generated files emit no diagnostics (existing behavior)
+        let config = DiagnosticsConfig::default()
+            .set_experimental(true)
+            .disable(DiagnosticCode::UndefinedFunction);
+        check_diagnostics_with_config(
+            config,
+            &format!(
+                r#"
+            //- /src/generated.erl
+            % @{}
+            -module(generated).
+
+            %% Fully generated - no diagnostics
+            some_fun() ->
+                0 + 42.
+            "#,
+                "generated"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_partially_generated_unmatched_begin_section() {
+        // Test that when BEGIN MANUAL SECTION has no matching END,
+        // the rest of the file is considered generated (no diagnostics)
+        let config = DiagnosticsConfig::default()
+            .set_experimental(true)
+            .disable(DiagnosticCode::UndefinedFunction);
+        check_diagnostics_with_config(
+            config,
+            &format!(
+                r#"
+            //- /src/partial_unmatched.erl
+            % @{}
+            -module(partial_unmatched).
+
+            %% Generated section
+            generated_fun() ->
+                0 + 42.
+
+            % BEGIN MANUAL SECTION handlers
+            %% No END marker - rest of file should be considered generated
+            unmatched_section_fun() ->
+                0 + 123.
+            "#,
+                "partially-generated"
+            ),
+        );
+    }
+
+    #[test]
+    fn test_is_partially_generated_detection() {
+        // Test the generated_status detection for partially-generated files
+        use elp_ide_db::RootDatabase;
+        use elp_ide_db::elp_base_db::GeneratedStatus;
+        use elp_ide_db::elp_base_db::fixture::WithFixture;
+
+        let (db, fixture) = RootDatabase::with_fixture(&format!(
+            r#"
+            //- /src/partial.erl
+            % @{}
+            -module(partial).
+            foo() -> ok.
+            "#,
+            "partially-generated"
+        ));
+
+        for file_id in &fixture.files {
+            assert_eq!(
+                db.generated_status(*file_id),
+                GeneratedStatus::PartiallyGenerated,
+                "File should be detected as partially-generated"
+            );
+        }
+    }
+
+    #[test]
+    fn test_manual_section_ranges_parsing() {
+        // Test manual section ranges are correctly parsed
+        use elp_ide_db::RootDatabase;
+        use elp_ide_db::elp_base_db::fixture::WithFixture;
+
+        let (db, fixture) = RootDatabase::with_fixture(&format!(
+            r#"
+            //- /src/partial.erl
+            % @{}
+            -module(partial).
+            % BEGIN MANUAL SECTION first
+            manual_code_1() -> ok.
+            % END MANUAL SECTION
+            generated_code() -> ok.
+            % BEGIN MANUAL SECTION second
+            manual_code_2() -> ok.
+            % END MANUAL SECTION
+            "#,
+            "partially-generated"
+        ));
+
+        for file_id in &fixture.files {
+            let ranges = db.manual_section_ranges(*file_id);
+            assert_eq!(
+                ranges.len(),
+                2,
+                "Should have 2 manual sections, got {:?}",
+                ranges
+            );
+        }
+    }
+
+    #[test]
+    fn test_generated_takes_precedence_over_partially_generated() {
+        // Test that when a file contains both @generated and @partially-generated,
+        // it should be recognized as Generated (not PartiallyGenerated)
+        use elp_ide_db::RootDatabase;
+        use elp_ide_db::elp_base_db::GeneratedStatus;
+        use elp_ide_db::elp_base_db::fixture::WithFixture;
+
+        let (db, fixture) = RootDatabase::with_fixture(&format!(
+            r#"
+            //- /src/both_markers.erl
+            % @{}
+            % @{}
+            -module(both_markers).
+            foo() -> ok.
+            "#,
+            "generated", "partially-generated"
+        ));
+
+        for file_id in &fixture.files {
+            assert_eq!(
+                db.generated_status(*file_id),
+                GeneratedStatus::Generated,
+                "File with both markers should be detected as Generated"
+            );
+        }
     }
 }

@@ -555,7 +555,7 @@ impl Analysis {
     }
 
     pub fn is_generated(&self, file_id: FileId) -> Cancellable<bool> {
-        self.with_db(|db| db.is_generated(file_id))
+        self.with_db(|db| db.generated_status(file_id).is_generated())
     }
 
     pub fn is_test_suite_or_test_helper(&self, file_id: FileId) -> Cancellable<Option<bool>> {
