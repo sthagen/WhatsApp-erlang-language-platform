@@ -79,10 +79,16 @@ pub fn run_lint_command(
     let start_time = SystemTime::now();
     let memory_start = MemoryUsage::now();
 
-    if args.in_place {
+    if args.in_place && args.is_format_normal() {
         writeln!(
             cli.err(),
             "Warning: the --in-place flag is deprecated and will be removed in an upcoming release. Fixing in place is now the default behavior when using --apply-fix."
+        )?;
+    }
+    if args.include_ct_diagnostics && args.is_format_normal() {
+        writeln!(
+            cli.err(),
+            "Warning: the --include-ct-diagnostics flag is deprecated and will be removed in an upcoming release. Common Test diagnostics are now always included."
         )?;
     }
 
@@ -253,9 +259,8 @@ fn do_diagnostics_one(
             diagnostics.set_erlang_service(file_id, diags);
         }
     }
-    if args.include_ct_diagnostics {
-        diagnostics.set_ct(file_id, db.ct_diagnostics(file_id, config)?);
-    }
+    // CT diagnostics are always included (--include-ct-diagnostics is now a no-op)
+    diagnostics.set_ct(file_id, db.ct_diagnostics(file_id, config)?);
     if args.include_edoc_diagnostics {
         let edoc_diagnostics = db
             .edoc_diagnostics(file_id, config)?

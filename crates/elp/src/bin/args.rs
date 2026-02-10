@@ -281,7 +281,7 @@ pub struct Lint {
 
     /// Include diagnostics produced by erlc
     pub include_erlc_diagnostics: bool,
-    /// Include Common Test diagnostics
+    /// Deprecated (no-op): Common Test diagnostics are now always included
     pub include_ct_diagnostics: bool,
     /// Include EDoc diagnostics
     pub include_edoc_diagnostics: bool,

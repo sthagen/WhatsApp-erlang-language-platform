@@ -1909,7 +1909,6 @@ mod tests {
         simple_snapshot(
             args_vec![
                 "lint",
-                "--include-ct-diagnostics",
                 "--diagnostic-filter"
                 "W0008"
             ],
@@ -1926,7 +1925,6 @@ mod tests {
         simple_snapshot_expect_error_sorted(
             args_vec![
                 "lint",
-                "--include-ct-diagnostics",
                 "--include-tests",
                 "--diagnostic-filter"
                 "W0008"
