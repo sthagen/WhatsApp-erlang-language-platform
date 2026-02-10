@@ -1984,9 +1984,10 @@ mod tests {
 
     #[test]
     fn lint_custom_function_matches() {
-        simple_snapshot(
+        simple_snapshot_expect_error(
             args_vec![
                 "lint",
+                "--no-stream",
                 "--config-file",
                 "../../test/test_projects/linter/elp_lint_custom_function_matches.toml",
                 "--module",

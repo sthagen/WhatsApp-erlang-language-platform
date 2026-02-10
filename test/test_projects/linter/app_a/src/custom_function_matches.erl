@@ -13,4 +13,5 @@ main() ->
     excluded:function(),
     not_excluded:function(),
     cross:call(),
+    cross_node:call(),
     ok.
