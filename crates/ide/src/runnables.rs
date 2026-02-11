@@ -98,7 +98,6 @@ impl Runnable {
             RunnableKind::Suite { .. } => {
                 args.push(target);
                 args.push("--".to_string());
-                args.push("--print-passing-details".to_string());
                 args.push("--run-disabled".to_string());
             }
         }
