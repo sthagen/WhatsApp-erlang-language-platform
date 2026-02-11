@@ -107,6 +107,7 @@ mod duplicate_module;
 mod effect_free_statement;
 mod equality_check_with_unnecessary_operator;
 mod eqwalizer_assists;
+mod ets_lookup_to_lookup_element;
 mod expression_can_be_simplified;
 mod from_config;
 mod head_mismatch;
@@ -1732,6 +1733,7 @@ const SSR_PATTERN_LINTERS: &[&dyn SsrPatternsDiagnostics] = &[
     &unnecessary_map_from_list_around_comprehension::LINTER,
     &could_be_a_string_literal::LINTER,
     &lists_reverse_append::LINTER,
+    &ets_lookup_to_lookup_element::LINTER,
 ];
 
 /// Generic linters

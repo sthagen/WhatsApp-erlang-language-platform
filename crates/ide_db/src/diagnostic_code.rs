@@ -91,6 +91,7 @@ pub enum DiagnosticCode {
     NoNoWarnSuppressions,
     CouldBeAStringLiteral,
     ListsReverseAppend,
+    EtsLookupToLookupElement,
     HirUnresolvedMacro,
     HirUnresolvedInclude,
     BoundVarInLhs,
@@ -260,6 +261,7 @@ impl DiagnosticCode {
             DiagnosticCode::UnavailableType => "W0059".to_string(),
             DiagnosticCode::BoundVarInLhs => "W0060".to_string(),
             DiagnosticCode::MixedStrictRelaxedGenerators => "W0063".to_string(),
+            DiagnosticCode::EtsLookupToLookupElement => "W0064".to_string(),
             DiagnosticCode::ErlangService(c) => c.to_string(),
             DiagnosticCode::Eqwalizer(c) => format!("eqwalizer: {c}"),
             DiagnosticCode::AdHoc(c) => format!("ad-hoc: {c}"),
@@ -364,6 +366,7 @@ impl DiagnosticCode {
             DiagnosticCode::HirUnresolvedMacro => "hir_unresolved_macro".to_string(),
             DiagnosticCode::HirUnresolvedInclude => "hir_unresolved_include".to_string(),
             DiagnosticCode::UnavailableType => "unavailable_type".to_string(),
+            DiagnosticCode::EtsLookupToLookupElement => "ets_lookup_to_lookup_element".to_string(),
 
             DiagnosticCode::ErlangService(c) => c.to_string(),
             DiagnosticCode::Eqwalizer(c) => c.to_string(),
@@ -544,6 +547,7 @@ impl DiagnosticCode {
             DiagnosticCode::NoErrorLogger => false,
             DiagnosticCode::NoNoWarnSuppressions => false,
             DiagnosticCode::ListsReverseAppend => false,
+            DiagnosticCode::EtsLookupToLookupElement => false,
             DiagnosticCode::HirUnresolvedMacro => false,
             DiagnosticCode::HirUnresolvedInclude => false,
 
