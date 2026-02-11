@@ -107,6 +107,10 @@ pub(crate) fn var_name_starts_with_underscore(db: &dyn InternDatabase, var: &hir
     var.as_string(db).starts_with('_')
 }
 
+pub(crate) fn is_wildcard(sema: &Semantic, var: hir::Var) -> bool {
+    var_name_starts_with_underscore(sema.db.upcast(), &var)
+}
+
 pub(crate) fn is_only_place_where_var_is_defined(
     sema: &Semantic,
     var: &InFunctionClauseBody<AnyExprId>,

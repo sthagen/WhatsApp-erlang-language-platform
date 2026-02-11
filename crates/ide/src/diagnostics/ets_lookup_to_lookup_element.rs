@@ -45,10 +45,10 @@ use hir::Expr;
 use hir::Pat;
 use hir::Semantic;
 use hir::Strategy;
-use hir::Var;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 
+use crate::codemod_helpers::is_wildcard;
 use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
@@ -232,10 +232,6 @@ fn is_wildcard_match(sema: &Semantic, body: &Body, wildcard: &Option<Placeholder
         },
         None => false,
     }
-}
-
-fn is_wildcard(sema: &Semantic, var: Var) -> bool {
-    var.as_string(sema.db.upcast()).starts_with("_")
 }
 
 #[cfg(test)]

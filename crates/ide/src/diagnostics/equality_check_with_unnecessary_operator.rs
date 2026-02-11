@@ -48,12 +48,12 @@ use hir::Body;
 use hir::Expr;
 use hir::Pat;
 use hir::Semantic;
-use hir::Var;
 use hir::db::InternDatabase;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 use hir::fold::Strategy;
 
+use crate::codemod_helpers::is_wildcard;
 use crate::diagnostics::Category;
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::DiagnosticConditions;
@@ -311,10 +311,6 @@ fn is_underscore(sema: &Semantic, body: &Body, wildcard: &Option<PlaceholderMatc
         },
         None => false,
     }
-}
-
-fn is_wildcard(sema: &Semantic, var: Var) -> bool {
-    var.as_string(sema.db.upcast()).starts_with("_")
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
