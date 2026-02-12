@@ -98,6 +98,7 @@ mod atoms_exhaustion;
 mod binary_string_to_sigil;
 mod boolean_precedence;
 mod bound_variable;
+mod inefficient_list_empty_check;
 mod could_be_a_string_literal;
 mod cross_node_eval;
 mod debugging_function;
@@ -1734,6 +1735,7 @@ const SSR_PATTERN_LINTERS: &[&dyn SsrPatternsDiagnostics] = &[
     &could_be_a_string_literal::LINTER,
     &lists_reverse_append::LINTER,
     &ets_lookup_to_lookup_element::LINTER,
+    &inefficient_list_empty_check::LINTER,
 ];
 
 /// Generic linters

@@ -96,6 +96,7 @@ pub enum DiagnosticCode {
     HirUnresolvedInclude,
     BoundVarInLhs,
     MixedStrictRelaxedGenerators,
+    InefficientListEmptyCheck,
 
     // Wrapper for erlang service diagnostic codes
     ErlangService(String),
@@ -262,6 +263,7 @@ impl DiagnosticCode {
             DiagnosticCode::BoundVarInLhs => "W0060".to_string(),
             DiagnosticCode::MixedStrictRelaxedGenerators => "W0063".to_string(),
             DiagnosticCode::EtsLookupToLookupElement => "W0064".to_string(),
+            DiagnosticCode::InefficientListEmptyCheck => "W0065".to_string(),
             DiagnosticCode::ErlangService(c) => c.to_string(),
             DiagnosticCode::Eqwalizer(c) => format!("eqwalizer: {c}"),
             DiagnosticCode::AdHoc(c) => format!("ad-hoc: {c}"),
@@ -281,6 +283,7 @@ impl DiagnosticCode {
             DiagnosticCode::MixedStrictRelaxedGenerators => {
                 "mixed_strict_relaxed_generators".to_string()
             }
+            DiagnosticCode::InefficientListEmptyCheck => "inefficient_list_empty_check".to_string(),
             DiagnosticCode::ModuleMismatch => "module_mismatch".to_string(),
             DiagnosticCode::UnusedMacro => "unused_macro".to_string(),
             DiagnosticCode::UnusedRecordField => "unused_record_field".to_string(),
@@ -499,6 +502,7 @@ impl DiagnosticCode {
             DiagnosticCode::BoundVarInPattern => false,
             DiagnosticCode::BoundVarInLhs => false,
             DiagnosticCode::MixedStrictRelaxedGenerators => false,
+            DiagnosticCode::InefficientListEmptyCheck => false,
             DiagnosticCode::UnusedMacro => false,
             DiagnosticCode::UnusedRecordField => false,
             DiagnosticCode::MutableVarBug => false,
