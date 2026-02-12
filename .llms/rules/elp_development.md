@@ -142,6 +142,20 @@ to the `known_names!` macro in alphabetical order within the appropriate categor
 - Group related tests in the same module
 - Use descriptive test names that explain the scenario
 
+### Updating Expect-Test Snapshots
+
+When expect-test assertions fail because the expected output has changed (not because of a bug), use `UPDATE_EXPECT=1` to auto-update the snapshots:
+
+```bash
+# Update snapshots for a specific crate
+UPDATE_EXPECT=1 cargo test -p hir
+
+# Update snapshots for a specific test
+UPDATE_EXPECT=1 cargo test -p hir -- test_name
+```
+
+Do NOT manually edit `expect![[...]]` strings — always use `UPDATE_EXPECT=1` to regenerate them.
+
 ### Test Assertions
 
 Use `assert_eq_expected!` instead of `assert_eq!` for comparing expected vs actual
@@ -371,3 +385,22 @@ cargo test --manifest-path crates/ide/Cargo.toml
 - Always run tests before finishing
 - Always run `cargo clippy --tests` before submitting PRs
 - Use `cargo fmt` for code formatting
+
+#### Recommended Build/Test Workflow
+
+When making changes across multiple files, follow this order for fast feedback:
+
+1. **Edit all files first**, then run a single build check:
+   ```bash
+   cargo build --workspace --tests
+   ```
+2. **Run tests for the affected crate only** (faster than `--workspace`):
+   ```bash
+   cargo test -p <crate_name>
+   ```
+3. **Run clippy as a final check** before submitting:
+   ```bash
+   cargo clippy --workspace --tests
+   ```
+
+Avoid running `--workspace` tests after every edit — scope to the affected crate for faster iteration.
