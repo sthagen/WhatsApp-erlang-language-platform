@@ -130,7 +130,7 @@ request({setopts, Opts}, #{encoding := Encoding0} = State) ->
        _ -> Binary0 = false
     end,
     Binary1 = lists:member(binary, Opts),
-    case Binary0 or Binary1 of
+    case Binary0 orelse Binary1 of
       true -> Mode = binary;
       false -> Mode = list
     end,
