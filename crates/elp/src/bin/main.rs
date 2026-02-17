@@ -45,15 +45,25 @@ mod reporting;
 mod shell;
 mod ssr_cli;
 
-// Use jemalloc as the global allocator
-#[cfg(not(any(target_env = "msvc", target_os = "openbsd")))]
+// Use jemalloc as the global allocator when the jemalloc feature is enabled.
+// For Cargo/OSS builds, jemalloc is a default feature.
+// For Buck builds, the allocator is controlled via the BUCK file's `allocator` setting,
+// and this binary does not get the jemalloc feature, so the #[global_allocator] is not set.
+#[cfg(all(
+    feature = "jemalloc",
+    not(any(target_env = "msvc", target_os = "openbsd"))
+))]
 use jemallocator::Jemalloc;
 
 use crate::args::Args;
 
-#[cfg(not(any(target_env = "msvc", target_os = "openbsd")))]
+#[cfg(all(
+    feature = "jemalloc",
+    not(any(target_env = "msvc", target_os = "openbsd"))
+))]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
+
 static EQWALIZER_SUPPORT_DIR: Dir = include_dir!("$EQWALIZER_SUPPORT_DIR");
 static INIT: Once = Once::new();
 

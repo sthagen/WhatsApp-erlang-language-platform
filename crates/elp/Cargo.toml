@@ -5,8 +5,9 @@ edition.workspace = true
 version.workspace = true
 
 [features]
-default = ["buck"]
+default = ["buck", "jemalloc"]
 buck = ["elp_project_model/buck"]
+jemalloc = ["dep:jemalloc-ctl", "dep:jemallocator", "profile/jemalloc"]
 
 [[bin]]
 name = "elp"
@@ -62,9 +63,8 @@ vfs-notify.workspace = true
 vfs.workspace = true
 
 [target.'cfg(not(any(target_env = "msvc", target_os = "openbsd")))'.dependencies]
-jemalloc-ctl.workspace = true
-jemallocator.workspace = true
-profile = { workspace = true, features = ["jemalloc"] }
+jemalloc-ctl = { workspace = true, optional = true }
+jemallocator = { workspace = true, optional = true }
 
 [dev-dependencies]
 expect-test.workspace = true

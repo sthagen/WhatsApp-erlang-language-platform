@@ -47,7 +47,13 @@ impl std::ops::Sub for MemoryUsage {
 
 impl MemoryUsage {
     pub fn now() -> MemoryUsage {
-        #[cfg(not(any(target_env = "msvc", target_os = "openbsd")))]
+        // Use jemalloc stats when the jemalloc feature is enabled.
+        // For Cargo/OSS builds, jemalloc is a default feature.
+        // For Buck builds, the jemalloc feature is enabled when sanitizers are not used.
+        #[cfg(all(
+            feature = "jemalloc",
+            not(any(target_env = "msvc", target_os = "openbsd"))
+        ))]
         {
             jemalloc_ctl::epoch::advance().unwrap();
             MemoryUsage {
@@ -56,7 +62,7 @@ impl MemoryUsage {
                 resident: Bytes(jemalloc_ctl::stats::resident::read().unwrap() as isize),
             }
         }
-        #[cfg(target_env = "msvc")]
+        #[cfg(any(not(feature = "jemalloc"), target_env = "msvc", target_os = "openbsd"))]
         {
             MemoryUsage {
                 allocated: Bytes(0),
