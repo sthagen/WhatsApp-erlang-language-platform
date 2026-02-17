@@ -17,64 +17,117 @@ use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
 use elp_ide_ssr::SubId;
-use elp_ide_ssr::match_pattern_in_file_functions;
 use hir::AnyExprId;
 use hir::BasedInteger;
 use hir::Expr;
 use hir::Literal;
 use hir::Semantic;
-use hir::fold::MacroStrategy;
-use hir::fold::ParenStrategy;
-use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
+use crate::Assist;
 use crate::diagnostics::Category;
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticConditions;
-use crate::diagnostics::DiagnosticDescriptor;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
+use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: false,
-        include_tests: true,
-        default_disabled: false,
-    },
-    checker: &|acc, sema, file_id, _ext| {
-        inefficient_enumerate_custom_index_ssr(acc, sema, file_id);
-        inefficient_enumerate_custom_index_and_step_ssr(acc, sema, file_id);
-    },
-};
+pub(crate) struct InefficientEnumerateLinter;
+
+impl Linter for InefficientEnumerateLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::ListsZipWithSeqRatherThanEnumerate
+    }
+
+    fn description(&self) -> &'static str {
+        "Unnecessary intermediate list allocated."
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::WeakWarning
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum PatternKind {
+    /// `lists:zip(lists:seq(Index, length(List)), List)`
+    TwoArg,
+    /// `lists:zip(lists:seq(Index, Step, length(List)), List)`
+    ThreeArg,
+}
+
+impl SsrPatternsLinter for InefficientEnumerateLinter {
+    type Context = PatternKind;
+
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, PatternKind)> = vec![
+                (
+                    format!(
+                        "ssr: lists:zip(lists:seq({INDEX_VAR},length({LIST_VAR})),{LIST_VAR})."
+                    ),
+                    PatternKind::TwoArg,
+                ),
+                (
+                    format!(
+                        "ssr: lists:zip(lists:seq({INDEX_VAR},{STEP_VAR},length({LIST_VAR})),{LIST_VAR})."
+                    ),
+                    PatternKind::ThreeArg,
+                ),
+            ];
+        }
+        &PATTERNS
+    }
+
+    fn is_match_valid(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if let Some(comments) = matched.comments(sema)
+            && !comments.is_empty()
+        {
+            return None;
+        }
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        Some(true)
+    }
+
+    fn fixes(
+        &self,
+        context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        match context {
+            PatternKind::TwoArg => {
+                if is_indexing_from_literal_one(sema, matched) {
+                    make_fix_simple(sema, file_id, matched)
+                } else {
+                    make_fix_custom_index(sema, file_id, matched)
+                }
+            }
+            PatternKind::ThreeArg => make_fix_custom_index_and_step(sema, file_id, matched),
+        }
+    }
+
+    fn add_categories(&self, context: &Self::Context) -> Vec<Category> {
+        match context {
+            PatternKind::ThreeArg => vec![Category::SimplificationRule],
+            _ => vec![],
+        }
+    }
+}
+
+pub(crate) static LINTER: InefficientEnumerateLinter = InefficientEnumerateLinter;
 
 static LIST_VAR: &str = "_@List";
 static INDEX_VAR: &str = "_@Index";
 static STEP_VAR: &str = "_@Step";
-
-fn inefficient_enumerate_custom_index_ssr(
-    diags: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
-) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::Expand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: lists:zip(lists:seq({INDEX_VAR},length({LIST_VAR})),{LIST_VAR}).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if is_indexing_from_literal_one(sema, m) {
-            if let Some(diagnostic) = make_diagnostic(sema, file_id, m) {
-                diags.push(diagnostic);
-            }
-        } else if let Some(diagnostic) = make_diagnostic_custom_index(sema, file_id, m) {
-            diags.push(diagnostic);
-        }
-    });
-}
 
 fn is_indexing_from_literal_one(sema: &Semantic, m: &Match) -> bool {
     || -> Option<bool> {
@@ -91,142 +144,56 @@ fn is_indexing_from_literal_one(sema: &Semantic, m: &Match) -> bool {
     .unwrap_or(false)
 }
 
-fn inefficient_enumerate_custom_index_and_step_ssr(
-    diags: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
-) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::Expand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: lists:zip(lists:seq({INDEX_VAR},{STEP_VAR},length({LIST_VAR})),{LIST_VAR}).")
-            .as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(diagnostic) = make_diagnostic_custom_index_and_step(sema, file_id, m) {
-            diags.push(diagnostic);
-        }
-    });
-}
-
-fn make_diagnostic(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-) -> Option<Diagnostic> {
-    sensibility_check(sema, original_file_id, matched)?;
-    let file_id = matched.range.file_id;
+fn make_fix_simple(sema: &Semantic, file_id: FileId, matched: &Match) -> Option<Vec<Assist>> {
     let inefficient_call_range = matched.range.range;
     let list_arg_matches = matched.placeholder_texts(sema, LIST_VAR)?;
     let list_arg = list_arg_matches.first()?;
-    let message = "Unnecessary intermediate list allocated.".to_string();
     let mut builder = SourceChangeBuilder::new(file_id);
     let efficient_enumerate = format!("lists:enumerate({list_arg})");
     builder.replace(inefficient_call_range, efficient_enumerate);
-    let fixes = vec![fix(
+    Some(vec![fix(
         "lists_zip_lists_seq_to_lists_enumerate",
         "Rewrite to use lists:enumerate/1",
         builder.finish(),
         inefficient_call_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::ListsZipWithSeqRatherThanEnumerate,
-            message,
-            inefficient_call_range,
-        )
-        .with_severity(Severity::WeakWarning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes)),
-    )
+    )])
 }
 
-fn make_diagnostic_custom_index(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-) -> Option<Diagnostic> {
-    sensibility_check(sema, original_file_id, matched)?;
-    let file_id = matched.range.file_id;
+fn make_fix_custom_index(sema: &Semantic, file_id: FileId, matched: &Match) -> Option<Vec<Assist>> {
     let inefficient_call_range = matched.range.range;
     let list_arg_matches = matched.placeholder_texts(sema, LIST_VAR)?;
     let list_arg = list_arg_matches.first()?;
     let index_arg = matched.placeholder_text(sema, INDEX_VAR)?;
-    let message = "Unnecessary intermediate list allocated.".to_string();
     let mut builder = SourceChangeBuilder::new(file_id);
     let efficient_enumerate = format!("lists:enumerate({index_arg}, {list_arg})");
     builder.replace(inefficient_call_range, efficient_enumerate);
-    let fixes = vec![fix(
+    Some(vec![fix(
         "lists_zip_lists_seq_to_lists_enumerate",
         "Rewrite to use lists:enumerate/2",
         builder.finish(),
         inefficient_call_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::ListsZipWithSeqRatherThanEnumerate,
-            message,
-            inefficient_call_range,
-        )
-        .with_severity(Severity::WeakWarning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes)),
-    )
+    )])
 }
 
-fn make_diagnostic_custom_index_and_step(
+fn make_fix_custom_index_and_step(
     sema: &Semantic,
-    original_file_id: FileId,
+    file_id: FileId,
     matched: &Match,
-) -> Option<Diagnostic> {
-    sensibility_check(sema, original_file_id, matched)?;
-    let file_id = matched.range.file_id;
+) -> Option<Vec<Assist>> {
     let inefficient_call_range = matched.range.range;
     let list_arg_matches = matched.placeholder_texts(sema, LIST_VAR)?;
     let list_arg = list_arg_matches.first()?;
     let index_arg = matched.placeholder_text(sema, INDEX_VAR)?;
     let step_arg = matched.placeholder_text(sema, STEP_VAR)?;
-    let message = "Unnecessary intermediate list allocated.".to_string();
     let mut builder = SourceChangeBuilder::new(file_id);
     let efficient_enumerate = format!("lists:enumerate({index_arg}, {step_arg}, {list_arg})");
     builder.replace(inefficient_call_range, efficient_enumerate);
-    let fixes = vec![fix(
+    Some(vec![fix(
         "list_zip_with_seq_rather_than_enumerate",
         "Rewrite to use lists:enumerate/3",
         builder.finish(),
         inefficient_call_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::ListsZipWithSeqRatherThanEnumerate,
-            message,
-            inefficient_call_range,
-        )
-        .with_severity(Severity::WeakWarning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes))
-        .add_categories([Category::SimplificationRule]),
-    )
-}
-
-fn sensibility_check(sema: &Semantic<'_>, original_file_id: FileId, matched: &Match) -> Option<()> {
-    if let Some(comments) = matched.comments(sema) {
-        // Avoid clobbering comments in the original source code
-        if !comments.is_empty() {
-            return None;
-        }
-    }
-    if matched.range.file_id != original_file_id {
-        // We've somehow ended up with a match in a different file - this means we've
-        // accidentally expanded a macro from a different file, or some other complex case that
-        // gets hairy, so bail out.
-        return None;
-    }
-    Some(())
+    )])
 }
 
 #[cfg(test)]
