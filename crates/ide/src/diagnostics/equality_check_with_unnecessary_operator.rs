@@ -41,24 +41,27 @@ use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
 use elp_ide_ssr::PlaceholderMatch;
 use elp_ide_ssr::SubId;
-use elp_ide_ssr::match_pattern_in_file_functions;
+use elp_syntax::TextRange;
 use hir::AnyExprId;
 use hir::BinarySeg;
 use hir::Body;
+use hir::CallTarget;
 use hir::Expr;
+use hir::Literal;
 use hir::Pat;
 use hir::Semantic;
+use hir::Strategy;
 use hir::db::InternDatabase;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
-use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
+use crate::Assist;
 use crate::codemod_helpers::is_wildcard;
 use crate::diagnostics::Category;
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticConditions;
-use crate::diagnostics::DiagnosticDescriptor;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
+use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
 static LHS_VAR: &str = "_@Lhs";
@@ -67,216 +70,218 @@ static SAME_BRANCH_VAR: &str = "_@SameBranch";
 static DIFF_BRANCH_VAR: &str = "_@DiffBranch";
 static UNDERSCORE_VAR: &str = "_@Wildcard";
 
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: false,
-        include_tests: true,
-        default_disabled: false,
-    },
-    checker: &|acc, sema, file_id, _ext| {
-        // N.B. we only apply when the operator is `=:=`/`=/=` (not `==`/`/=`)
-        // as we can't be sure that the values with be safe to match otherwise
-        // (e.g. floats are not safely matchable)
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =:= {RHS_VAR} of
-                    true -> {SAME_BRANCH_VAR};
-                    false -> {DIFF_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            false,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =/= {RHS_VAR} of
-                    true -> {DIFF_BRANCH_VAR};
-                    false -> {SAME_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            false,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: if {LHS_VAR} =/= {RHS_VAR} -> {DIFF_BRANCH_VAR};
-                    true -> {SAME_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            false,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: if {LHS_VAR} =:= {RHS_VAR} -> {SAME_BRANCH_VAR};
-                    true -> {DIFF_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            false,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =:= {RHS_VAR} of
-                    false -> {DIFF_BRANCH_VAR};
-                    true -> {SAME_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            false,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =/= {RHS_VAR} of
-                    false -> {SAME_BRANCH_VAR};
-                    true -> {DIFF_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            false,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =:= {RHS_VAR} of
-                    true -> {SAME_BRANCH_VAR};
-                    {UNDERSCORE_VAR} -> {DIFF_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            true,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =/= {RHS_VAR} of
-                    true -> {DIFF_BRANCH_VAR};
-                    {UNDERSCORE_VAR} -> {SAME_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            true,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =:= {RHS_VAR} of
-                    false -> {DIFF_BRANCH_VAR};
-                    {UNDERSCORE_VAR} -> {SAME_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            true,
-        );
-        from_ssr(
-            acc,
-            sema,
-            file_id,
-            format!(
-                "ssr: case {LHS_VAR} =/= {RHS_VAR} of
-                    false -> {SAME_BRANCH_VAR};
-                    {UNDERSCORE_VAR} -> {DIFF_BRANCH_VAR}
-                  end."
-            )
-            .as_str(),
-            true,
-        );
-    },
-};
+pub(crate) struct EqualityCheckWithUnnecessaryOperatorLinter;
 
-fn from_ssr(
-    diags: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
-    ssr_pattern: &str,
-    underscore_expected: bool,
-) {
-    let matches = match_pattern_in_file_functions(
-        sema,
+impl Linter for EqualityCheckWithUnnecessaryOperatorLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::EqualityCheckWithUnnecessaryOperator
+    }
+
+    fn description(&self) -> &'static str {
+        "Consider rewriting to an equality match."
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::Information
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum PatternContext {
+    /// Pattern where the second branch is `true` or `false` (no wildcard)
+    Exact,
+    /// Pattern where the second branch uses a wildcard (e.g. `_ -> ...`)
+    Wildcard,
+}
+
+impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
+    type Context = PatternContext;
+
+    fn strategy(&self) -> Strategy {
         Strategy {
             macros: MacroStrategy::DoNotExpand,
             parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        ssr_pattern,
-    );
-    matches.matches.iter().for_each(|m| {
-        validate_and_make_diagnostic(diags, sema, file_id, m, underscore_expected);
-    });
-}
+        }
+    }
 
-fn validate_and_make_diagnostic(
-    diags: &mut Vec<Diagnostic>,
-    sema: &Semantic<'_>,
-    file_id: FileId,
-    m: &Match,
-    underscore_expected: bool,
-) -> Option<()> {
-    let lhs = &m.get_placeholder_match(sema, LHS_VAR)?;
-    let rhs = &m.get_placeholder_match(sema, RHS_VAR)?;
-    let wildcard = &m.get_placeholder_match(sema, UNDERSCORE_VAR);
-    let body_arc = m.matched_node_body.get_body(sema)?;
-    let body = body_arc.as_ref();
-    if check_underscore(sema, body, wildcard, underscore_expected) {
-        // As long of one of the expressions is a valid pattern, we can rewrite to use it in the
-        // pattern position, and use the other in the expression position.
-        // We prioritise literals and more complex values in the pattern position, because it is more idiomatic.
+    // N.B. we only apply when the operator is `=:=`/`=/=` (not `==`/`/=`)
+    // as we can't be sure that the values with be safe to match otherwise
+    // (e.g. floats are not safely matchable)
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, PatternContext)> = vec![
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =:= {RHS_VAR} of
+                            true -> {SAME_BRANCH_VAR};
+                            false -> {DIFF_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Exact,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =/= {RHS_VAR} of
+                            true -> {DIFF_BRANCH_VAR};
+                            false -> {SAME_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Exact,
+                ),
+                (
+                    format!(
+                        "ssr: if {LHS_VAR} =/= {RHS_VAR} -> {DIFF_BRANCH_VAR};
+                            true -> {SAME_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Exact,
+                ),
+                (
+                    format!(
+                        "ssr: if {LHS_VAR} =:= {RHS_VAR} -> {SAME_BRANCH_VAR};
+                            true -> {DIFF_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Exact,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =:= {RHS_VAR} of
+                            false -> {DIFF_BRANCH_VAR};
+                            true -> {SAME_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Exact,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =/= {RHS_VAR} of
+                            false -> {SAME_BRANCH_VAR};
+                            true -> {DIFF_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Exact,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =:= {RHS_VAR} of
+                            true -> {SAME_BRANCH_VAR};
+                            {UNDERSCORE_VAR} -> {DIFF_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Wildcard,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =/= {RHS_VAR} of
+                            true -> {DIFF_BRANCH_VAR};
+                            {UNDERSCORE_VAR} -> {SAME_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Wildcard,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =:= {RHS_VAR} of
+                            false -> {DIFF_BRANCH_VAR};
+                            {UNDERSCORE_VAR} -> {SAME_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Wildcard,
+                ),
+                (
+                    format!(
+                        "ssr: case {LHS_VAR} =/= {RHS_VAR} of
+                            false -> {SAME_BRANCH_VAR};
+                            {UNDERSCORE_VAR} -> {DIFF_BRANCH_VAR}
+                          end."
+                    ),
+                    PatternContext::Wildcard,
+                ),
+            ];
+        }
+        &PATTERNS
+    }
+
+    fn is_match_valid(
+        &self,
+        context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        if let Some(comments) = matched.comments(sema)
+            && !comments.is_empty()
+        {
+            return None;
+        }
+        let lhs = &matched.get_placeholder_match(sema, LHS_VAR)?;
+        let rhs = &matched.get_placeholder_match(sema, RHS_VAR)?;
+        let wildcard = &matched.get_placeholder_match(sema, UNDERSCORE_VAR);
+        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let body = body_arc.as_ref();
+        let underscore_expected = *context == PatternContext::Wildcard;
+        if !check_underscore(sema, body, wildcard, underscore_expected) {
+            return Some(false);
+        }
+        if is_length_zero_comparison(sema, body, lhs, rhs) {
+            return None;
+        }
         let lhs_as_pattern_priority = pattern_priority(sema, body, lhs);
         let rhs_as_pattern_priority = pattern_priority(sema, body, rhs);
         match (lhs_as_pattern_priority, rhs_as_pattern_priority) {
-            (Some(left), Some(right)) => match left.cmp(&right) {
-                Ordering::Less => report_diagnostic(diags, sema, file_id, m, body, lhs, rhs),
-                Ordering::Greater => report_diagnostic(diags, sema, file_id, m, body, rhs, lhs),
-                Ordering::Equal => report_diagnostic(diags, sema, file_id, m, body, lhs, rhs),
-            },
-            (Some(_), None) => report_diagnostic(diags, sema, file_id, m, body, rhs, lhs),
-            (None, Some(_)) => report_diagnostic(diags, sema, file_id, m, body, lhs, rhs),
-            (None, None) => {
-                // No rewrite possible - neither side of the operator is valid in the pattern position
-            }
+            (Some(_), _) | (_, Some(_)) => Some(true),
+            (None, None) => Some(false),
         }
     }
-    Some(())
-}
 
-fn report_diagnostic(
-    diags: &mut Vec<Diagnostic>,
-    sema: &Semantic<'_>,
-    file_id: FileId,
-    m: &Match,
-    body: &Body,
-    discriminee: &PlaceholderMatch,
-    pattern: &PlaceholderMatch,
-) {
-    if let Some(diagnostic) = make_diagnostic(sema, file_id, m, body, discriminee, pattern) {
-        diags.push(diagnostic)
+    fn fixes(
+        &self,
+        context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        let lhs = &matched.get_placeholder_match(sema, LHS_VAR)?;
+        let rhs = &matched.get_placeholder_match(sema, RHS_VAR)?;
+        let wildcard = &matched.get_placeholder_match(sema, UNDERSCORE_VAR);
+        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let body = body_arc.as_ref();
+        let underscore_expected = *context == PatternContext::Wildcard;
+        if !check_underscore(sema, body, wildcard, underscore_expected) {
+            return None;
+        }
+        let lhs_as_pattern_priority = pattern_priority(sema, body, lhs);
+        let rhs_as_pattern_priority = pattern_priority(sema, body, rhs);
+        let (discriminee, pattern) = match (lhs_as_pattern_priority, rhs_as_pattern_priority) {
+            (Some(left), Some(right)) => match left.cmp(&right) {
+                Ordering::Less => (lhs, rhs),
+                Ordering::Greater => (rhs, lhs),
+                Ordering::Equal => (lhs, rhs),
+            },
+            (Some(_), None) => (rhs, lhs),
+            (None, Some(_)) => (lhs, rhs),
+            (None, None) => return None,
+        };
+        make_fix(sema, file_id, matched, body, discriminee, pattern)
+    }
+
+    fn add_categories(&self, _context: &Self::Context) -> Vec<Category> {
+        vec![Category::SimplificationRule]
+    }
+
+    fn range(&self, sema: &Semantic, matched: &Match) -> Option<TextRange> {
+        let discriminee_lhs_range = matched.placeholder_range(sema, LHS_VAR)?;
+        let discriminee_rhs_range = matched.placeholder_range(sema, RHS_VAR)?;
+        Some(discriminee_lhs_range.cover(discriminee_rhs_range))
     }
 }
+
+pub(crate) static LINTER: EqualityCheckWithUnnecessaryOperatorLinter =
+    EqualityCheckWithUnnecessaryOperatorLinter;
 
 // If the wildcard metavar was bound at all, make sure it is equivalent to an underscore
 fn check_underscore(
@@ -518,70 +523,73 @@ fn pattern_priority_pat(sema: &Semantic, body: &Body, pat: Pat) -> Option<Patter
     }
 }
 
-fn make_diagnostic(
+/// Check if the LHS/RHS of the equality check represent `length(List) =:= 0`
+/// (or `0 =:= length(List)`). If so, we skip this lint so that
+/// `InefficientListEmptyCheckLinter` can take priority with a better fix.
+fn is_length_zero_comparison(
     sema: &Semantic,
-    original_file_id: FileId,
+    body: &Body,
+    lhs: &PlaceholderMatch,
+    rhs: &PlaceholderMatch,
+) -> bool {
+    (is_length_call(sema, body, lhs) && is_integer_zero(body, rhs))
+        || (is_integer_zero(body, lhs) && is_length_call(sema, body, rhs))
+}
+
+fn is_length_call(sema: &Semantic, body: &Body, pm: &PlaceholderMatch) -> bool {
+    let SubId::AnyExprId(AnyExprId::Expr(expr_id)) = pm.code_id else {
+        return false;
+    };
+    let Expr::Call { target, args } = &body[expr_id] else {
+        return false;
+    };
+    if args.len() != 1 {
+        return false;
+    }
+    let intern_db: &dyn InternDatabase = sema.db.upcast();
+    match target {
+        CallTarget::Local { name } => {
+            matches!(body[*name].as_atom(), Some(atom) if atom.as_string(intern_db) == "length")
+        }
+        CallTarget::Remote { module, name, .. } => {
+            matches!(body[*module].as_atom(), Some(atom) if atom.as_string(intern_db) == "erlang")
+                && matches!(body[*name].as_atom(), Some(atom) if atom.as_string(intern_db) == "length")
+        }
+    }
+}
+
+fn is_integer_zero(body: &Body, pm: &PlaceholderMatch) -> bool {
+    let SubId::AnyExprId(AnyExprId::Expr(expr_id)) = pm.code_id else {
+        return false;
+    };
+    matches!(&body[expr_id], Expr::Literal(Literal::Integer(n)) if n.value == 0)
+}
+
+fn make_fix(
+    sema: &Semantic,
+    file_id: FileId,
     matched: &Match,
     body: &Body,
     expr: &PlaceholderMatch,
     pat: &PlaceholderMatch,
-) -> Option<Diagnostic> {
-    let file_id = matched.range.file_id;
-    if file_id != original_file_id {
-        // We've somehow ended up with a match in a different file - this means we've
-        // accidentally expanded a macro from a different file, or some other complex case that
-        // gets hairy, so bail out.
-        return None;
-    }
+) -> Option<Vec<Assist>> {
     let old_match_range = matched.range.range;
-    let discriminee_lhs_range = matched.placeholder_range(sema, LHS_VAR)?;
-    let discriminee_rhs_range = matched.placeholder_range(sema, RHS_VAR)?;
-    let discriminee_range = discriminee_lhs_range.cover(discriminee_rhs_range);
-    let message = "Consider rewriting to an equality match.".to_string();
+    let same_branch_text = matched.placeholder_text(sema, SAME_BRANCH_VAR)?;
+    let diff_branch_text = matched.placeholder_text(sema, DIFF_BRANCH_VAR)?;
+    let expr_text = expr.text(sema, body)?;
+    let pat_text = pat.text(sema, body)?;
+    let equality_pattern_replacement = format!(
+        "case {expr_text} of {pat_text} -> {same_branch_text}; _ -> {diff_branch_text} end"
+    );
     let mut builder = SourceChangeBuilder::new(file_id);
-    let equality_pattern_replacement = get_replacement(sema, matched, body, expr, pat)?;
     builder.replace(old_match_range, equality_pattern_replacement);
-    let fixes = vec![fix(
+    Some(vec![fix(
         "equality_check_with_unnecessary_operator",
         "Rewrite to use equality match",
         builder.finish(),
         old_match_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::EqualityCheckWithUnnecessaryOperator,
-            message,
-            discriminee_range,
-        )
-        .with_severity(Severity::Information)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes))
-        .add_categories([Category::SimplificationRule]),
-    )
+    )])
 }
-
-fn get_replacement(
-    sema: &Semantic,
-    m: &Match,
-    body: &Body,
-    expr: &PlaceholderMatch,
-    pat: &PlaceholderMatch,
-) -> Option<String> {
-    if let Some(comments) = m.comments(sema) {
-        // Avoid clobbering comments in the original source code
-        if !comments.is_empty() {
-            return None;
-        }
-    }
-    let same_branch_text = m.placeholder_text(sema, SAME_BRANCH_VAR)?;
-    let diff_branch_text = m.placeholder_text(sema, DIFF_BRANCH_VAR)?;
-    let expr_text = expr.text(sema, body)?;
-    let pat_text = pat.text(sema, body)?;
-    Some(format!(
-        "case {expr_text} of {pat_text} -> {same_branch_text}; _ -> {diff_branch_text} end"
-    ))
-}
-
 #[cfg(test)]
 mod tests {
 
@@ -1665,6 +1673,55 @@ mod tests {
                 false ->
                     % My important comment on different body
                     Diff
+            end.
+            "#,
+        )
+    }
+
+    #[test]
+    fn ignores_length_zero_comparison() {
+        // Yield to InefficientListEmptyCheckLinter which provides a better fix
+        check_diagnostics(
+            r#"
+         //- /src/equality_op.erl
+         -module(equality_op).
+
+         check_empty(List) ->
+            case length(List) =:= 0 of
+                true -> empty;
+                false -> non_empty
+            end.
+            "#,
+        )
+    }
+
+    #[test]
+    fn ignores_length_zero_comparison_wildcard() {
+        check_diagnostics(
+            r#"
+         //- /src/equality_op.erl
+         -module(equality_op).
+
+         check_empty(List) ->
+            case length(List) =:= 0 of
+                true -> empty;
+                _ -> non_empty
+            end.
+            "#,
+        )
+    }
+
+    #[test]
+    fn ignores_zero_length_comparison() {
+        check_diagnostics(
+            r#"
+         //- /src/equality_op.erl
+         -module(equality_op).
+
+         check_empty(List) ->
+            case 0 =:= length(List) of
+                true -> empty;
+                false -> non_empty
             end.
             "#,
         )
