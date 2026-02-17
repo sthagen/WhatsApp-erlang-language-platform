@@ -50,7 +50,7 @@ impl Linter for UnspecificIncludeLinter {
     }
 
     fn description(&self) -> &'static str {
-        "Unspecific include."
+        "Include missing application and sub-directory."
     }
 
     fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
@@ -208,7 +208,7 @@ mod tests {
          //- /app_a/src/unspecific_include.erl app:app_a include_path:/app_b/include
            -module(unspecific_include).
            -include("some_header_from_app_a.hrl").
-           %%       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0037: Unspecific include.
+           %%       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0037: Include missing application and sub-directory.
 
          //- /app_b/include/some_header_from_app_a.hrl include_path:/app_b/include app:app_b
            -define(A,3).
@@ -235,7 +235,7 @@ mod tests {
            //- /app_a/src/unspecific_include.erl include_path:/app_b/include app:app_a
            -module(unspecific_include).
            -include("some~_header_from_app_a.hrl").
-           %%       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: Unspecific include.
+           %%       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: Include missing application and sub-directory.
            //- /app_b/include/some_header_from_app_a.hrl include_path:/app_b/include app:app_b
            -define(A,3)."#,
             // Note: the test fixture include path is not ideal for this, see lint_reports_bxl_project_error test in elp/main
@@ -253,7 +253,7 @@ mod tests {
            //- /app_a/src/unspecific_include.erl include_path:/app_b/include app:app_a
            -module(unspecific_include).
            -include_lib("some~_header_from_app_a.hrl").
-           %%           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: Unspecific include.
+           %%           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: Include missing application and sub-directory.
            //- /app_b/include/some_header_from_app_a.hrl include_path:/app_b/include app:app_b
            -define(A,3)."#,
             // Note: the test fixture include path is not ideal for this, see lint_reports_bxl_project_error test in elp/main
