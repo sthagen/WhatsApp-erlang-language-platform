@@ -16,166 +16,136 @@ use elp_ide_db::DiagnosticCode;
 use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
-use elp_ide_ssr::match_pattern_in_file_functions;
 use hir::Semantic;
-use hir::fold::MacroStrategy;
-use hir::fold::ParenStrategy;
-use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
+use crate::Assist;
 use crate::diagnostics::Category;
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticConditions;
-use crate::diagnostics::DiagnosticDescriptor;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
+use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: false,
-        include_tests: true,
-        default_disabled: false,
-    },
-    checker: &|acc, sema, file_id, _ext| {
-        inefficient_last_hd_ssr(acc, sema, file_id);
-        inefficient_last_nth_ssr(acc, sema, file_id);
-        inefficient_last_pat_ssr(acc, sema, file_id);
-    },
-};
+pub(crate) struct InefficientLastLinter;
+
+impl Linter for InefficientLastLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::UnnecessaryReversalToFindLastElementOfList
+    }
+
+    fn description(&self) -> &'static str {
+        "Unnecessary intermediate reverse list allocated."
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::Warning
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum PatternKind {
+    /// `hd(lists:reverse(List))`
+    Hd,
+    /// `lists:nth(1, lists:reverse(List))`
+    Nth,
+    /// `[LastElem|_] = lists:reverse(List)`
+    Pat,
+}
+
+impl SsrPatternsLinter for InefficientLastLinter {
+    type Context = PatternKind;
+
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, PatternKind)> = vec![
+                (
+                    format!("ssr: hd(lists:reverse({LIST_VAR}))."),
+                    PatternKind::Hd,
+                ),
+                (
+                    format!("ssr: lists:nth(1, lists:reverse({LIST_VAR}))."),
+                    PatternKind::Nth,
+                ),
+                (
+                    format!("ssr: [{LAST_ELEM_VAR}|_] = lists:reverse({LIST_VAR})."),
+                    PatternKind::Pat,
+                ),
+            ];
+        }
+        &PATTERNS
+    }
+
+    fn is_match_valid(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if let Some(comments) = matched.comments(sema)
+            && !comments.is_empty()
+        {
+            return None;
+        }
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        Some(true)
+    }
+
+    fn fixes(
+        &self,
+        context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        match context {
+            PatternKind::Hd | PatternKind::Nth => make_fix_hd(sema, file_id, matched),
+            PatternKind::Pat => make_fix_pat(sema, file_id, matched),
+        }
+    }
+
+    fn add_categories(&self, context: &Self::Context) -> Vec<Category> {
+        match context {
+            PatternKind::Pat => vec![Category::SimplificationRule],
+            _ => vec![],
+        }
+    }
+}
+
+pub(crate) static LINTER: InefficientLastLinter = InefficientLastLinter;
 
 static LIST_VAR: &str = "_@List";
 static LAST_ELEM_VAR: &str = "_@LastElem";
 
-fn inefficient_last_hd_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::Expand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: hd(lists:reverse({LIST_VAR})).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(diagnostic) = make_diagnostic_hd(sema, file_id, m) {
-            diags.push(diagnostic)
-        }
-    });
-}
-
-// lists:nth(1, L) is functionally equivalent to hd(L)
-fn inefficient_last_nth_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::Expand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: lists:nth(1, lists:reverse({LIST_VAR})).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(diagnostic) = make_diagnostic_hd(sema, file_id, m) {
-            diags.push(diagnostic)
-        }
-    });
-}
-
-fn inefficient_last_pat_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::Expand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: [{LAST_ELEM_VAR}|_] = lists:reverse({LIST_VAR}).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(diagnostic) = make_diagnostic_pat(sema, file_id, m) {
-            diags.push(diagnostic)
-        }
-    });
-}
-
-fn make_diagnostic_hd(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-) -> Option<Diagnostic> {
-    sensibility_check(sema, original_file_id, matched)?;
-    let file_id = matched.range.file_id;
+fn make_fix_hd(sema: &Semantic, file_id: FileId, matched: &Match) -> Option<Vec<Assist>> {
     let inefficient_call_range = matched.range.range;
     let list_arg = matched.placeholder_text(sema, LIST_VAR)?;
-    let message = "Unnecessary intermediate reverse list allocated.".to_string();
     let mut builder = SourceChangeBuilder::new(file_id);
     let efficient_last = format!("lists:last({list_arg})");
     builder.replace(inefficient_call_range, efficient_last);
-    let fixes = vec![fix(
+    Some(vec![fix(
         "list_head_reverse_to_last",
         "Rewrite to use lists:last/1",
         builder.finish(),
         inefficient_call_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::UnnecessaryReversalToFindLastElementOfList,
-            message,
-            inefficient_call_range,
-        )
-        .with_severity(Severity::Warning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes)),
-    )
+    )])
 }
 
-fn make_diagnostic_pat(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-) -> Option<Diagnostic> {
-    sensibility_check(sema, original_file_id, matched)?;
-    let file_id = matched.range.file_id;
+fn make_fix_pat(sema: &Semantic, file_id: FileId, matched: &Match) -> Option<Vec<Assist>> {
     let inefficient_call_range = matched.range.range;
     let list_arg = matched.placeholder_text(sema, LIST_VAR)?;
     let last_elem_binding = matched.placeholder_text(sema, LAST_ELEM_VAR)?;
-    let message = "Unnecessary intermediate reverse list allocated.".to_string();
     let mut builder = SourceChangeBuilder::new(file_id);
     let efficient_last = format!("{last_elem_binding} = lists:last({list_arg})");
     builder.replace(inefficient_call_range, efficient_last);
-    let fixes = vec![fix(
+    Some(vec![fix(
         "unnecessary_reversal_to_find_last_element_of_list",
         "Rewrite to use lists:last/1",
         builder.finish(),
         inefficient_call_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::UnnecessaryReversalToFindLastElementOfList,
-            message,
-            inefficient_call_range,
-        )
-        .with_severity(Severity::Warning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes))
-        .add_categories([Category::SimplificationRule]),
-    )
-}
-
-fn sensibility_check(sema: &Semantic<'_>, original_file_id: FileId, matched: &Match) -> Option<()> {
-    if let Some(comments) = matched.comments(sema) {
-        // Avoid clobbering comments in the original source code
-        if !comments.is_empty() {
-            return None;
-        }
-    }
-    if matched.range.file_id != original_file_id {
-        // We've somehow ended up with a match in a different file - this means we've
-        // accidentally expanded a macro from a different file, or some other complex case that
-        // gets hairy, so bail out.
-        return None;
-    }
-    Some(())
+    )])
 }
 
 #[cfg(test)]

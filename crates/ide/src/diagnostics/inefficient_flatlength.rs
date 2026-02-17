@@ -16,95 +16,84 @@ use elp_ide_db::DiagnosticCode;
 use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
-use elp_ide_ssr::match_pattern_in_file_functions;
 use hir::Semantic;
-use hir::fold::MacroStrategy;
-use hir::fold::ParenStrategy;
-use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticConditions;
-use crate::diagnostics::DiagnosticDescriptor;
+use crate::Assist;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
+use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: false,
-        include_tests: true,
-        default_disabled: false,
-    },
-    checker: &|acc, sema, file_id, _ext| {
-        inefficient_flatlength_ssr(acc, sema, file_id);
-    },
-};
+pub(crate) struct InefficientFlatlengthLinter;
 
-static LIST_ARG_VAR: &str = "_@List";
+impl Linter for InefficientFlatlengthLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::UnnecessaryFlatteningToFindFlatLength
+    }
 
-fn inefficient_flatlength_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::Expand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: length(lists:flatten({LIST_ARG_VAR})).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(diagnostic) = make_diagnostic(sema, file_id, m) {
-            diags.push(diagnostic);
+    fn description(&self) -> &'static str {
+        "Unnecessary intermediate flat-list allocated."
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::WeakWarning
+    }
+}
+
+impl SsrPatternsLinter for InefficientFlatlengthLinter {
+    type Context = ();
+
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> =
+                vec![(format!("ssr: length(lists:flatten({LIST_ARG_VAR}))."), ()),];
         }
-    });
-}
+        &PATTERNS
+    }
 
-fn make_diagnostic(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-) -> Option<Diagnostic> {
-    sensibility_check(sema, original_file_id, matched)?;
-    let file_id = matched.range.file_id;
-    let inefficient_call_range = matched.range.range;
-    let nested_list_arg_match_src = matched.placeholder_text(sema, LIST_ARG_VAR)?;
-    let message = "Unnecessary intermediate flat-list allocated.".to_string();
-    let mut builder = SourceChangeBuilder::new(file_id);
-    let efficient_flatlength = format!("lists:flatlength({nested_list_arg_match_src})");
-    builder.replace(inefficient_call_range, efficient_flatlength);
-    let fixes = vec![fix(
-        "unnecessary_flattening_to_find_flat_length",
-        "Rewrite to use lists:flatlength/1",
-        builder.finish(),
-        inefficient_call_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::UnnecessaryFlatteningToFindFlatLength,
-            message,
-            inefficient_call_range,
-        )
-        .with_severity(Severity::WeakWarning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes)),
-    )
-}
-
-fn sensibility_check(sema: &Semantic<'_>, original_file_id: FileId, matched: &Match) -> Option<()> {
-    if let Some(comments) = matched.comments(sema) {
-        // Avoid clobbering comments in the original source code
-        if !comments.is_empty() {
+    fn is_match_valid(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if let Some(comments) = matched.comments(sema)
+            && !comments.is_empty()
+        {
             return None;
         }
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        Some(true)
     }
-    if matched.range.file_id != original_file_id {
-        // We've somehow ended up with a match in a different file - this means we've
-        // accidentally expanded a macro from a different file, or some other complex case that
-        // gets hairy, so bail out.
-        return None;
+
+    fn fixes(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        let inefficient_call_range = matched.range.range;
+        let nested_list_arg_match_src = matched.placeholder_text(sema, LIST_ARG_VAR)?;
+        let mut builder = SourceChangeBuilder::new(file_id);
+        let efficient_flatlength = format!("lists:flatlength({nested_list_arg_match_src})");
+        builder.replace(inefficient_call_range, efficient_flatlength);
+        Some(vec![fix(
+            "unnecessary_flattening_to_find_flat_length",
+            "Rewrite to use lists:flatlength/1",
+            builder.finish(),
+            inefficient_call_range,
+        )])
     }
-    Some(())
 }
+
+pub(crate) static LINTER: InefficientFlatlengthLinter = InefficientFlatlengthLinter;
+
+static LIST_ARG_VAR: &str = "_@List";
 
 #[cfg(test)]
 mod tests {
