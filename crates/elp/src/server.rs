@@ -122,6 +122,7 @@ mod capabilities;
 mod dispatch;
 mod logger;
 mod progress;
+mod server_telemetry;
 pub mod setup;
 mod telemetry_manager;
 
@@ -1466,13 +1467,13 @@ impl Server {
 
         let watch_count = folders.watch.len();
         let buck_query_config = self.reload_manager.lock().get_query_config();
-        let data = serde_json::json!({
-            "app_count": project_apps.all_apps.len(),
-            "project_count": projects.len(),
-            "watch_count": watch_count,
-            "query_config": buck_query_config.to_string(),
-        });
-        telemetry::send("project_size".to_string(), data);
+
+        server_telemetry::send_project_size(
+            &project_apps,
+            &projects,
+            watch_count,
+            buck_query_config,
+        );
 
         let register_options = lsp_types::DidChangeWatchedFilesRegistrationOptions {
             watchers: folders.watch,

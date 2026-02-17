@@ -12,8 +12,10 @@ use std::cmp;
 
 use elp_ide::elp_ide_db::elp_base_db::FileSetConfig;
 use elp_ide::elp_ide_db::elp_base_db::ProjectApps;
+use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_ide::elp_ide_db::elp_base_db::VfsPath;
 use elp_ide::elp_ide_db::elp_base_db::loader;
+use elp_project_model::ProjectAppData;
 use fxhash::FxHashSet;
 use vfs::AbsPathBuf;
 
@@ -22,6 +24,34 @@ pub struct ProjectFolders {
     pub load: Vec<loader::Entry>,
     pub watch: Vec<lsp_types::FileSystemWatcher>,
     pub file_set_config: FileSetConfig,
+}
+
+pub fn watch_paths_for_app(
+    app: &ProjectAppData,
+    project_id: ProjectId,
+    otp_project_id: Option<ProjectId>,
+) -> Vec<String> {
+    let mut paths = Vec::new();
+    for root in app.all_dirs_to_watch() {
+        if Some(project_id) != otp_project_id {
+            paths.push(format!("{root}/**/*.{{e,h}}rl"));
+        }
+    }
+    for file in app.all_files_to_watch() {
+        paths.push(file.to_string());
+    }
+    paths
+}
+
+pub fn project_root_watch_paths(root: &AbsPathBuf) -> Vec<String> {
+    vec![
+        format!("{}/**/BUCK", root),
+        format!("{}/**/TARGETS", root),
+        format!("{}/**/TARGETS.v2", root),
+        format!("{}/**/.elp.toml", root),
+        format!("{}/**/.elp_lint.toml", root),
+        format!("{}/**/rebar.{{config,config.script,lock}}", root),
+    ]
 }
 
 impl ProjectFolders {
@@ -47,35 +77,17 @@ impl ProjectFolders {
 
         let load = loader_config(project_apps);
 
+        let otp_project_id = project_apps.otp_project_id;
+
         let mut watch_paths: FxHashSet<_> = project_apps
             .all_apps
             .iter()
-            .flat_map(|(project_id, app)| {
-                let mut paths = Vec::new();
-                // Add all_dirs_to_watch() with project_id check and glob
-                for root in app.all_dirs_to_watch() {
-                    if Some(*project_id) != project_apps.otp_project_id {
-                        paths.push(format!("{root}/**/*.{{e,h}}rl"));
-                    }
-                }
-                // Add all_files_to_watch() directly, no project_id check or glob
-                for file in app.all_files_to_watch() {
-                    paths.push(file.to_string());
-                }
-                paths
-            })
+            .flat_map(|(project_id, app)| watch_paths_for_app(app, *project_id, otp_project_id))
             .collect();
 
         for project in &project_apps.projects {
             let root = project.root();
-            watch_paths.extend(vec![
-                format!("{}/**/BUCK", root),
-                format!("{}/**/TARGETS", root),
-                format!("{}/**/TARGETS.v2", root),
-                format!("{}/**/.elp.toml", root),
-                format!("{}/**/.elp_lint.toml", root),
-                format!("{}/**/rebar.{{config,config.script,lock}}", root),
-            ]);
+            watch_paths.extend(project_root_watch_paths(&root));
         }
 
         // LSP spec says "If omitted it defaults to
