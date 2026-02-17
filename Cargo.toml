@@ -68,7 +68,6 @@ itertools = "0.10.5"
 jemalloc-ctl = { version = "0.5.0", package = "tikv-jemalloc-ctl" }
 jemallocator = { version = "0.5.4", package = "tikv-jemallocator" }
 jod-thread = "0.1.2"
-krates = "0.12.6"
 la-arena = "0.3.1"
 lazy_static = "1.5.0"
 log = "0.4.22"
