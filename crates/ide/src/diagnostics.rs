@@ -1613,7 +1613,6 @@ pub fn diagnostics_descriptors<'a>() -> Vec<&'a DiagnosticDescriptor<'a>> {
         &mutable_variable::DESCRIPTOR,
         &effect_free_statement::DESCRIPTOR,
         &simplify_negation::DESCRIPTOR,
-        &map_insertion_to_syntax::DESCRIPTOR,
         &nonstandard_integer_formatting::DESCRIPTOR,
         &expression_can_be_simplified::DESCRIPTOR,
         &application_env::DESCRIPTOR,
@@ -1736,6 +1735,8 @@ const SSR_PATTERN_LINTERS: &[&dyn SsrPatternsDiagnostics] = &[
     &inefficient_last::LINTER,
     &inefficient_flatlength::LINTER,
     &map_find_to_syntax::LINTER,
+    &map_insertion_to_syntax::MAP_PUT_LINTER,
+    &map_insertion_to_syntax::MAP_UPDATE_LINTER,
 ];
 
 /// Generic linters

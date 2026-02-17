@@ -19,145 +19,186 @@ use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
 use elp_ide_ssr::is_placeholder_a_var_from_sema_and_match;
-use elp_ide_ssr::match_pattern_in_file_functions;
 use hir::Semantic;
+use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
-use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
+use crate::Assist;
 use crate::diagnostics::Category;
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticConditions;
-use crate::diagnostics::DiagnosticDescriptor;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
+use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
-
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: false,
-        include_tests: true,
-        default_disabled: false,
-    },
-    checker: &|acc, sema, file_id, _ext| {
-        map_put_to_syntax_ssr(acc, sema, file_id);
-        map_update_to_syntax_ssr(acc, sema, file_id);
-    },
-};
 
 static KEY_VAR: &str = "_@Key";
 static VALUE_VAR: &str = "_@Value";
 static MAP_VAR: &str = "_@Map";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum MapInsertionFunction {
-    Put,
-    Update,
-}
+// ---------- maps:put ----------
 
-impl MapInsertionFunction {
-    pub fn to_fix_id(&self) -> &'static str {
-        match self {
-            MapInsertionFunction::Put => "maps_put_function_rather_than_syntax",
-            MapInsertionFunction::Update => "maps_update_function_rather_than_syntax",
-        }
+pub(crate) struct MapPutToSyntaxLinter;
+
+impl Linter for MapPutToSyntaxLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::MapsPutFunctionRatherThanSyntax
     }
-    pub fn to_fix_label(&self) -> &'static str {
-        match self {
-            MapInsertionFunction::Put => "Rewrite to use map put syntax",
-            MapInsertionFunction::Update => "Rewrite to use map update syntax",
-        }
+
+    fn description(&self) -> &'static str {
+        "Consider using map syntax rather than a function call."
     }
-    pub fn to_code(&self) -> DiagnosticCode {
-        match self {
-            MapInsertionFunction::Put => DiagnosticCode::MapsPutFunctionRatherThanSyntax,
-            MapInsertionFunction::Update => DiagnosticCode::MapsUpdateFunctionRatherThanSyntax,
-        }
-    }
-    pub fn to_replacement_str(&self, sema: &Semantic, m: &Match) -> Option<String> {
-        let map = m.placeholder_text(sema, MAP_VAR)?;
-        let key = m.placeholder_text(sema, KEY_VAR)?;
-        let value = m.placeholder_text(sema, VALUE_VAR)?;
-        Some(match self {
-            MapInsertionFunction::Put => format!("{map}#{{{key} => {value}}}",),
-            MapInsertionFunction::Update => format!("{map}#{{{key} := {value}}}"),
-        })
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::WeakWarning
     }
 }
 
-fn map_put_to_syntax_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let matches = match_pattern_in_file_functions(
-        sema,
+impl SsrPatternsLinter for MapPutToSyntaxLinter {
+    type Context = ();
+
+    fn strategy(&self) -> Strategy {
         Strategy {
             macros: MacroStrategy::DoNotExpand,
             parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: maps:put({KEY_VAR},{VALUE_VAR},{MAP_VAR}).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(map_match) = m.get_placeholder_match(sema, MAP_VAR)
-            && is_placeholder_a_var_from_sema_and_match(sema, m, &map_match)
-            && let Some(diagnostic) = make_diagnostic(sema, file_id, m, MapInsertionFunction::Put)
-        {
-            diags.push(diagnostic)
         }
-    });
+    }
+
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> = vec![(
+                format!("ssr: maps:put({KEY_VAR},{VALUE_VAR},{MAP_VAR})."),
+                (),
+            )];
+        }
+        &PATTERNS
+    }
+
+    fn is_match_valid(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        let map_match = matched.get_placeholder_match(sema, MAP_VAR)?;
+        Some(is_placeholder_a_var_from_sema_and_match(
+            sema, matched, &map_match,
+        ))
+    }
+
+    fn fixes(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        let range = matched.range.range;
+        let map = matched.placeholder_text(sema, MAP_VAR)?;
+        let key = matched.placeholder_text(sema, KEY_VAR)?;
+        let value = matched.placeholder_text(sema, VALUE_VAR)?;
+        let mut builder = SourceChangeBuilder::new(file_id);
+        builder.replace(range, format!("{map}#{{{key} => {value}}}"));
+        Some(vec![fix(
+            "maps_put_function_rather_than_syntax",
+            "Rewrite to use map put syntax",
+            builder.finish(),
+            range,
+        )])
+    }
+
+    fn add_categories(&self, _context: &Self::Context) -> Vec<Category> {
+        vec![Category::SimplificationRule]
+    }
 }
 
-fn map_update_to_syntax_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    let matches = match_pattern_in_file_functions(
-        sema,
+pub(crate) static MAP_PUT_LINTER: MapPutToSyntaxLinter = MapPutToSyntaxLinter;
+
+// ---------- maps:update ----------
+
+pub(crate) struct MapUpdateToSyntaxLinter;
+
+impl Linter for MapUpdateToSyntaxLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::MapsUpdateFunctionRatherThanSyntax
+    }
+
+    fn description(&self) -> &'static str {
+        "Consider using map syntax rather than a function call."
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::WeakWarning
+    }
+}
+
+impl SsrPatternsLinter for MapUpdateToSyntaxLinter {
+    type Context = ();
+
+    fn strategy(&self) -> Strategy {
         Strategy {
             macros: MacroStrategy::DoNotExpand,
             parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        format!("ssr: maps:update({KEY_VAR},{VALUE_VAR},{MAP_VAR}).").as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        if let Some(map_match) = m.get_placeholder_match(sema, MAP_VAR)
-            && is_placeholder_a_var_from_sema_and_match(sema, m, &map_match)
-            && let Some(diagnostic) =
-                make_diagnostic(sema, file_id, m, MapInsertionFunction::Update)
-        {
-            diags.push(diagnostic)
         }
-    });
+    }
+
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> = vec![(
+                format!("ssr: maps:update({KEY_VAR},{VALUE_VAR},{MAP_VAR})."),
+                (),
+            )];
+        }
+        &PATTERNS
+    }
+
+    fn is_match_valid(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        let map_match = matched.get_placeholder_match(sema, MAP_VAR)?;
+        Some(is_placeholder_a_var_from_sema_and_match(
+            sema, matched, &map_match,
+        ))
+    }
+
+    fn fixes(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        let range = matched.range.range;
+        let map = matched.placeholder_text(sema, MAP_VAR)?;
+        let key = matched.placeholder_text(sema, KEY_VAR)?;
+        let value = matched.placeholder_text(sema, VALUE_VAR)?;
+        let mut builder = SourceChangeBuilder::new(file_id);
+        builder.replace(range, format!("{map}#{{{key} := {value}}}"));
+        Some(vec![fix(
+            "maps_update_function_rather_than_syntax",
+            "Rewrite to use map update syntax",
+            builder.finish(),
+            range,
+        )])
+    }
+
+    fn add_categories(&self, _context: &Self::Context) -> Vec<Category> {
+        vec![Category::SimplificationRule]
+    }
 }
 
-fn make_diagnostic(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-    op: MapInsertionFunction,
-) -> Option<Diagnostic> {
-    let file_id = matched.range.file_id;
-    if file_id != original_file_id {
-        // We've somehow ended up with a match in a different file - this means we've
-        // accidentally expanded a macro from a different file, or some other complex case that
-        // gets hairy, so bail out.
-        return None;
-    }
-    let map_function_call_range = matched.range.range;
-    let message = "Consider using map syntax rather than a function call.".to_string();
-    let mut builder = SourceChangeBuilder::new(file_id);
-    let map_syntax = op.to_replacement_str(sema, matched)?;
-    builder.replace(map_function_call_range, map_syntax);
-    let fixes = vec![fix(
-        op.to_fix_id(),
-        op.to_fix_label(),
-        builder.finish(),
-        map_function_call_range,
-    )];
-    Some(
-        Diagnostic::new(op.to_code(), message, map_function_call_range)
-            .with_severity(Severity::WeakWarning)
-            .with_ignore_fix(sema, file_id)
-            .with_fixes(Some(fixes))
-            .add_categories([Category::SimplificationRule]),
-    )
-}
+pub(crate) static MAP_UPDATE_LINTER: MapUpdateToSyntaxLinter = MapUpdateToSyntaxLinter;
 
 #[cfg(test)]
 mod tests {
