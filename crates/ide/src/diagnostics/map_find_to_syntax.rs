@@ -38,170 +38,222 @@ use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_ssr::Match;
 use elp_ide_ssr::PlaceholderMatch;
 use elp_ide_ssr::SubId;
-use elp_ide_ssr::match_pattern_in_file_functions;
 use hir::AnyExprId;
 use hir::Body;
 use hir::Expr;
 use hir::Pat;
 use hir::Semantic;
+use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
-use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticConditions;
-use crate::diagnostics::DiagnosticDescriptor;
+use crate::Assist;
+use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
+use crate::diagnostics::SsrPatternsLinter;
 use crate::fix;
 
-pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
-    conditions: DiagnosticConditions {
-        experimental: false,
-        include_generated: false,
-        include_tests: true,
-        default_disabled: false,
-    },
-    checker: &|diags, sema, file_id, _ext| {
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
-                    error -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    error -> {NOT_FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
-                    error -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    error -> {NOT_FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
-                    _ -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
-                    error -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
-                    error -> {NOT_FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    error -> {NOT_FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
-                    _ -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
-                    _ -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
-                    {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
-                    error -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-        from_ssr(
-            diags,
-            sema,
-            file_id,
-            format!(
-                "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
-                    {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
-                    _ -> {NOT_FOUND_BODY_VAR}
-                  end."
-            ),
-        );
-    },
-};
+pub(crate) struct MapFindToSyntaxLinter;
+
+impl Linter for MapFindToSyntaxLinter {
+    fn id(&self) -> DiagnosticCode {
+        DiagnosticCode::MapsFindFunctionRatherThanSyntax
+    }
+
+    fn description(&self) -> &'static str {
+        "Unnecessary allocation of result tuple when the key is found."
+    }
+
+    fn severity(&self, _sema: &Semantic, _file_id: FileId) -> Severity {
+        Severity::Warning
+    }
+}
+
+impl SsrPatternsLinter for MapFindToSyntaxLinter {
+    type Context = ();
+
+    fn strategy(&self) -> Strategy {
+        Strategy {
+            macros: MacroStrategy::DoNotExpand,
+            parens: ParenStrategy::InvisibleParens,
+        }
+    }
+
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> = vec![
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
+                            error -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            error -> {NOT_FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
+                            error -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            error -> {NOT_FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
+                            _ -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
+                            error -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
+                            error -> {NOT_FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            error -> {NOT_FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} -> {FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
+                            _ -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
+                            _ -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
+                            {{ok, {VALUE_VAR2}}} -> {FOUND_BODY_VAR2};
+                            error -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case maps:find({KEY_VAR},{MAP_VAR}) of
+                            {{ok, {VALUE_VAR}}} when {VALUE_GUARD_VAR} -> {FOUND_BODY_VAR};
+                            _ -> {NOT_FOUND_BODY_VAR}
+                          end."
+                    ),
+                    (),
+                ),
+            ];
+        }
+        &PATTERNS
+    }
+
+    fn is_match_valid(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<bool> {
+        if let Some(comments) = matched.comments(sema)
+            && !comments.is_empty()
+        {
+            return None;
+        }
+        if matched.range.file_id != file_id {
+            return None;
+        }
+        let key = matched.get_placeholder_match(sema, KEY_VAR)?;
+        let value = matched.get_placeholder_match(sema, VALUE_VAR)?;
+        let maybe_value2 = matched.get_placeholder_match(sema, VALUE_VAR2);
+        let body_arc = matched.matched_node_body.get_body(sema)?;
+        let body = body_arc.as_ref();
+        if !is_match_valid_pat(body, key) || !is_match_valid_pat(body, value) {
+            return Some(false);
+        }
+        if let Some(value2) = maybe_value2
+            && !is_match_valid_pat(body, value2)
+        {
+            return Some(false);
+        }
+        Some(true)
+    }
+
+    fn fixes(
+        &self,
+        _context: &Self::Context,
+        matched: &Match,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<Vec<Assist>> {
+        let old_query_range = matched.range.range;
+        let mut builder = SourceChangeBuilder::new(file_id);
+        let map_syntax_replacement = get_map_syntax_replacement(sema, matched)?;
+        builder.replace(old_query_range, map_syntax_replacement);
+        Some(vec![fix(
+            "maps_find_rather_than_syntax",
+            "Rewrite to use map query syntax",
+            builder.finish(),
+            old_query_range,
+        )])
+    }
+}
+
+pub(crate) static LINTER: MapFindToSyntaxLinter = MapFindToSyntaxLinter;
 
 static KEY_VAR: &str = "_@Key";
 static VALUE_VAR: &str = "_@Value";
@@ -212,39 +264,6 @@ static NOT_FOUND_BODY_VAR: &str = "_@NotFound";
 
 static VALUE_VAR2: &str = "_@Value2";
 static FOUND_BODY_VAR2: &str = "_@Found2";
-
-fn from_ssr(diags: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId, pattern: String) {
-    let matches = match_pattern_in_file_functions(
-        sema,
-        Strategy {
-            macros: MacroStrategy::DoNotExpand,
-            parens: ParenStrategy::InvisibleParens,
-        },
-        file_id,
-        pattern.as_str(),
-    );
-    matches.matches.iter().for_each(|m| {
-        || -> Option<()> {
-            let key = m.get_placeholder_match(sema, KEY_VAR)?;
-            let value = m.get_placeholder_match(sema, VALUE_VAR)?;
-            let maybe_value2 = m.get_placeholder_match(sema, VALUE_VAR2);
-            let body_arc = m.matched_node_body.get_body(sema)?;
-            let body = body_arc.as_ref();
-            if is_match_valid_pat(body, key) && is_match_valid_pat(body, value) {
-                if let Some(value2) = maybe_value2 {
-                    if is_match_valid_pat(body, value2)
-                        && let Some(diagnostic) = make_diagnostic(sema, file_id, m)
-                    {
-                        diags.push(diagnostic)
-                    }
-                } else if let Some(diagnostic) = make_diagnostic(sema, file_id, m) {
-                    diags.push(diagnostic)
-                }
-            }
-            Some(())
-        }();
-    });
-}
 
 fn is_match_valid_pat(body: &Body, matched: PlaceholderMatch) -> bool {
     match matched.code_id {
@@ -287,60 +306,12 @@ fn is_pat_valid(body: &Body, pat: Pat) -> bool {
     }
 }
 
-fn make_diagnostic(
-    sema: &Semantic,
-    original_file_id: FileId,
-    matched: &Match,
-) -> Option<Diagnostic> {
-    if let Some(comments) = matched.comments(sema) {
-        // Avoid clobbering comments in the original source code
-        if !comments.is_empty() {
-            return None;
-        }
-    }
-    let file_id = matched.range.file_id;
-    if file_id != original_file_id {
-        // We've somehow ended up with a match in a different file - this means we've
-        // accidentally expanded a macro from a different file, or some other complex case that
-        // gets hairy, so bail out.
-        return None;
-    }
-    let old_query_range = matched.range.range;
-    let message = "Unnecessary allocation of result tuple when the key is found.".to_string();
-    let mut builder = SourceChangeBuilder::new(file_id);
-    let map_syntax_replacement = get_map_syntax_replacement(sema, matched)?;
-    builder.replace(old_query_range, map_syntax_replacement);
-    let fixes = vec![fix(
-        "maps_find_rather_than_syntax",
-        "Rewrite to use map query syntax",
-        builder.finish(),
-        old_query_range,
-    )];
-    Some(
-        Diagnostic::new(
-            DiagnosticCode::MapsFindFunctionRatherThanSyntax,
-            message,
-            old_query_range,
-        )
-        .with_severity(Severity::Warning)
-        .with_ignore_fix(sema, file_id)
-        .with_fixes(Some(fixes)),
-    )
-}
-
 fn get_map_syntax_replacement(sema: &Semantic, m: &Match) -> Option<String> {
     let key = m.placeholder_text(sema, KEY_VAR)?;
     let map = m.placeholder_text(sema, MAP_VAR)?;
     let val = m.placeholder_text(sema, VALUE_VAR)?;
     let found = m.placeholder_text(sema, FOUND_BODY_VAR)?;
     let not_found = m.placeholder_text(sema, NOT_FOUND_BODY_VAR)?;
-
-    if let Some(comments) = m.comments(sema) {
-        // Avoid clobbering comments in the original source code
-        if !comments.is_empty() {
-            return None;
-        }
-    }
 
     if let Some(val2) = m.placeholder_text(sema, VALUE_VAR2) {
         let found2 = m.placeholder_text(sema, FOUND_BODY_VAR2)?;
@@ -387,7 +358,6 @@ fn get_map_syntax_replacement(sema: &Semantic, m: &Match) -> Option<String> {
         ))
     }
 }
-
 #[cfg(test)]
 mod tests {
 
