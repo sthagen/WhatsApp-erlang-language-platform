@@ -17,6 +17,7 @@ use elp_ide_db::DiagnosticCode;
 use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use hir::Semantic;
+use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
 use crate::diagnostics::SsrPatternsLinter;
@@ -37,8 +38,12 @@ impl Linter for ListsReverseAppendLinter {
 impl SsrPatternsLinter for ListsReverseAppendLinter {
     type Context = ();
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![(format!("ssr: lists:reverse({LIST_VAR}) ++ {TAIL_VAR}."), ())]
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> =
+                vec![(format!("ssr: lists:reverse({LIST_VAR}) ++ {TAIL_VAR}."), ()),];
+        }
+        &PATTERNS
     }
 
     fn fixes(

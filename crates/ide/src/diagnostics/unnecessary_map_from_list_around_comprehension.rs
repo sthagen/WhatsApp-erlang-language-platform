@@ -19,6 +19,7 @@ use hir::Semantic;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 use hir::fold::Strategy;
+use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
@@ -57,57 +58,60 @@ impl SsrPatternsLinter for UnnecessaryMapFromListAroundComprehensionLinter {
         }
     }
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}])."
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, GeneratorStrictness)> = vec![
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}])."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}, {COND1_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}, {COND1_VAR}])."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}])."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}, {COND3_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}, {COND3_VAR}])."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}])."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}, {COND1_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}, {COND1_VAR}])."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}])."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-            (
-                format!(
-                    "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}, {COND3_VAR}])."
+                (
+                    format!(
+                        "ssr: maps:from_list([{{{KEY_VAR},{VALUE_VAR}}} || {BINDING_VAR} <:- {GENERATOR_VAR}, {COND1_VAR}, {COND2_VAR}, {COND3_VAR}])."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-        ]
+            ];
+        }
+        &PATTERNS
     }
 
     fn is_match_valid(

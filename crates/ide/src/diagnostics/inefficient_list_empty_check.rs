@@ -25,6 +25,7 @@ use elp_ide_db::DiagnosticCode;
 use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use hir::Semantic;
+use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
@@ -50,63 +51,66 @@ impl Linter for InefficientListEmptyCheckLinter {
 impl SsrPatternsLinter for InefficientListEmptyCheckLinter {
     type Context = ();
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) of 0 -> {EMPTY_VAR}; _ -> {NON_EMPTY_VAR} end."
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> = vec![
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) of 0 -> {EMPTY_VAR}; _ -> {NON_EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) =:= 0 of true -> {EMPTY_VAR}; false -> {NON_EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) =:= 0 of true -> {EMPTY_VAR}; false -> {NON_EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) =:= 0 of true -> {EMPTY_VAR}; _ -> {NON_EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) =:= 0 of true -> {EMPTY_VAR}; _ -> {NON_EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) =/= 0 of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) =/= 0 of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) =/= 0 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) =/= 0 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) > 0 of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) > 0 of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) > 0 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) > 0 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) >= 1 of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) >= 1 of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case length({LIST_VAR}) >= 1 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                (
+                    format!(
+                        "ssr: case length({LIST_VAR}) >= 1 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-        ]
+            ];
+        }
+        &PATTERNS
     }
 
     fn fixes(

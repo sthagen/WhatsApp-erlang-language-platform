@@ -19,6 +19,7 @@ use hir::fold::ParenStrategy;
 use hir::quote::escape_and_quote_atom;
 use hir::quote::escape_and_quote_binary_string;
 use hir::quote::escape_and_quote_string;
+use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
@@ -62,37 +63,40 @@ pub(crate) struct StringRewrite {
 impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
     type Context = StringRewrite;
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![
-            (
-                format!("ssr: list_to_binary({STRING_VAR})."),
-                StringRewrite {
-                    from: StringKind::List,
-                    to: StringKind::Binary,
-                },
-            ),
-            (
-                format!("ssr: list_to_atom({STRING_VAR})."),
-                StringRewrite {
-                    from: StringKind::List,
-                    to: StringKind::Atom,
-                },
-            ),
-            (
-                format!("ssr: atom_to_list({STRING_VAR})."),
-                StringRewrite {
-                    from: StringKind::Atom,
-                    to: StringKind::List,
-                },
-            ),
-            (
-                format!("ssr: atom_to_binary({STRING_VAR})."),
-                StringRewrite {
-                    from: StringKind::Atom,
-                    to: StringKind::Binary,
-                },
-            ),
-        ]
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, StringRewrite)> = vec![
+                (
+                    format!("ssr: list_to_binary({STRING_VAR})."),
+                    StringRewrite {
+                        from: StringKind::List,
+                        to: StringKind::Binary,
+                    },
+                ),
+                (
+                    format!("ssr: list_to_atom({STRING_VAR})."),
+                    StringRewrite {
+                        from: StringKind::List,
+                        to: StringKind::Atom,
+                    },
+                ),
+                (
+                    format!("ssr: atom_to_list({STRING_VAR})."),
+                    StringRewrite {
+                        from: StringKind::Atom,
+                        to: StringKind::List,
+                    },
+                ),
+                (
+                    format!("ssr: atom_to_binary({STRING_VAR})."),
+                    StringRewrite {
+                        from: StringKind::Atom,
+                        to: StringKind::Binary,
+                    },
+                ),
+            ];
+        }
+        &PATTERNS
     }
 
     fn pattern_description(&self, context: &Self::Context) -> &'static str {

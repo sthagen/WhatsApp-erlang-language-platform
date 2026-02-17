@@ -747,11 +747,11 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
 /// A trait that simplifies writing linters using SSR patterns
 pub(crate) trait SsrPatternsLinter: Linter {
     /// Associated type for the pattern enum - each linter defines its own
-    type Context: Clone + fmt::Debug + PartialEq;
+    type Context: Clone + fmt::Debug + PartialEq + 'static;
 
     /// Specify the SSR patterns to match
     /// Use the `Context`` to distinguish between each variant
-    fn patterns(&self) -> Vec<(String, Self::Context)>;
+    fn patterns(&self) -> &'static [(String, Self::Context)];
 
     /// Customize the description based on each matched pattern.
     /// If implemented, it overrides the value of the `description()`.
@@ -838,12 +838,12 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
         for (pattern, context) in self.patterns() {
             let strategy = self.strategy();
             let scope = self.scope(file_id);
-            let matches = match_pattern(sema, strategy, &pattern, scope);
+            let matches = match_pattern(sema, strategy, pattern, scope);
             for matched in &matches.matches {
-                if Some(true) == self.is_match_valid(&context, matched, sema, file_id) {
-                    let message = self.pattern_description(&context);
-                    let fixes = self.fixes(&context, matched, sema, file_id);
-                    let categories = self.add_categories(&context);
+                if Some(true) == self.is_match_valid(context, matched, sema, file_id) {
+                    let message = self.pattern_description(context);
+                    let fixes = self.fixes(context, matched, sema, file_id);
+                    let categories = self.add_categories(context);
                     let range = match self.range(sema, matched) {
                         None => matched.range.range,
                         Some(range) => range,

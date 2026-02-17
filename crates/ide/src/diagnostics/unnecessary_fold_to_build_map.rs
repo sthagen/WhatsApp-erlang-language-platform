@@ -31,6 +31,7 @@ use hir::AnyExprId;
 use hir::Body;
 use hir::Expr;
 use hir::Semantic;
+use lazy_static::lazy_static;
 
 use crate::Assist;
 use crate::diagnostics::Linter;
@@ -63,21 +64,24 @@ pub(crate) enum PatternKind {
 impl SsrPatternsLinter for UnnecessaryFoldToBuildMapLinter {
     type Context = PatternKind;
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![
-            (
-                format!(
-                    "ssr: lists:foldl(fun({{{KEY_VAR},{VALUE_VAR}}}, {ACC_VAR}) -> {ACC_VAR}#{{{KEY_VAR} => {VALUE_VAR}}} end, #{{}}, {LIST_VAR})."
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, PatternKind)> = vec![
+                (
+                    format!(
+                        "ssr: lists:foldl(fun({{{KEY_VAR},{VALUE_VAR}}}, {ACC_VAR}) -> {ACC_VAR}#{{{KEY_VAR} => {VALUE_VAR}}} end, #{{}}, {LIST_VAR})."
+                    ),
+                    PatternKind::FromList,
                 ),
-                PatternKind::FromList,
-            ),
-            (
-                format!(
-                    "ssr: lists:foldl(fun({KEY_VAR}, {ACC_VAR}) -> {ACC_VAR}#{{{KEY_VAR} => {VALUE_VAR}}} end, #{{}}, {LIST_VAR})."
+                (
+                    format!(
+                        "ssr: lists:foldl(fun({KEY_VAR}, {ACC_VAR}) -> {ACC_VAR}#{{{KEY_VAR} => {VALUE_VAR}}} end, #{{}}, {LIST_VAR})."
+                    ),
+                    PatternKind::FromKeys,
                 ),
-                PatternKind::FromKeys,
-            ),
-        ]
+            ];
+        }
+        &PATTERNS
     }
 
     fn pattern_description(&self, context: &Self::Context) -> &'static str {

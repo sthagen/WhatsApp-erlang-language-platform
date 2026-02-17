@@ -21,6 +21,7 @@ use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
+use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
@@ -50,8 +51,12 @@ impl Linter for BinaryStringToSigilLinter {
 impl SsrPatternsLinter for BinaryStringToSigilLinter {
     type Context = ();
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![(format!("ssr: <<{STRING_CONTENT_VAR}>>."), ())]
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> =
+                vec![(format!("ssr: <<{STRING_CONTENT_VAR}>>."), ()),];
+        }
+        &PATTERNS
     }
 
     fn is_match_valid(

@@ -47,6 +47,7 @@ use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
+use lazy_static::lazy_static;
 
 use crate::codemod_helpers::is_wildcard;
 use crate::diagnostics::Linter;
@@ -73,36 +74,39 @@ impl Linter for EtsLookupToLookupElementLinter {
 impl SsrPatternsLinter for EtsLookupToLookupElementLinter {
     type Context = ();
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![
-            (
-                format!(
-                    "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
-                        [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR};
-                        [] -> {DEFAULT_VAR}
-                      end."
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, ())> = vec![
+                (
+                    format!(
+                        "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
+                            [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR};
+                            [] -> {DEFAULT_VAR}
+                          end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
-                        [] -> {DEFAULT_VAR};
-                        [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR}
-                      end."
+                (
+                    format!(
+                        "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
+                            [] -> {DEFAULT_VAR};
+                            [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR}
+                          end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-            (
-                format!(
-                    "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
-                        [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR};
-                        _ -> {DEFAULT_VAR}
-                      end."
+                (
+                    format!(
+                        "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
+                            [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR};
+                            _ -> {DEFAULT_VAR}
+                          end."
+                    ),
+                    (),
                 ),
-                (),
-            ),
-        ]
+            ];
+        }
+        &PATTERNS
     }
 
     fn is_match_valid(

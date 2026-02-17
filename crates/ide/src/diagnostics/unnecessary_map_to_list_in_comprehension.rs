@@ -19,6 +19,7 @@ use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
+use lazy_static::lazy_static;
 
 use crate::diagnostics::Linter;
 use crate::diagnostics::Severity;
@@ -57,57 +58,60 @@ impl SsrPatternsLinter for UnnecessaryMapToListInComprehensionLinter {
         }
     }
 
-    fn patterns(&self) -> Vec<(String, Self::Context)> {
-        vec![
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR})]."
+    fn patterns(&self) -> &'static [(String, Self::Context)] {
+        lazy_static! {
+            static ref PATTERNS: Vec<(String, GeneratorStrictness)> = vec![
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR})]."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR}), {COND1_VAR}]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR}), {COND1_VAR}]."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}]."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}, {COND3_VAR}]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}, {COND3_VAR}]."
+                    ),
+                    GeneratorStrictness::NonStrict,
                 ),
-                GeneratorStrictness::NonStrict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR})]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR})]."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR}), {COND1_VAR}]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR}), {COND1_VAR}]."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}]."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-            (
-                format!(
-                    "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}, {COND3_VAR}]."
+                (
+                    format!(
+                        "ssr: [{BODY_VAR} || {{{KEY_VAR}, {VALUE_VAR}}} <:- maps:to_list({MAP_VAR}), {COND1_VAR}, {COND2_VAR}, {COND3_VAR}]."
+                    ),
+                    GeneratorStrictness::Strict,
                 ),
-                GeneratorStrictness::Strict,
-            ),
-        ]
+            ];
+        }
+        &PATTERNS
     }
 
     fn is_match_valid(
