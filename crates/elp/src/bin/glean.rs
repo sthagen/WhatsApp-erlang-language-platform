@@ -1969,6 +1969,7 @@ mod tests {
     use fxhash::FxHashSet;
 
     use super::*;
+    use crate::test_utils::resource_file;
 
     #[test]
     fn serialization_test_v1() {
@@ -2052,7 +2053,7 @@ mod tests {
 
         write_results(map, module_index, &mut cli, &args).expect("success");
         let (out, err) = cli.to_strings();
-        let expected = expect_file!["../resources/test/glean/serialization_test.out"];
+        let expected = resource_file!("glean/serialization_test.out");
         assert_eq!(expected.data().trim(), &out);
         assert_eq!(err, "")
     }

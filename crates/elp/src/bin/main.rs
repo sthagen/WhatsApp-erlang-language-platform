@@ -44,6 +44,8 @@ mod lint_cli;
 mod reporting;
 mod shell;
 mod ssr_cli;
+#[cfg(test)]
+mod test_utils;
 
 // Use jemalloc as the global allocator when the jemalloc feature is enabled.
 // For Cargo/OSS builds, jemalloc is a default feature.
@@ -276,6 +278,10 @@ mod tests {
         }
     }
 
+    use crate::test_utils::get_resources_dir;
+    use crate::test_utils::project_path;
+    use crate::test_utils::resource_file;
+
     fn elp(args: Vec<OsString>) -> (String, String, i32) {
         let mut cli = Fake::default();
         let args = Args::from(args.as_slice());
@@ -298,7 +304,7 @@ mod tests {
         let (_stdout, stderr, code) = elp(args_vec![
             "parse-all",
             "--project",
-            "../../test/test_projects/standard",
+            project_path("standard"),
             "--to",
             tmp.path(),
         ]);
@@ -316,12 +322,11 @@ mod tests {
 
     fn parse_all_complete(project: &str) -> Result<i32> {
         // Just check the command returns.
-        let project_path = format!("../../test/test_projects/{project}");
         let tmp = Builder::new().prefix("elp_parse_all_").tempdir().unwrap();
         let (_stdout, _stderr, code) = elp(args_vec![
             "parse-all",
             "--project",
-            project_path,
+            project_path(project),
             "--to",
             tmp.path(),
         ]);
@@ -345,10 +350,10 @@ mod tests {
             let (args, path) = add_project(args, project, None, None);
             let fast_str = if fast { "_fast" } else { "" };
             let extension = if json { "jsonl" } else { "pretty" };
-            let exp_path = expect_file!(format!(
-                "../resources/test/{}/eqwalize_{}{}.{}",
+            let exp_path = expect_file!(get_resources_dir().join(format!(
+                "{}/eqwalize_{}{}.{}",
                 project, module, fast_str, extension
-            ));
+            )));
 
             let (stdout, stderr, code) = elp(args);
             match code {
@@ -453,12 +458,12 @@ mod tests {
                             })
                             .unwrap();
 
-                        let exp_path = expect_file!(format!(
-                            "../resources/test/{}/{}/{}.pretty",
+                        let exp_path = expect_file!(get_resources_dir().join(format!(
+                            "{}/{}/{}.pretty",
                             project,
                             app,
                             module.as_str(),
-                        ));
+                        )));
                         let (stdout, _) = cli.to_strings();
 
                         let otp_version = OTP_VERSION.as_ref().expect("MISSING OTP VERSION");
@@ -557,7 +562,7 @@ mod tests {
             simple_snapshot(
                 args_vec!["eqwalize-all", "--format", "json"],
                 "standard",
-                expect_file!("../resources/test/standard/eqwalize_all_diagnostics.jsonl"),
+                resource_file!("standard/eqwalize_all_diagnostics.jsonl"),
                 buck,
                 None,
             );
@@ -571,7 +576,7 @@ mod tests {
             simple_snapshot(
                 args_vec!["eqwalize-all", "--format", "json"],
                 "standard",
-                expect_file!("../resources/test/standard/eqwalize_all_diagnostics_gen.jsonl"),
+                resource_file!("standard/eqwalize_all_diagnostics_gen.jsonl"),
                 buck,
                 None,
             );
@@ -585,7 +590,7 @@ mod tests {
             simple_snapshot(
                 args_vec!["eqwalize-all"],
                 "standard",
-                expect_file!("../resources/test/standard/eqwalize_all_diagnostics.pretty"),
+                resource_file!("standard/eqwalize_all_diagnostics.pretty"),
                 buck,
                 None,
             );
@@ -597,9 +602,9 @@ mod tests {
     fn eqwalize_app_diagnostics_match_snapshot_pretty(buck: bool) {
         if otp_supported_by_eqwalizer() {
             let expected = if buck {
-                expect_file!("../resources/test/standard/eqwalize_app_diagnostics.pretty")
+                resource_file!("standard/eqwalize_app_diagnostics.pretty")
             } else {
-                expect_file!("../resources/test/standard/eqwalize_app_diagnostics_rebar.pretty")
+                resource_file!("standard/eqwalize_app_diagnostics_rebar.pretty")
             };
             simple_snapshot(
                 args_vec!["eqwalize-app", "app_a",],
@@ -617,7 +622,7 @@ mod tests {
             simple_snapshot(
                 args_vec!["eqwalize-target", "//standard:app_a",],
                 "standard",
-                expect_file!("../resources/test/standard/eqwalize_target_diagnostics.pretty"),
+                resource_file!("standard/eqwalize_target_diagnostics.pretty"),
                 true,
                 None,
             );
@@ -628,9 +633,9 @@ mod tests {
     #[test_case(true  ; "buck")]
     fn eqwalize_app_diagnostics_match_snapshot_pretty_gen(buck: bool) {
         let expected = if buck {
-            expect_file!("../resources/test/standard/eqwalize_app_diagnostics_gen.pretty")
+            resource_file!("standard/eqwalize_app_diagnostics_gen.pretty")
         } else {
-            expect_file!("../resources/test/standard/eqwalize_app_diagnostics_gen_rebar.pretty")
+            resource_file!("standard/eqwalize_app_diagnostics_gen_rebar.pretty")
         };
 
         if otp_supported_by_eqwalizer() {
@@ -650,7 +655,7 @@ mod tests {
         simple_snapshot(
             args_vec!["eqwalize", "parse_error_a_cascade",],
             "diagnostics",
-            expect_file!("../resources/test/standard/eqwalize_all_parse_error_cascade.pretty"),
+            resource_file!("standard/eqwalize_all_parse_error_cascade.pretty"),
             buck,
             None,
         );
@@ -662,7 +667,7 @@ mod tests {
         simple_dialyzer_snapshot(
             args_vec!["dialyze-all"],
             "diagnostics",
-            expect_file!("../resources/test/standard/dialyze_all.stdout"),
+            resource_file!("standard/dialyze_all.stdout"),
             0,
         );
     }
@@ -673,7 +678,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp", "--module", "diagnostics",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics1.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics1.stdout"),
             buck,
             None,
         );
@@ -691,7 +696,7 @@ mod tests {
                 "error"
             ],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics_error.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics_error.stdout"),
             buck,
             None,
         );
@@ -703,7 +708,7 @@ mod tests {
         simple_snapshot(
             args_vec!["parse-elp", "--module", "file_attribute",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_elp_file_attribute.stdout"),
+            resource_file!("diagnostics/parse_elp_file_attribute.stdout"),
             buck,
             None,
         );
@@ -715,7 +720,7 @@ mod tests {
         simple_snapshot_with_json_config(
             args_vec!["parse-elp", "--module", "diagnostics",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics1.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics1.stdout"),
             true,
             None,
             Some("test_build_info.json"),
@@ -729,7 +734,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp", "--module", "diagnostics", "--format", "json"],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics_json.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics_json.stdout"),
             buck,
             None,
         );
@@ -741,9 +746,7 @@ mod tests {
         simple_snapshot(
             args_vec!["parse-elp", "--module", "erlang_diagnostics_errors_gen"],
             "diagnostics",
-            expect_file!(
-                "../resources/test/standard/parse_all_diagnostics_exclude_generated.jsonl"
-            ),
+            resource_file!("standard/parse_all_diagnostics_exclude_generated.jsonl"),
             buck,
             None,
         );
@@ -760,9 +763,7 @@ mod tests {
                 "--include-generated"
             ],
             "diagnostics",
-            expect_file!(
-                "../resources/test/standard/parse_all_diagnostics_include_generated.jsonl"
-            ),
+            resource_file!("standard/parse_all_diagnostics_include_generated.jsonl"),
             buck,
             None,
         );
@@ -774,7 +775,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp", "--module", "cascading",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics_cascading.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics_cascading.stdout"),
             buck,
             None,
         );
@@ -786,7 +787,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp", "--module", "syntax",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics_syntax.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics_syntax.stdout"),
             buck,
             None,
         );
@@ -798,7 +799,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics_hrl.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics_hrl.stdout"),
             buck,
             Some("app_a/include/broken_diagnostics.hrl"),
         );
@@ -810,9 +811,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp",],
             "diagnostics",
-            expect_file!(
-                "../resources/test/diagnostics/parse_all_diagnostics_broken_parse_trans.stdout"
-            ),
+            resource_file!("diagnostics/parse_all_diagnostics_broken_parse_trans.stdout"),
             buck,
             Some("app_a/src/broken_parse_trans.erl"),
         );
@@ -824,7 +823,7 @@ mod tests {
         simple_snapshot(
             args_vec!["parse-elp",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_diagnostics_escript.stdout"),
+            resource_file!("diagnostics/parse_all_diagnostics_escript.stdout"),
             buck,
             Some("app_a/src/diagnostics.escript"),
         );
@@ -836,9 +835,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp",],
             "diagnostics",
-            expect_file!(
-                "../resources/test/diagnostics/parse_all_diagnostics_errors_escript.stdout"
-            ),
+            resource_file!("diagnostics/parse_all_diagnostics_errors_escript.stdout"),
             buck,
             Some("app_a/src/diagnostics_errors.escript"),
         );
@@ -850,9 +847,7 @@ mod tests {
         simple_snapshot(
             args_vec!["parse-elp",],
             "diagnostics",
-            expect_file!(
-                "../resources/test/diagnostics/parse_all_diagnostics_warnings_escript.stdout"
-            ),
+            resource_file!("diagnostics/parse_all_diagnostics_warnings_escript.stdout"),
             buck,
             Some("app_a/src/diagnostics_warnings.escript"),
         );
@@ -864,7 +859,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp", "--module", "otp_7655",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_otp_7655.stdout"),
+            resource_file!("diagnostics/parse_all_otp_7655.stdout"),
             buck,
             None,
         );
@@ -876,7 +871,7 @@ mod tests {
         simple_snapshot(
             args_vec!["parse-elp", "--include-generated", "--module", "crlf",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_all_crlf.stdout"),
+            resource_file!("diagnostics/parse_all_crlf.stdout"),
             buck,
             None,
         );
@@ -1269,7 +1264,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["parse-elp", "--module", "app_b"],
             "custom_build_tool",
-            expect_file!("../resources/test/custom_build_tool/parse_elp_custom_build_tool.jsonl"),
+            resource_file!("custom_build_tool/parse_elp_custom_build_tool.jsonl"),
             true,
             None,
         );
@@ -1281,7 +1276,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["lint", "--module", "app_a", "--diagnostic-filter", "P1700",],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint2.stdout"),
+            resource_file!("linter/parse_elp_lint2.stdout"),
             buck,
             None,
         );
@@ -1293,7 +1288,7 @@ mod tests {
         simple_snapshot_expect_error(
             args_vec!["lint", "--app", "app_a", "--diagnostic-filter", "P1700",],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_app.stdout"),
+            resource_file!("linter/parse_elp_lint_app.stdout"),
             buck,
             None,
         );
@@ -1311,7 +1306,7 @@ mod tests {
                 "P1700",
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_app.stdout"),
+            resource_file!("linter/parse_elp_lint_app.stdout"),
             buck,
             None,
         );
@@ -1331,7 +1326,7 @@ mod tests {
                 "W0007",
             ],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/lint_report_suppressed.stdout"),
+            resource_file!("diagnostics/lint_report_suppressed.stdout"),
             buck,
             None,
         );
@@ -1356,12 +1351,12 @@ mod tests {
                 tmp_path,
             ],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_elp_lint_recursive.stdout"),
+            resource_file!("diagnostics/parse_elp_lint_recursive.stdout"),
             0,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[("app_a/src/lint_recursive.erl", "lint_recursive.erl")],
             false,
         )
@@ -1384,12 +1379,12 @@ mod tests {
                 "app_a",
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_ignore_apps.stdout"),
+            resource_file!("linter/parse_elp_lint_ignore_apps.stdout"),
             0,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
         )
@@ -1413,12 +1408,12 @@ mod tests {
                 "app_c",
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_ignore_apps_b.stdout"),
+            resource_file!("linter/parse_elp_lint_ignore_apps_b.stdout"),
             0,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
         )
@@ -1439,12 +1434,12 @@ mod tests {
                 "--read-config"
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_config_output.stdout"),
+            resource_file!("linter/parse_elp_lint_config_output.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
             Some(expect![[r#"
@@ -1459,24 +1454,22 @@ mod tests {
     fn lint_custom_config_file_invalid(buck: bool) {
         let tmp_dir = make_tmp_dir();
         let tmp_path = tmp_dir.path();
+        let project_path = project_path("linter");
+        let project_path = Path::new(&project_path);
+        let config_file_path = project_path.join("does_not_exist.toml");
         check_lint_fix_stderr(
-            args_vec![
-                "lint",
-                "--experimental",
-                "--config-file",
-                "../../test/test_projects/linter/does_not_exist.toml"
-            ],
+            args_vec!["lint", "--experimental", "--config-file", &config_file_path],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_custom_config_invalid_output.stdout"),
+            resource_file!("linter/parse_elp_lint_custom_config_invalid_output.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
             Some(expect![[r#"
-                unable to read "../../test/test_projects/linter/does_not_exist.toml": No such file or directory (os error 2)
+                unable to read "{project_path}/does_not_exist.toml": No such file or directory (os error 2)
             "#]]),
         )
         .expect("bad test");
@@ -1492,15 +1485,15 @@ mod tests {
                 "lint",
                 "--experimental",
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_test1.toml"
+                project_path("linter/elp_lint_test1.toml")
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_custom_config_output.stdout"),
+            resource_file!("linter/parse_elp_lint_custom_config_output.stdout"),
             0,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
             None,
@@ -1513,12 +1506,13 @@ mod tests {
     fn lint_custom_ad_hoc_lints(buck: bool) {
         let tmp_dir = make_tmp_dir();
         let tmp_path = tmp_dir.path();
+        let config_path = project_path("linter/elp_lint_adhoc.toml");
         check_lint_fix(
             args_vec![
                 "lint",
                 "--experimental",
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_adhoc.toml",
+                &config_path,
                 "--module",
                 "app_b",
                 "--apply-fix",
@@ -1527,12 +1521,12 @@ mod tests {
                 tmp_path,
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_adhoc_output.stdout"),
+            resource_file!("linter/parse_elp_lint_adhoc_output.stdout"),
             0,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/from_config"),
+            get_resources_dir().join("lint/from_config").as_path(),
             &[("app_b/src/app_b.erl", "app_b.erl")],
             false,
         )
@@ -1549,10 +1543,10 @@ mod tests {
                 "--diagnostic-ignore",
                 "W0011",
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_test_ignore.toml"
+                project_path("linter/elp_lint_test_ignore.toml")
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_ignore.stdout"),
+            resource_file!("linter/parse_elp_lint_ignore.stdout"),
             buck,
             None,
         );
@@ -1570,7 +1564,7 @@ mod tests {
                 "expression_updates_literal"
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_erlang_service.stdout"),
+            resource_file!("linter/parse_elp_lint_erlang_service.stdout"),
             buck,
             None,
         );
@@ -1584,16 +1578,16 @@ mod tests {
         check_lint_fix_stderr(
             args_vec!["lint", "--experimental", "--read-config"],
             "linter_bad_config",
-            expect_file!("../resources/test/linter/parse_elp_lint_bad_config_output.stdout"),
+            resource_file!("linter/parse_elp_lint_bad_config_output.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            tmp_path,
             &[],
             false,
             Some(expect![[r#"
-                failed to read "../../test/test_projects/linter_bad_config/.elp_lint.toml":TOML parse error at line 6, column 4
+                failed to read "{project_path}/.elp_lint.toml":TOML parse error at line 6, column 4
                   |
                 6 |    syntax error
                   |    ^
@@ -1610,7 +1604,7 @@ mod tests {
         simple_snapshot_expect_error_sorted(
             args_vec!["lint"],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_no_lint_specified_output.stdout"),
+            resource_file!("linter/parse_elp_no_lint_specified_output.stdout"),
             buck,
             None,
         );
@@ -1623,7 +1617,7 @@ mod tests {
             simple_snapshot_expect_error(
                 args_vec!["lint", "--no-stream"],
                 "diagnostics",
-                expect_file!("../resources/test/diagnostics/lint_no_stream.stdout"),
+                resource_file!("diagnostics/lint_no_stream.stdout"),
                 buck,
                 None,
             );
@@ -1636,7 +1630,7 @@ mod tests {
         simple_snapshot_expect_error_sorted(
             args_vec!["lint", "--format", "json"],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_no_lint_specified_json_output.stdout"),
+            resource_file!("linter/parse_elp_no_lint_specified_json_output.stdout"),
             buck,
             None,
         );
@@ -1648,7 +1642,7 @@ mod tests {
         simple_snapshot_expect_stderror(
             args_vec!["lint", "--apply-fix",],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_apply_fix_no_lint_output.stdout"),
+            resource_file!("linter/parse_elp_apply_fix_no_lint_output.stdout"),
             buck,
             None,
             false,
@@ -1664,15 +1658,15 @@ mod tests {
             args_vec![
                 "lint",
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_test2.toml"
+                project_path("linter/elp_lint_test2.toml")
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_explicit_enable_output.stdout"),
+            resource_file!("linter/parse_elp_lint_explicit_enable_output.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
             Some(expect![[r#"
@@ -1697,12 +1691,12 @@ mod tests {
                 "json",
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_json_output.stdout"),
+            resource_file!("linter/parse_elp_lint_json_output.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/lint_recursive"),
+            get_resources_dir().join("lint/lint_recursive").as_path(),
             &[],
             false,
             Some(expect![[r#"
@@ -1729,12 +1723,12 @@ mod tests {
                 "--apply-fix",
             ],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_elp_lint_fix.stdout"),
+            resource_file!("diagnostics/parse_elp_lint_fix.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/head_mismatch"),
+            get_resources_dir().join("lint/head_mismatch").as_path(),
             &[("app_a/src/lints.erl", "lints.erl")],
             false,
             Some(expect![[r#"
@@ -1763,12 +1757,12 @@ mod tests {
                 "--apply-fix"
             ],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_elp_lint_fix_json.stdout"),
+            resource_file!("diagnostics/parse_elp_lint_fix_json.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/head_mismatch"),
+            get_resources_dir().join("lint/head_mismatch").as_path(),
             &[("app_a/src/lints.erl", "lints.erl")],
             false,
             Some(expect![[r#"
@@ -1805,12 +1799,12 @@ mod tests {
                 "--apply-fix",
             ],
             project,
-            expect_file!("../resources/test/diagnostics/parse_elp_lint_fix.stdout"),
+            resource_file!("diagnostics/parse_elp_lint_fix.stdout"),
             101,
             buck,
             None,
             Path::new(&project_path(project)),
-            Path::new("../resources/test/lint/head_mismatch"),
+            get_resources_dir().join("lint/head_mismatch").as_path(),
             &[("app_a/src/lints.erl", "app_a/src/lints.erl")],
             true,
             Some(expect![[r#"
@@ -1838,12 +1832,12 @@ mod tests {
                 "--ignore-fix-only",
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_fix_ignore.stdout"),
+            resource_file!("linter/parse_elp_lint_fix_ignore.stdout"),
             0,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/ignore_app_env"),
+            get_resources_dir().join("lint/ignore_app_env").as_path(),
             &[("app_b/src/app_b.erl", "app_b.erl")],
             false,
         )
@@ -1868,12 +1862,12 @@ mod tests {
                 "--ignore-fix-only",
             ],
             "linter",
-            expect_file!("../resources/test/linter/parse_elp_lint_fixme_spelling.stdout"),
+            resource_file!("linter/parse_elp_lint_fixme_spelling.stdout"),
             101,
             buck,
             None,
             tmp_path,
-            Path::new("../resources/test/lint/ignore_app_env"),
+            get_resources_dir().join("lint/ignore_app_env").as_path(),
             &[("app_a/src/spelling.erl", "spelling.erl")],
             false,
             Some(expect![[r#"
@@ -1889,7 +1883,7 @@ mod tests {
         simple_snapshot_expect_stderror(
             args_vec!["lint", "--module", "app_a", "--diagnostic-filter", "L1500",],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_elp_l1500_deprecated.stdout"),
+            resource_file!("diagnostics/parse_elp_l1500_deprecated.stdout"),
             buck,
             None,
             false,
@@ -1907,7 +1901,7 @@ mod tests {
                 "O0039"
             ],
             "linter",
-            expect_file!("../resources/test/linter/elp_lint_edoc.stdout"),
+            resource_file!("linter/elp_lint_edoc.stdout"),
             buck,
             None,
         );
@@ -1923,7 +1917,7 @@ mod tests {
                 "W0008"
             ],
             "linter",
-            expect_file!("../resources/test/linter/elp_lint_ct_no_tests_flag.stdout"),
+            resource_file!("linter/elp_lint_ct_no_tests_flag.stdout"),
             buck,
             None,
         );
@@ -1940,7 +1934,7 @@ mod tests {
                 "W0008"
             ],
             "linter",
-            expect_file!("../resources/test/linter/elp_lint_ct.stdout"),
+            resource_file!("linter/elp_lint_ct.stdout"),
             buck,
             None,
         );
@@ -1952,7 +1946,7 @@ mod tests {
             simple_snapshot_expect_error_sorted(
                 args_vec!["lint", "--module", "top_includer",],
                 "buck_tests_2",
-                expect_file!("../resources/test/buck_tests_2/resolves_generated_includes.stdout"),
+                resource_file!("buck_tests_2/resolves_generated_includes.stdout"),
                 true,
                 None,
             );
@@ -1981,10 +1975,10 @@ mod tests {
                 "lint",
                 "--no-stream"
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_warnings_as_errors.toml"
+                project_path("linter/elp_lint_warnings_as_errors.toml")
             ],
             "linter",
-            expect_file!("../resources/test/linter/warnings_as_errors.stdout"),
+            resource_file!("linter/warnings_as_errors.stdout"),
             true,
             None,
         )
@@ -1997,12 +1991,12 @@ mod tests {
                 "lint",
                 "--no-stream",
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_custom_function_matches.toml",
+                project_path("linter/elp_lint_custom_function_matches.toml"),
                 "--module",
                 "custom_function_matches"
             ],
             "linter",
-            expect_file!("../resources/test/linter/custom_function_matches.stdout"),
+            resource_file!("linter/custom_function_matches.stdout"),
             true,
             None,
         )
@@ -2014,12 +2008,12 @@ mod tests {
             args_vec![
                 "lint",
                 "--config-file",
-                "../../test/test_projects/xref/elp_lint_unavailable_type.toml",
+                project_path("xref/elp_lint_unavailable_type.toml"),
                 "--module",
                 "unavailable_type"
             ],
             "xref",
-            expect_file!("../resources/test/xref/unavailable_type.stdout"),
+            resource_file!("xref/unavailable_type.stdout"),
             true,
             None,
         )
@@ -2031,10 +2025,10 @@ mod tests {
             args_vec![
                 "lint",
                 "--config-file",
-                "../../test/test_projects/linter/elp_lint_ssr_adhoc.toml",
+                project_path("linter/elp_lint_ssr_adhoc.toml"),
             ],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc.stdout"),
+            resource_file!("linter/ssr_ad_hoc.stdout"),
             true,
             None,
         )
@@ -2042,18 +2036,15 @@ mod tests {
 
     #[test]
     fn lint_ssr_from_bad_config() {
+        let config_file = project_path("linter/elp_lint_ssr_adhoc_parse_fail.toml");
         simple_snapshot_expect_stderror(
-            args_vec![
-                "lint",
-                "--config-file",
-                "../../test/test_projects/linter/elp_lint_ssr_adhoc_parse_fail.toml",
-            ],
+            args_vec!["lint", "--config-file", &config_file, "--experimental"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_parse_fail.stdout"),
-            true,
+            resource_file!("linter/ssr_ad_hoc_parse_fail.stdout"),
+            false,
             None,
             false,
-        )
+        );
     }
 
     #[test]
@@ -2061,7 +2052,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "ssr: {_@A, _@B}.",],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli.stdout"),
             true,
             None,
         )
@@ -2072,7 +2063,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "{_@A, _@B}",],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli.stdout"),
             true,
             None,
         )
@@ -2092,7 +2083,7 @@ mod tests {
                 "{_@A, _@B}",
             ],
             "linter",
-            expect_file!("../resources/test/linter/ssr_context_separator.stdout"),
+            resource_file!("linter/ssr_context_separator.stdout"),
             true,
             None,
         )
@@ -2112,7 +2103,7 @@ mod tests {
                 "{_@A, _@B}",
             ],
             "linter",
-            expect_file!("../resources/test/linter/ssr_context_separator_color.stdout"),
+            resource_file!("linter/ssr_context_separator_color.stdout"),
             true,
             None,
         )
@@ -2123,7 +2114,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "3" "{4}",],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_multiple.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_multiple.stdout"),
             true,
             None,
         )
@@ -2134,7 +2125,7 @@ mod tests {
         simple_snapshot_expect_stderror(
             args_vec!["ssr", "ssr: {_@A, = _@B}.",],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_parse_error.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_parse_error.stdout"),
             true,
             None,
             false,
@@ -2146,7 +2137,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--parens", "(_@A)",],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_parens_visible.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_parens_visible.stdout"),
             true,
             None,
         )
@@ -2158,7 +2149,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "(((3)))",],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_parens_invisible.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_parens_invisible.stdout"),
             true,
             None,
         )
@@ -2169,7 +2160,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--macros", "expand", "?BAR(_@AA)", "{4}"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_macros_expand.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_macros_expand.stdout"),
             true,
             None,
         )
@@ -2180,7 +2171,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "?BAR(_@AA)", "{4}"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_macros_expand.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_macros_expand.stdout"),
             true,
             None,
         )
@@ -2191,7 +2182,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--macros", "visible-expand", "?BAR(_@AA)", "{4}"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_macros_visible_expand.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_macros_visible_expand.stdout"),
             true,
             None,
         )
@@ -2202,7 +2193,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--macros", "no-expand", "?BAR(_@AA)", "{4}"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_macros_no_expand.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_macros_no_expand.stdout"),
             true,
             None,
         )
@@ -2213,7 +2204,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--dump-config", "?BAR(_@AA)", "{4}"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_dump_config.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_dump_config.stdout"),
             true,
             None,
         )
@@ -2224,7 +2215,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--dump-config", "?BAR(_@AA)", "{4}"],
             "linter",
-            expect_file!("../resources/test/linter/ssr_ad_hoc_cli_dump_config.stdout"),
+            resource_file!("linter/ssr_ad_hoc_cli_dump_config.stdout"),
             true,
             None,
         )
@@ -2236,7 +2227,7 @@ mod tests {
         simple_snapshot(
             args_vec!["ssr", "--module", "erlang_diagnostics_errors_gen", "ok"],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/ssr_exclude_generated.stdout"),
+            resource_file!("diagnostics/ssr_exclude_generated.stdout"),
             buck,
             None,
         );
@@ -2254,7 +2245,7 @@ mod tests {
                 "ok"
             ],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/ssr_include_generated.stdout"),
+            resource_file!("diagnostics/ssr_include_generated.stdout"),
             buck,
             None,
         );
@@ -2271,7 +2262,7 @@ mod tests {
         simple_snapshot_sorted(
             args_vec!["lint", "--read-config"],
             "hierarchical_config",
-            expect_file!("../resources/test/hierarchical_config/basic.stdout"),
+            resource_file!("hierarchical_config/basic.stdout"),
             buck,
             None,
         );
@@ -2283,7 +2274,7 @@ mod tests {
         simple_snapshot_sorted(
             args_vec!["lint", "--read-config", "--no-stream"],
             "linter_config",
-            expect_file!("../resources/test/linter_config/basic.stdout"),
+            resource_file!("linter_config/basic.stdout"),
             buck,
             None,
         );
@@ -2365,9 +2356,7 @@ mod tests {
             simple_snapshot_expect_error(
                 args_vec!["eqwalize-all", "--bail-on-error"],
                 "standard",
-                expect_file!(
-                    "../resources/test/standard/eqwalize_all_bail_on_error_failure.pretty"
-                ),
+                resource_file!("standard/eqwalize_all_bail_on_error_failure.pretty"),
                 buck,
                 None,
             );
@@ -2381,9 +2370,7 @@ mod tests {
             simple_snapshot(
                 args_vec!["eqwalize", "--bail-on-error", "app_a_no_errors"],
                 "standard",
-                expect_file!(
-                    "../resources/test/standard/eqwalize_all_bail_on_error_success.pretty"
-                ),
+                resource_file!("standard/eqwalize_all_bail_on_error_success.pretty"),
                 buck,
                 None,
             );
@@ -2396,9 +2383,7 @@ mod tests {
             simple_snapshot_expect_error(
                 args_vec!["eqwalize", "--bail-on-error", "app_b"],
                 "eqwalizer_ignore_modules",
-                expect_file!(
-                    "../resources/test/eqwalizer_ignore_modules/eqwalize_bail_on_error_failure.pretty"
-                ),
+                resource_file!("eqwalizer_ignore_modules/eqwalize_bail_on_error_failure.pretty"),
                 true,
                 None,
             );
@@ -2411,8 +2396,8 @@ mod tests {
             simple_snapshot(
                 args_vec!["eqwalize-all", "--bail-on-error"],
                 "eqwalizer_ignore_modules",
-                expect_file!(
-                    "../resources/test/eqwalizer_ignore_modules/eqwalize_all_bail_on_error_success.pretty"
+                resource_file!(
+                    "eqwalizer_ignore_modules/eqwalize_all_bail_on_error_success.pretty"
                 ),
                 true,
                 None,
@@ -2536,7 +2521,7 @@ mod tests {
     #[test]
     fn help() {
         let args = args::args().run_inner(Args::from(&["--help"])).unwrap_err();
-        let expected = expect_file!["../resources/test/help.stdout"];
+        let expected = resource_file!("help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2546,7 +2531,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["eqwalize-all", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/eqwalize_all_help.stdout"];
+        let expected = resource_file!("eqwalize_all_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2556,7 +2541,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["eqwalize", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/eqwalize_help.stdout"];
+        let expected = resource_file!("eqwalize_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2566,7 +2551,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["eqwalize-target", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/eqwalize_target_help.stdout"];
+        let expected = resource_file!("eqwalize_target_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2576,7 +2561,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["eqwalize-app", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/eqwalize_app.stdout"];
+        let expected = resource_file!("eqwalize_app.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2586,7 +2571,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["dialyze-all", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/dialyze_all_help.stdout"];
+        let expected = resource_file!("dialyze_all_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2596,7 +2581,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["parse-all", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/parse_all_help.stdout"];
+        let expected = resource_file!("parse_all_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2606,7 +2591,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["parse-elp", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/parse_elp_help.stdout"];
+        let expected = resource_file!("parse_elp_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2616,7 +2601,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["lint", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/lint_help.stdout"];
+        let expected = resource_file!("lint_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2626,7 +2611,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["ssr", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/ssr_help.stdout"];
+        let expected = resource_file!("ssr_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2636,7 +2621,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["search", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/ssr_help.stdout"];
+        let expected = resource_file!("ssr_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2646,7 +2631,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["build-info", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/build_info_help.stdout"];
+        let expected = resource_file!("build_info_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2656,7 +2641,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["project-info", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/project_info_help.stdout"];
+        let expected = resource_file!("project_info_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2666,7 +2651,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["explain", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/explain_help.stdout"];
+        let expected = resource_file!("explain_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2676,7 +2661,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["glean", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/glean_help.stdout"];
+        let expected = resource_file!("glean_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2686,7 +2671,7 @@ mod tests {
         let args = args::args()
             .run_inner(Args::from(&["config", "--help"]))
             .unwrap_err();
-        let expected = expect_file!["../resources/test/config_help.stdout"];
+        let expected = resource_file!("config_help.stdout");
         let stdout = args.unwrap_stdout();
         expected.assert_eq(&stdout);
     }
@@ -2697,7 +2682,7 @@ mod tests {
     fn explain_code() {
         let args = args_vec!["explain", "--code", "W0005"];
         let (stdout, stderr, code) = elp(args);
-        let expected = expect_file!["../resources/test/explain_code.stdout"];
+        let expected = resource_file!("explain_code.stdout");
         expected.assert_eq(stdout.strip_prefix(BASE_URL).unwrap());
         assert!(stderr.is_empty());
         assert_eq!(code, 0);
@@ -2707,7 +2692,7 @@ mod tests {
     fn explain_unknown_code() {
         let args = args_vec!["explain", "--code", "does_not_exist"];
         let (stdout, stderr, code) = elp(args);
-        let expected = expect_file!["../resources/test/explain_unkwnown_code.stdout"];
+        let expected = resource_file!("explain_unkwnown_code.stdout");
         expected.assert_eq(&stdout);
         assert!(stderr.is_empty());
         assert_eq!(code, 0);
@@ -2717,7 +2702,7 @@ mod tests {
     fn dump_config() {
         let args = args_vec!["config"];
         let (stdout, stderr, code) = elp(args);
-        let expected = expect_file!["../resources/test/config_stanza.stdout"];
+        let expected = resource_file!("config_stanza.stdout");
         expected.assert_eq(&stdout);
         assert!(stderr.is_empty());
         assert_eq!(code, 0);
@@ -2729,7 +2714,7 @@ mod tests {
         simple_snapshot(
             args_vec!["parse-elp", "--module", "otp27_docstrings"],
             "diagnostics",
-            expect_file!("../resources/test/diagnostics/parse_otp27_docstrings.jsonl"),
+            resource_file!("diagnostics/parse_otp27_docstrings.jsonl"),
             buck,
             None,
         );
@@ -2742,7 +2727,7 @@ mod tests {
             simple_snapshot_expect_error(
                 args_vec!["parse-elp", "--module", "otp27_sigils"],
                 "diagnostics",
-                expect_file!("../resources/test/diagnostics/parse_otp27_sigils.jsonl"),
+                resource_file!("diagnostics/parse_otp27_sigils.jsonl"),
                 buck,
                 None,
             );
@@ -2756,8 +2741,8 @@ mod tests {
             simple_snapshot_expect_error(
                 args_vec!["parse-elp", "--module", "main_app"],
                 "include_lib_dependency_test",
-                expect_file!(
-                    "../resources/test/include_lib_dependency_test/include_lib_non_dependency_fails.stdout"
+                resource_file!(
+                    "include_lib_dependency_test/include_lib_non_dependency_fails.stdout"
                 ),
                 buck,
                 None,
@@ -2766,8 +2751,8 @@ mod tests {
             simple_snapshot_expect_error(
                 args_vec!["parse-elp", "--module", "main_app"],
                 "include_lib_dependency_test",
-                expect_file!(
-                    "../resources/test/include_lib_dependency_test/include_lib_non_dependency_rebar.stdout"
+                resource_file!(
+                    "include_lib_dependency_test/include_lib_non_dependency_rebar.stdout"
                 ),
                 buck,
                 None,
@@ -3031,7 +3016,10 @@ mod tests {
                 "Expected exit code {expected_code}, got: {code}\nstdout:\n{stdout}\nstderr:\n{stderr}"
             );
             if let Some(expected_stderr) = expected_stderr {
-                expected_stderr.assert_eq(&stderr);
+                let project_path = path.to_str().expect("project_path");
+                let mut normalised_stderr = stderr.clone();
+                normalised_stderr = normalised_stderr.replace(project_path, "{project_path}");
+                expected_stderr.assert_eq(&normalised_stderr);
             } else {
                 expect![[""]].assert_eq(&stderr);
             }
@@ -3079,7 +3067,9 @@ mod tests {
                 "Expected exit code {expected_code}, got: {code}\nstdout:\n{stdout}\nstderr:\n{stderr}"
             );
             if let Some(expected_stderr) = expected_stderr {
-                expected_stderr.assert_eq(&stderr);
+                let project_path = path.to_str().expect("project_path");
+                let normalised_stderr = stderr.replace(project_path, "{project_path}");
+                expected_stderr.assert_eq(&normalised_stderr);
             } else {
                 expect![[""]].assert_eq(&stderr);
             }
@@ -3147,10 +3137,6 @@ mod tests {
             args.push(file_path);
         }
         (args, project_path)
-    }
-
-    fn project_path(project: &str) -> String {
-        format!("../../test/test_projects/{project}")
     }
 
     fn strip_ansi_codes(s: &str) -> String {
