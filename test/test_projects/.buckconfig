@@ -9,7 +9,6 @@
   ovr_config = prelude
   fbcode = none
   fbsource = none
-  fbcode_macros = none
   buck = none
 
 [external_cells]
@@ -22,3 +21,9 @@
 
 [build]
   execution_platforms = prelude//platforms:default
+
+[buildfile]
+# We use a custom buildfile name to avoid test projects to be recognized as
+# actual packages. They are test fixtures and should not be built automatically.
+# Some of them are intentionally broken.
+name = BUCK.ELP
