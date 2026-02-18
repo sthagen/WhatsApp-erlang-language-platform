@@ -16,9 +16,13 @@
 //! Detected patterns:
 //! - `case length(List) of 0 -> ...; _ -> ... end`
 //! - `case length(List) =:= 0 of true -> ...; false/_ -> ... end`
+//! - `case 0 =:= length(List) of true -> ...; false/_ -> ... end`
 //! - `case length(List) =/= 0 of true -> ...; false/_ -> ... end`
+//! - `case 0 =/= length(List) of true -> ...; false/_ -> ... end`
 //! - `case length(List) > 0 of true -> ...; false/_ -> ... end`
+//! - `case 0 < length(List) of true -> ...; false/_ -> ... end`
 //! - `case length(List) >= 1 of true -> ...; false/_ -> ... end`
+//! - `case 1 =< length(List) of true -> ...; false/_ -> ... end`
 
 use elp_ide_assists::Assist;
 use elp_ide_db::DiagnosticCode;
@@ -105,6 +109,55 @@ impl SsrPatternsLinter for InefficientListEmptyCheckLinter {
                 (
                     format!(
                         "ssr: case length({LIST_VAR}) >= 1 of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                // Reversed operand patterns
+                (
+                    format!(
+                        "ssr: case 0 =:= length({LIST_VAR}) of true -> {EMPTY_VAR}; false -> {NON_EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 0 =:= length({LIST_VAR}) of true -> {EMPTY_VAR}; _ -> {NON_EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 0 =/= length({LIST_VAR}) of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 0 =/= length({LIST_VAR}) of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 0 < length({LIST_VAR}) of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 0 < length({LIST_VAR}) of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 1 =< length({LIST_VAR}) of true -> {NON_EMPTY_VAR}; false -> {EMPTY_VAR} end."
+                    ),
+                    (),
+                ),
+                (
+                    format!(
+                        "ssr: case 1 =< length({LIST_VAR}) of true -> {NON_EMPTY_VAR}; _ -> {EMPTY_VAR} end."
                     ),
                     (),
                 ),
@@ -473,6 +526,154 @@ mod tests {
                 true -> non_empty;
                 false -> empty
             end.
+           "#,
+            expect![[r#"
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case List of [] -> empty; [_ | _] -> non_empty end.
+           "#]],
+        )
+    }
+
+    // ---- Reversed operand tests ----
+
+    #[test]
+    fn detects_list_empty_check_zero_eq() {
+        check_diagnostics(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 =:= length(List) of true -> empty; false -> non_empty end.
+        %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0065: Use pattern matching on the list directly instead of checking length.
+           "#,
+        )
+    }
+
+    #[test]
+    fn detects_list_empty_check_zero_eq_wildcard() {
+        check_diagnostics(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 =:= length(List) of true -> empty; _ -> non_empty end.
+        %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0065: Use pattern matching on the list directly instead of checking length.
+           "#,
+        )
+    }
+
+    #[test]
+    fn fixes_list_empty_check_zero_eq() {
+        check_fix(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 =:= len~gth(List) of true -> empty; false -> non_empty end.
+           "#,
+            expect![[r#"
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case List of [] -> empty; [_ | _] -> non_empty end.
+           "#]],
+        )
+    }
+
+    #[test]
+    fn detects_list_empty_check_zero_ne() {
+        check_diagnostics(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 =/= length(List) of true -> non_empty; false -> empty end.
+        %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0065: Use pattern matching on the list directly instead of checking length.
+           "#,
+        )
+    }
+
+    #[test]
+    fn fixes_list_empty_check_zero_ne() {
+        check_fix(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 =/= len~gth(List) of true -> non_empty; false -> empty end.
+           "#,
+            expect![[r#"
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case List of [] -> empty; [_ | _] -> non_empty end.
+           "#]],
+        )
+    }
+
+    #[test]
+    fn detects_list_empty_check_zero_lt() {
+        check_diagnostics(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 < length(List) of true -> non_empty; false -> empty end.
+        %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0065: Use pattern matching on the list directly instead of checking length.
+           "#,
+        )
+    }
+
+    #[test]
+    fn fixes_list_empty_check_zero_lt() {
+        check_fix(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 0 < len~gth(List) of true -> non_empty; false -> empty end.
+           "#,
+            expect![[r#"
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case List of [] -> empty; [_ | _] -> non_empty end.
+           "#]],
+        )
+    }
+
+    #[test]
+    fn detects_list_empty_check_one_le() {
+        check_diagnostics(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 1 =< length(List) of true -> non_empty; false -> empty end.
+        %%  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 💡 weak: W0065: Use pattern matching on the list directly instead of checking length.
+           "#,
+        )
+    }
+
+    #[test]
+    fn fixes_list_empty_check_one_le() {
+        check_fix(
+            r#"
+        //- /src/list_empty_check.erl
+        -module(list_empty_check).
+
+        check_list(List) ->
+            case 1 =< len~gth(List) of true -> non_empty; false -> empty end.
            "#,
             expect![[r#"
         -module(list_empty_check).
