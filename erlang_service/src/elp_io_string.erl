@@ -29,7 +29,6 @@
     original := string(),
     mode := binary | list,
     encoding := latin1 | unicode
-
 }.
 
 -include_lib("kernel/include/file.hrl").
@@ -96,7 +95,7 @@ file_info(_Opts, #{original := Original} = State) ->
     Sz = length(Original),
     {{ok, #file_info{size = Sz}}, State}.
 
--spec file_position(integer()|cur, state()) -> {{ok, number() | none()}, state()}.
+-spec file_position(integer() | cur, state()) -> {{ok, number() | none()}, state()}.
 file_position(cur, #{original := Original, buffer := Buffer} = State) ->
     Pos = length(Original) - length(Buffer),
     {{ok, Pos}, State};
@@ -108,31 +107,31 @@ file_position(Pos, #{original := Original} = State) ->
 request({get_chars, _Encoding, _Prompt, N}, #{buffer := Str, mode := Mode} = State) ->
     {ReplyStr, NewStr} = get_chars(N, Str),
     case {ReplyStr, Mode} of
-      {eof, _} -> Reply = ReplyStr;
-      {_, list} -> Reply = ReplyStr;
-      {_, binary} -> Reply = unicode:characters_to_binary(ReplyStr)
+        {eof, _} -> Reply = ReplyStr;
+        {_, list} -> Reply = ReplyStr;
+        {_, binary} -> Reply = unicode:characters_to_binary(ReplyStr)
     end,
     {Reply, State#{buffer => NewStr}};
 request({get_line, _Encoding, _Prompt}, #{buffer := Str} = State) ->
     {Reply, NewStr} = get_line(Str),
     {Reply, State#{buffer => NewStr}};
-request({get_until, _Encoding, _Prompt, Module, Function, XArgs},  #{buffer := Str} = State) ->
+request({get_until, _Encoding, _Prompt, Module, Function, XArgs}, #{buffer := Str} = State) ->
     {Reply, NewStr} = get_until(Module, Function, XArgs, Str),
     {Reply, State#{buffer => NewStr}};
 request(getopts, #{mode := Mode, encoding := Encoding} = State) ->
     case Mode of
-      binary -> {[{binary, true}, {encoding, Encoding}], State};
-      list ->   {[{binary, false}, {encoding, Encoding}], State}
+        binary -> {[{binary, true}, {encoding, Encoding}], State};
+        list -> {[{binary, false}, {encoding, Encoding}], State}
     end;
 request({setopts, Opts}, #{encoding := Encoding0} = State) ->
     case lists:keyfind(binary, 1, Opts) of
-       {binary, true} -> Binary0 = true;
-       _ -> Binary0 = false
+        {binary, true} -> Binary0 = true;
+        _ -> Binary0 = false
     end,
     Binary1 = lists:member(binary, Opts),
     case Binary0 orelse Binary1 of
-      true -> Mode = binary;
-      false -> Mode = list
+        true -> Mode = binary;
+        false -> Mode = list
     end,
     case lists:keyfind(binary, 1, Opts) of
         {encoding, latin1} -> Encoding1 = latin1;

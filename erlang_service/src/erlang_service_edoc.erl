@@ -267,7 +267,8 @@ render_docs_v1(
                 none =/= kna_to_name_arity(KNA)
             ],
         type_docs =>
-            [], % No support for type docs in OTP 27
+            % No support for type docs in OTP 27
+            [],
         diagnostics => Diagnostics
     };
 % Format used by edoc
@@ -287,7 +288,8 @@ render_docs_v1(
     #{
         module_doc => ModuleDocEn,
         function_docs => [{F, FDoc} || {{_FName, _FArity} = F, FDoc} <- FunctionDocs],
-        type_docs => [], % No support for EDoc type docs
+        % No support for EDoc type docs
+        type_docs => [],
         diagnostics => Diagnostics
     }.
 

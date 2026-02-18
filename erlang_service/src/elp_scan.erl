@@ -368,8 +368,7 @@ scan1("?" = Cs, St, Off, Toks) ->
 %% << <:- <- <:= <=
 scan1("<<" ++ Cs, St, Off, Toks) ->
     tok2(Cs, St, Off, Toks, '<<', 2);
-
-scan1("<:-" ++Cs, St, Off, Toks) ->
+scan1("<:-" ++ Cs, St, Off, Toks) ->
     tok2(Cs, St, Off, Toks, '<:-', 3);
 scan1("<-" ++ Cs, St, Off, Toks) ->
     tok2(Cs, St, Off, Toks, '<-', 2);
@@ -1631,7 +1630,8 @@ reserved_word('else') -> true;
 reserved_word(_) -> false.
 
 %% We skip over CR to match what ELP is expecting
-char_byte_size($\r) -> 0;
+char_byte_size($\r) ->
+    0;
 char_byte_size(C) ->
     %% TODO: more efficient implementation
     byte_size(<<C/utf8>>).

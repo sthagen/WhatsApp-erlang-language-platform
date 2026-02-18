@@ -66,19 +66,22 @@ start_link() ->
 
 -define(RECURSIVE_CALLBACK_TIMEOUT, infinity).
 
--spec path_open(id(), string(), file_id(), include_type())
-   -> {ok, pid(), string(), file_id()} | {error, any()}.
+-spec path_open(id(), string(), file_id(), include_type()) ->
+    {ok, pid(), string(), file_id()} | {error, any()}.
 path_open(ReqId, Name, FileId, IncludeType) ->
-  case gen_server:call(?SERVER, {request, ReqId,
-             [unicode:characters_to_binary(add_include_type(Name, FileId, IncludeType))]},
-              ?RECURSIVE_CALLBACK_TIMEOUT) of
-    {ok, <<SzPath:32, Paths:SzPath/binary,
-           NewFileId:32,
-           Sz:32, FileText:Sz/binary>>} ->
-        Pid = elp_io_string:new(FileText),
-        {ok, Pid, binary_to_list(Paths), NewFileId};
-     X -> X
-  end.
+    case
+        gen_server:call(
+            ?SERVER,
+            {request, ReqId, [unicode:characters_to_binary(add_include_type(Name, FileId, IncludeType))]},
+            ?RECURSIVE_CALLBACK_TIMEOUT
+        )
+    of
+        {ok, <<SzPath:32, Paths:SzPath/binary, NewFileId:32, Sz:32, FileText:Sz/binary>>} ->
+            Pid = elp_io_string:new(FileText),
+            {ok, Pid, binary_to_list(Paths), NewFileId};
+        X ->
+            X
+    end.
 
 %%==============================================================================
 %% gen_server callbacks
@@ -103,14 +106,17 @@ init(noargs) ->
     State = #{io => Port, requests => [], own_requests => []},
     {ok, State}.
 
--spec handle_call({request, id(), any()}, gen_server:from(), state())
-   -> {noreply, state()} | {stop|reply, any(), state()}.
-handle_call({request, ReqId, Data}, From,
-            #{io := IO, requests := Requests, own_requests := OwnRequests} = State) ->
+-spec handle_call({request, id(), any()}, gen_server:from(), state()) ->
+    {noreply, state()} | {stop | reply, any(), state()}.
+handle_call(
+    {request, ReqId, Data},
+    From,
+    #{io := IO, requests := Requests, own_requests := OwnRequests} = State
+) ->
     case lists:keytake(ReqId, 2, Requests) of
         {value, {_Pid, Id, _}, _NewRequests} ->
             request(Id, Data, IO),
-            {noreply, State#{own_requests => [{Id, From}|OwnRequests]}};
+            {noreply, State#{own_requests => [{Id, From} | OwnRequests]}};
         _ ->
             {reply, failed, State}
     end;
@@ -221,8 +227,10 @@ handle_request(<<"DCP", Id:64/big, Data/binary>>, State) ->
 handle_request(<<"CTI", Id:64/big, Sz:32, AstBinary:Sz/binary, Data/binary>>, State) ->
     request(erlang_service_ct, Id, Data, [AstBinary], 10_000, State);
 %% Start of callback responses
-handle_request(<<"REP", OrigId:64/big, Status:8, Data/binary>>,
-               #{own_requests := OwnRequests} = State) ->
+handle_request(
+    <<"REP", OrigId:64/big, Status:8, Data/binary>>,
+    #{own_requests := OwnRequests} = State
+) ->
     case lists:keytake(OrigId, 1, OwnRequests) of
         {value, {OrigId, ReplyFrom}, NewOwnRequests} ->
             case Status of
@@ -233,7 +241,6 @@ handle_request(<<"REP", OrigId:64/big, Status:8, Data/binary>>,
         _ ->
             {noreply, State}
     end.
-
 
 -spec request(module(), id(), binary(), [any()], timeout(), state()) -> {noreply, state()}.
 request(Module, Id, Data, AdditionalParams, Timeout, #{requests := Requests} = State) ->
@@ -249,8 +256,7 @@ request(Module, Id, Data, AdditionalParams, Timeout, #{requests := Requests} = S
 
 -spec collect_paths(binary()) -> [file:filename()].
 collect_paths(<<>>) -> [];
-collect_paths(<<Size:32/big, Data:Size/binary, Rest/binary>>) ->
-    [binary_to_list(Data) | collect_paths(Rest)].
+collect_paths(<<Size:32/big, Data:Size/binary, Rest/binary>>) -> [binary_to_list(Data) | collect_paths(Rest)].
 
 -spec encode_segments([segment()]) -> iodata().
 encode_segments(Segments) ->
@@ -265,6 +271,6 @@ encode_segment({Tag, Data}) when byte_size(Tag) =:= 3 ->
 add_include_type(Path, FileId, IncludeType) ->
     case IncludeType of
         normal -> io_lib:format("~p:N:~s", [FileId, Path]);
-        lib    -> io_lib:format("~p:L:~s", [FileId, Path]);
-        doc    -> io_lib:format("~p:D:~s", [FileId, Path])
+        lib -> io_lib:format("~p:L:~s", [FileId, Path]);
+        doc -> io_lib:format("~p:D:~s", [FileId, Path])
     end.

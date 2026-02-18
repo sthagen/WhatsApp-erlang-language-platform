@@ -254,7 +254,7 @@ inclusion_range(Forms, Path) ->
     Context = build_include_context(FileAttrs, Path),
 
     case Context of
-        [ _, {IncludeLoc, _IncludePath} | _Rest] ->
+        [_, {IncludeLoc, _IncludePath} | _Rest] ->
             %% Return the location from the second entry (the include directive location in the parent file)
             %% Extract the position from the location tuple and return as a range
             case IncludeLoc of
