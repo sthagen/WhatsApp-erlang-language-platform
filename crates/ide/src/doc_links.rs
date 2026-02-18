@@ -19,6 +19,7 @@ use hir::Semantic;
 
 // @fb-only: mod meta_only;
 mod otp_links;
+mod pragma_links;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocLink {
@@ -43,6 +44,7 @@ pub(crate) fn external_docs(db: &RootDatabase, position: &FilePosition) -> Optio
             // @fb-only: exdoc_links::links(&mut doc_links, &sema, &def);
         });
     }
+    pragma_links::links(&mut doc_links, node, position);
     // @fb-only: meta_only::links(&mut doc_links, node, position);
     Some(doc_links)
 }
