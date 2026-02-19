@@ -1109,6 +1109,7 @@ impl BuckQueryError {
             .captures(&details)
             .and_then(|m| m.get(1))
             .map(|m| m.as_str().to_string());
+
         BuckQueryError {
             command,
             reason,
@@ -1128,7 +1129,11 @@ impl fmt::Display for BuckQueryError {
         } else {
             write!(
                 f,
-                "Project Initialisation Failed: invalid or missing buck 2 configuration"
+                "Project Initialisation Failed: invalid or missing buck 2 configuration\n\
+                 Command:\n{}\n\
+                 Reason:\n{}\n\
+                 Details:\n{}",
+                self.command, self.reason, self.details
             )
         }
     }
@@ -2089,6 +2094,25 @@ mod tests {
             "reason".to_string(),
             "Buck UI: https://a.b.com/buck2/ref-hash\nblah".to_string(),
         ));
+    }
+
+    #[test]
+    fn display_buck_query_error_no_url() {
+        let error = BuckQueryError::new(
+            "buck2 bxl //some:target".to_string(),
+            "Exited with status code: 1".to_string(),
+            "some error details without a url".to_string(),
+        );
+        assert!(error.buck_ui_url.is_none());
+        expect![[r#"
+            Project Initialisation Failed: invalid or missing buck 2 configuration
+            Command:
+            buck2 bxl //some:target
+            Reason:
+            Exited with status code: 1
+            Details:
+            some error details without a url"#]]
+        .assert_eq(&error.to_string());
     }
 
     #[test]
