@@ -409,3 +409,7 @@ bin_undefined(_) -> error(not_implemented).
 -spec bins([term()]) -> [binary()].
 bins(L) ->
     [Conv || B <- L, (Conv = bin_undefined(B)) =/= undefined].
+
+-spec test53_neg(#{atom() => integer()}) -> [atom()].
+test53_neg(M) ->
+    [V || _ := V <- maps:iterator(M, ordered)].
