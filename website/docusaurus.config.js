@@ -49,6 +49,19 @@ const {fbContent} = require('docusaurus-plugin-internaldocs-fb/internal');
   ],
 
   plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'eqwalizer',
+        path: fbContent({
+          internal: '../../eqwalizer/docs',
+          external: '../eqwalizer/docs',
+        }),
+        routeBasePath: 'docs/eqwalizer',
+        sidebarPath: require.resolve('./sidebarsEqwalizer.js'),
+        editUrl: undefined,
+      },
+    ],
   ],
 
   markdown: ({
@@ -90,6 +103,13 @@ const {fbContent} = require('docusaurus-plugin-internaldocs-fb/internal');
             label: 'Erlang Error Index',
           },
           {
+            type: 'doc',
+            docsPluginId: 'eqwalizer',
+            docId: 'reference',
+            position: 'left',
+            label: 'eqWAlizer',
+          },
+          {
             href: 'https://github.com/whatsapp/erlang-language-platform',
             label: 'GitHub',
             position: 'right',
@@ -113,6 +133,10 @@ const {fbContent} = require('docusaurus-plugin-internaldocs-fb/internal');
               {
                 label: 'Erlang Error Index',
                 to: '/docs/erlang-error-index',
+              },
+              {
+                label: 'eqWAlizer',
+                to: '/docs/eqwalizer/reference',
               },
             ],
           },
