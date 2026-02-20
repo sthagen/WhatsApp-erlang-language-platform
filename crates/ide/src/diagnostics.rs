@@ -115,6 +115,7 @@ mod inefficient_enumerate;
 mod inefficient_flatlength;
 mod inefficient_last;
 mod inefficient_list_empty_check;
+mod lists_map_to_comprehension;
 mod lists_reverse_append;
 mod macro_precedence_suprise;
 mod map_find_to_syntax;
@@ -1737,6 +1738,7 @@ const SSR_PATTERN_LINTERS: &[&dyn SsrPatternsDiagnostics] = &[
     &map_find_to_syntax::LINTER,
     &map_insertion_to_syntax::MAP_PUT_LINTER,
     &map_insertion_to_syntax::MAP_UPDATE_LINTER,
+    &lists_map_to_comprehension::LINTER,
 ];
 
 /// Generic linters
