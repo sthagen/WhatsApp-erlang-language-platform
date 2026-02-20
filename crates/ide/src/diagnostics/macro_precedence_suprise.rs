@@ -213,16 +213,18 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "our ELP macro lowering is not able to process this expansion"]
     fn in_guard() {
+        // TODO(T256429482): This should detect the macro precedence issue in guard
+        // expressions, but ELP's macro lowering is not able to process this expansion.
+        // Once fixed, add the diagnostic annotation:
+        //   %%                          ^^^^^^^^^^^^^^^^^^ 💡 warning: W0039: The macro expansion can have unexpected precedence here
         check_diagnostics(
             r#"
              -module(main).
              -define(IS_FROBBABLE(X), is_tuple(X), element(1, X) =:= frob).
              foo(A) ->
                case A of
-                  X when is_map(X) orelse ?IS~_FROBBABLE(X) -> ok
-              %%                          ^^^^^^^^^^^^^^^^^^ 💡 warning: The macro expansion can have unexpected precedence here
+                  X when is_map(X) orelse ?IS_FROBBABLE(X) -> ok
                end.
             "#,
         );
