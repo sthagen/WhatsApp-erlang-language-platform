@@ -524,15 +524,18 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Not implemented yet
     fn fixes_lookup_with_named_wildcard_key() {
-        check_fix(
+        // TODO(T256426988): This should detect the pattern and suggest ets:lookup_element/4,
+        // but named wildcards (_IgnoredKey, _Else) are not yet matched by the SSR patterns.
+        // Once fixed, convert this back to a check_fix test expecting:
+        //   ets:lookup_element(Tab, Key, 2, undefined).
+        check_diagnostics(
             r#"
          //- /src/main.erl
          -module(main).
 
          read(Tab, Key) ->
-            case ets:lo~okup(Tab, Key) of
+            case ets:lookup(Tab, Key) of
                 [{_IgnoredKey, V}] -> V;
                 _Else -> undefined
             end.
@@ -543,13 +546,6 @@ mod tests {
          lookup(_, _) -> error(not_impl).
          lookup_element(_, _, _, _) -> error(not_impl).
             "#,
-            expect![[r#"
-         -module(main).
-
-         read(Tab, Key) ->
-            ets:lookup_element(Tab, Key, 2, undefined).
-
-         "#]],
         )
     }
 
