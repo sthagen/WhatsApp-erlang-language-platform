@@ -406,6 +406,14 @@ pub type DeprecatedAttributeId = Idx<DeprecatedAttribute>;
 pub type FeatureAttributeId = Idx<FeatureAttribute>;
 pub type SsrDefinitionId = Idx<SsrDefinition>;
 
+/// Result of evaluating a preprocessor condition
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum PPConditionResult {
+    Active,
+    Inactive,
+    Unknown, // For unsupported -if(Expr)
+}
+
 impl Index<ModuleAttributeId> for FormList {
     type Output = ModuleAttribute;
 
