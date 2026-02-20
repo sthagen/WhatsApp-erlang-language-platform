@@ -626,7 +626,7 @@ impl Index<SsrDefinitionId> for FormList {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleAttribute {
     pub name: Name,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::ModuleAttribute>,
 }
 
@@ -635,12 +635,12 @@ pub struct ModuleAttribute {
 pub enum IncludeAttribute {
     Include {
         path: SmolStr,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::PpInclude>,
     },
     IncludeLib {
         path: SmolStr,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::PpIncludeLib>,
     },
 }
@@ -686,17 +686,17 @@ impl IncludeAttribute {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DeprecatedAttribute {
     Module {
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::DeprecatedAttribute>,
     },
     Fa {
         fa: DeprecatedFa,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::DeprecatedAttribute>,
     },
     Fas {
         fas: Vec<DeprecatedFa>,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::DeprecatedAttribute>,
     },
 }
@@ -755,7 +755,7 @@ pub struct FunctionClause {
     pub name: NameArity,
     pub param_names: Vec<ParamName>,
     pub is_macro: bool,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::FunDecl>,
     pub separator: Option<(ast::ClauseSeparator, TextRange)>,
 }
@@ -768,7 +768,7 @@ pub enum PPDirective {
     Define(DefineId),
     Undef {
         name: Name,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::PpUndef>,
     },
     Include(IncludeAttributeId),
@@ -803,7 +803,7 @@ impl PPDirective {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Define {
     pub name: MacroName,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::PpDefine>,
 }
 
@@ -818,17 +818,17 @@ pub struct Define {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PPCondition {
     Ifdef {
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         name: Name,
         form_id: FormId<ast::PpIfdef>,
     },
     Ifndef {
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         name: Name,
         form_id: FormId<ast::PpIfndef>,
     },
     If {
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::PpIf>,
     },
     Else {
@@ -861,7 +861,7 @@ impl PPCondition {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Export {
     pub entries: IdxRange<FaEntry>,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::ExportAttribute>,
 }
 
@@ -869,21 +869,21 @@ pub struct Export {
 pub struct Import {
     pub from: Name,
     pub entries: IdxRange<FaEntry>,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::ImportAttribute>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TypeExport {
     pub entries: IdxRange<FaEntry>,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::ExportTypeAttribute>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Behaviour {
     pub name: Name,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::BehaviourAttribute>,
 }
 
@@ -891,17 +891,17 @@ pub struct Behaviour {
 pub enum TypeAlias {
     Regular {
         name: NameArity,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::TypeAlias>,
     },
     Nominal {
         name: NameArity,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::Nominal>,
     },
     Opaque {
         name: NameArity,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
         form_id: FormId<ast::Opaque>,
     },
 }
@@ -927,21 +927,21 @@ impl TypeAlias {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Spec {
     pub name: NameArity,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::Spec>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Callback {
     pub name: NameArity,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::Callback>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OptionalCallbacks {
     pub entries: IdxRange<FaEntry>,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::OptionalCallbacksAttribute>,
 }
 
@@ -949,19 +949,19 @@ pub struct OptionalCallbacks {
 pub struct Record {
     pub name: Name,
     pub fields: IdxRange<RecordField>,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::RecordDecl>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CompileOption {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::CompileOptionsAttribute>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SsrDefinition {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::SsrDefinition>,
 }
 
@@ -971,7 +971,7 @@ pub struct SsrDefinition {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Attribute {
     pub name: Name,
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::WildAttribute>,
 }
 
@@ -989,25 +989,25 @@ impl Attribute {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleDocAttribute {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::WildAttribute>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ModuleDocMetadataAttribute {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::WildAttribute>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DocAttribute {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::WildAttribute>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DocMetadataAttribute {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::WildAttribute>,
 }
 
@@ -1015,7 +1015,7 @@ pub struct DocMetadataAttribute {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FeatureAttribute {
-    pub cond: Option<PPConditionId>,
+    pub pp_ctx: Option<PPConditionId>,
     pub form_id: FormId<ast::FeatureAttribute>,
 }
 

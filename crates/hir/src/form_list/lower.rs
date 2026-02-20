@@ -143,9 +143,9 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_ssr_definition(&mut self, ssr_definition: &ast::SsrDefinition) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let form_id = self.id_map.get_id(ssr_definition);
-        let res = SsrDefinition { cond, form_id };
+        let res = SsrDefinition { pp_ctx, form_id };
         Some(FormIdx::SsrDefinition(self.data.ssr_definitions.alloc(res)))
     }
 
@@ -157,13 +157,17 @@ impl<'a> Ctx<'a> {
         &mut self,
         deprecated_attr: &ast::DeprecatedAttribute,
     ) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         match deprecated_attr.attr() {
             None => None,
             Some(ast::DeprecatedDetails::DeprecatedFa(fa)) => {
                 let fa = self.lower_deprecated_fa(&fa)?;
                 let form_id = self.id_map.get_id(deprecated_attr);
-                let fa_attr = DeprecatedAttribute::Fa { fa, form_id, cond };
+                let fa_attr = DeprecatedAttribute::Fa {
+                    fa,
+                    form_id,
+                    pp_ctx,
+                };
                 Some(FormIdx::DeprecatedAttribute(
                     self.data.deprecates.alloc(fa_attr),
                 ))
@@ -174,7 +178,11 @@ impl<'a> Ctx<'a> {
                     .flat_map(|fa| self.lower_deprecated_fa(&fa))
                     .collect();
                 let form_id = self.id_map.get_id(deprecated_attr);
-                let fas_attr = DeprecatedAttribute::Fas { fas, form_id, cond };
+                let fas_attr = DeprecatedAttribute::Fas {
+                    fas,
+                    form_id,
+                    pp_ctx,
+                };
                 Some(FormIdx::DeprecatedAttribute(
                     self.data.deprecates.alloc(fas_attr),
                 ))
@@ -182,7 +190,7 @@ impl<'a> Ctx<'a> {
             Some(ast::DeprecatedDetails::DeprecatedModule(module)) => {
                 if module.module()?.text()? == "module" {
                     let form_id = self.id_map.get_id(deprecated_attr);
-                    let module = DeprecatedAttribute::Module { form_id, cond };
+                    let module = DeprecatedAttribute::Module { form_id, pp_ctx };
                     Some(FormIdx::DeprecatedAttribute(
                         self.data.deprecates.alloc(module),
                     ))
@@ -216,12 +224,12 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_module_attr(&mut self, module_attr: &ast::ModuleAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let name = self.resolve_name(&module_attr.name()?);
         let form_id = self.id_map.get_id(module_attr);
         let res = ModuleAttribute {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::ModuleAttribute(
@@ -230,7 +238,7 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_function_clause(&mut self, function: &ast::FunDecl) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let (name, param_names, is_macro) = function.clauses().find_map(|clause| match clause {
             ast::FunctionOrMacroClause::FunctionClause(clause) => {
                 let name = clause.name()?;
@@ -267,7 +275,7 @@ impl<'a> Ctx<'a> {
             name,
             param_names,
             is_macro,
-            cond,
+            pp_ctx,
             form_id,
             separator: function.separator().map(|(s, t)| (s, t.text_range())),
         };
@@ -292,7 +300,7 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_include(&mut self, include: &ast::PpInclude) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let path: String = include
             .file()
             .flat_map(|detail| match detail {
@@ -304,14 +312,14 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(include);
         let res = IncludeAttribute::Include {
             path: SmolStr::new(path),
-            cond,
+            pp_ctx,
             form_id,
         };
         self.alloc_include(res)
     }
 
     fn lower_include_lib(&mut self, include: &ast::PpIncludeLib) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let path: String = include
             .file()
             .flat_map(|detail| match detail {
@@ -323,7 +331,7 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(include);
         let res = IncludeAttribute::IncludeLib {
             path: SmolStr::new(path),
-            cond,
+            pp_ctx,
             form_id,
         };
         self.alloc_include(res)
@@ -339,7 +347,7 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_define(&mut self, define: &ast::PpDefine) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let definition = define.lhs()?;
         let name = definition.name()?.as_name();
         let arity = definition
@@ -349,7 +357,7 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(define);
         let res = Define {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         let define_idx = self.data.defines.alloc(res);
@@ -363,23 +371,23 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_undef(&mut self, undef: &ast::PpUndef) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let name = undef.name()?.as_name();
         let form_id = self.id_map.get_id(undef);
         let res = PPDirective::Undef {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::PPDirective(self.data.pp_directives.alloc(res)))
     }
 
     fn lower_ifdef(&mut self, ifdef: &ast::PpIfdef) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let name = ifdef.name()?.as_name();
         let form_id = self.id_map.get_id(ifdef);
         let res = PPCondition::Ifdef {
-            cond,
+            pp_ctx,
             name,
             form_id,
         };
@@ -389,11 +397,11 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_ifndef(&mut self, ifndef: &ast::PpIfndef) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let name = ifndef.name()?.as_name();
         let form_id = self.id_map.get_id(ifndef);
         let res = PPCondition::Ifndef {
-            cond,
+            pp_ctx,
             name,
             form_id,
         };
@@ -410,9 +418,9 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_if(&mut self, pp_if: &ast::PpIf) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let form_id = self.id_map.get_id(pp_if);
-        let res = PPCondition::If { cond, form_id };
+        let res = PPCondition::If { pp_ctx, form_id };
         let id = self.data.pp_conditions.alloc(res);
         self.conditions.push(id);
         Some(FormIdx::PPCondition(id))
@@ -437,12 +445,12 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_export(&mut self, export: &ast::ExportAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let entries = self.lower_fa_entries(export.funs());
         let form_id = self.id_map.get_id(export);
         let res = Export {
             entries,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::Export(self.data.exports.alloc(res)))
@@ -455,24 +463,24 @@ impl<'a> Ctx<'a> {
             .map(|name| self.resolve_name(&name))
             .unwrap_or(Name::MISSING);
         let entries = self.lower_fa_entries(import.funs());
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let form_id = self.id_map.get_id(import);
         let res = Import {
             from,
             entries,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::Import(self.data.imports.alloc(res)))
     }
 
     fn lower_type_export(&mut self, export: &ast::ExportTypeAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let entries = self.lower_fa_entries(export.types());
         let form_id = self.id_map.get_id(export);
         let res = TypeExport {
             entries,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::TypeExport(self.data.type_exports.alloc(res)))
@@ -501,19 +509,19 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_behaviour(&mut self, behaviour: &ast::BehaviourAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let form_id = self.id_map.get_id(behaviour);
         let name = self.resolve_name(&behaviour.name()?);
         let res = Behaviour {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::Behaviour(self.data.behaviours.alloc(res)))
     }
 
     fn lower_type_alias(&mut self, alias: &ast::TypeAlias) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let type_name = alias.name()?;
         let name = self.resolve_name(&type_name.name()?);
         let arity = type_name.args()?.args().count().try_into().ok()?;
@@ -522,14 +530,14 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(alias);
         let res = TypeAlias::Regular {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::TypeAlias(self.data.type_aliases.alloc(res)))
     }
 
     fn lower_nominal_type(&mut self, nominal: &ast::Nominal) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let type_name = nominal.name()?;
         let name = self.resolve_name(&type_name.name()?);
         let arity = type_name.args()?.args().count().try_into().ok()?;
@@ -538,14 +546,14 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(nominal);
         let res = TypeAlias::Nominal {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::TypeAlias(self.data.type_aliases.alloc(res)))
     }
 
     fn lower_opaque(&mut self, opaque: &ast::Opaque) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let type_name = opaque.name()?;
         let name = self.resolve_name(&type_name.name()?);
         let arity = type_name.args()?.args().count().try_into().ok()?;
@@ -554,7 +562,7 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(opaque);
         let res = TypeAlias::Opaque {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::TypeAlias(self.data.type_aliases.alloc(res)))
@@ -564,12 +572,12 @@ impl<'a> Ctx<'a> {
         &mut self,
         cbs: &ast::OptionalCallbacksAttribute,
     ) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let entries = self.lower_fa_entries(cbs.callbacks());
         let form_id = self.id_map.get_id(cbs);
         let res = OptionalCallbacks {
             entries,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::OptionalCallbacks(
@@ -578,7 +586,7 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_spec(&mut self, spec: &ast::Spec) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         // We do not check the spec module name (if present), as any
         // issues are reported by the erlang service.
         let name = self.resolve_name(&spec.fun()?);
@@ -589,14 +597,14 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(spec);
         let res = Spec {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::Spec(self.data.specs.alloc(res)))
     }
 
     fn lower_callback(&mut self, callback: &ast::Callback) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         if callback.module().is_some() {
             return None;
         }
@@ -608,14 +616,14 @@ impl<'a> Ctx<'a> {
         let form_id = self.id_map.get_id(callback);
         let res = Callback {
             name,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::Callback(self.data.callbacks.alloc(res)))
     }
 
     fn lower_record(&mut self, record: &ast::RecordDecl) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let name = self.resolve_name(&record.name()?);
 
         let mut fields = record
@@ -635,7 +643,7 @@ impl<'a> Ctx<'a> {
         let res = Record {
             name,
             fields,
-            cond,
+            pp_ctx,
             form_id,
         };
         Some(FormIdx::Record(self.data.records.alloc(res)))
@@ -648,24 +656,24 @@ impl<'a> Ctx<'a> {
     }
 
     fn lower_compile(&mut self, copt: &ast::CompileOptionsAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let form_id = self.id_map.get_id(copt);
-        let res = CompileOption { cond, form_id };
+        let res = CompileOption { pp_ctx, form_id };
         Some(FormIdx::CompileOption(self.data.compile_options.alloc(res)))
     }
 
     fn lower_attribute(&mut self, attribute: &ast::WildAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let name = self.resolve_name(&attribute.name()?.name()?);
         // SmolStr does not impl PartialEq, can't match on `Name`
         if name == known::moduledoc {
-            self.lower_moduledoc_attribute(attribute, cond)
+            self.lower_moduledoc_attribute(attribute, pp_ctx)
         } else if name == known::doc {
-            self.lower_doc_attribute(attribute, cond)
+            self.lower_doc_attribute(attribute, pp_ctx)
         } else {
             let form_id = self.id_map.get_id(attribute);
             let res = Attribute {
-                cond,
+                pp_ctx,
                 form_id,
                 name,
             };
@@ -676,20 +684,20 @@ impl<'a> Ctx<'a> {
     fn lower_moduledoc_attribute(
         &mut self,
         attribute: &ast::WildAttribute,
-        cond: Option<Idx<PPCondition>>,
+        pp_ctx: Option<Idx<PPCondition>>,
     ) -> Option<FormIdx> {
         let form_id = self.id_map.get_id(attribute);
         let res = if let Some(ast::Expr::MapExpr(_)) = attribute.value() {
             FormIdx::ModuleDocMetadataAttribute(
                 self.data
                     .moduledoc_metadata_attributes
-                    .alloc(ModuleDocMetadataAttribute { cond, form_id }),
+                    .alloc(ModuleDocMetadataAttribute { pp_ctx, form_id }),
             )
         } else {
             FormIdx::ModuleDocAttribute(
                 self.data
                     .moduledoc_attributes
-                    .alloc(ModuleDocAttribute { cond, form_id }),
+                    .alloc(ModuleDocAttribute { pp_ctx, form_id }),
             )
         };
         Some(res)
@@ -698,29 +706,29 @@ impl<'a> Ctx<'a> {
     fn lower_doc_attribute(
         &mut self,
         attribute: &ast::WildAttribute,
-        cond: Option<Idx<PPCondition>>,
+        pp_ctx: Option<Idx<PPCondition>>,
     ) -> Option<FormIdx> {
         let form_id = self.id_map.get_id(attribute);
         let res = if let Some(ast::Expr::MapExpr(_)) = attribute.value() {
             FormIdx::DocMetadataAttribute(
                 self.data
                     .doc_metadata_attributes
-                    .alloc(DocMetadataAttribute { cond, form_id }),
+                    .alloc(DocMetadataAttribute { pp_ctx, form_id }),
             )
         } else {
             FormIdx::DocAttribute(
                 self.data
                     .doc_attributes
-                    .alloc(DocAttribute { cond, form_id }),
+                    .alloc(DocAttribute { pp_ctx, form_id }),
             )
         };
         Some(res)
     }
 
     fn lower_feature_attribute(&mut self, attribute: &ast::FeatureAttribute) -> Option<FormIdx> {
-        let cond = self.conditions.last().copied();
+        let pp_ctx = self.conditions.last().copied();
         let form_id = self.id_map.get_id(attribute);
-        let res = FeatureAttribute { cond, form_id };
+        let res = FeatureAttribute { pp_ctx, form_id };
         Some(FormIdx::FeatureAttribute(
             self.data.feature_attributes.alloc(res),
         ))

@@ -104,7 +104,7 @@ impl Printer<'_> {
             self,
             "-module({}). %% cond: {:?}",
             module_attribute.name,
-            raw_cond(&module_attribute.cond)
+            raw_cond(&module_attribute.pp_ctx)
         )
     }
 
@@ -112,21 +112,26 @@ impl Printer<'_> {
         match include {
             IncludeAttribute::Include {
                 path,
-                cond,
+                pp_ctx,
                 form_id: _,
             } => {
-                writeln!(self, "-include({:?}). %% cond: {:?}", path, raw_cond(cond))
+                writeln!(
+                    self,
+                    "-include({:?}). %% cond: {:?}",
+                    path,
+                    raw_cond(pp_ctx)
+                )
             }
             IncludeAttribute::IncludeLib {
                 path,
-                cond,
+                pp_ctx,
                 form_id: _,
             } => {
                 writeln!(
                     self,
                     "-inlcude_lib({:?}). %% cond: {:?}",
                     path,
-                    raw_cond(cond)
+                    raw_cond(pp_ctx)
                 )
             }
         }
@@ -139,7 +144,7 @@ impl Printer<'_> {
             "{}({}) -> .... %% cond: {:?}",
             function.name.name(),
             args,
-            raw_cond(&function.cond)
+            raw_cond(&function.pp_ctx)
         )
     }
 
@@ -148,10 +153,10 @@ impl Printer<'_> {
             PPDirective::Define(idx) => self.print_define(&self.forms[*idx]),
             PPDirective::Undef {
                 name,
-                cond,
+                pp_ctx,
                 form_id: _,
             } => {
-                writeln!(self, "-undef({}). %% cond: {:?}", name, raw_cond(cond))
+                writeln!(self, "-undef({}). %% cond: {:?}", name, raw_cond(pp_ctx))
             }
             PPDirective::Include(idx) => self.print_include(&self.forms[*idx]),
         }
@@ -164,14 +169,14 @@ impl Printer<'_> {
                 "-define({}({}), ...). %% cond: {:?}",
                 define.name.name(),
                 BlankArgs(arity),
-                raw_cond(&define.cond)
+                raw_cond(&define.pp_ctx)
             )
         } else {
             writeln!(
                 self,
                 "-define({}, ...). %% cond: {:?}",
                 define.name.name(),
-                raw_cond(&define.cond)
+                raw_cond(&define.pp_ctx)
             )
         }
     }
@@ -179,7 +184,7 @@ impl Printer<'_> {
     fn print_pp_condition(&mut self, pp: &PPCondition, idx: PPConditionId) -> fmt::Result {
         match pp {
             PPCondition::Ifdef {
-                cond,
+                pp_ctx,
                 name,
                 form_id: _,
             } => writeln!(
@@ -187,10 +192,10 @@ impl Printer<'_> {
                 "-ifdef({}). %% {:?}, cond: {:?}",
                 name,
                 idx.into_raw(),
-                raw_cond(cond)
+                raw_cond(pp_ctx)
             ),
             PPCondition::Ifndef {
-                cond,
+                pp_ctx,
                 name,
                 form_id: _,
             } => writeln!(
@@ -198,17 +203,17 @@ impl Printer<'_> {
                 "-ifndef({}). %% {:?}, cond: {:?}",
                 name,
                 idx.into_raw(),
-                raw_cond(cond)
+                raw_cond(pp_ctx)
             ),
             PPCondition::Endif { prev, form_id: _ } => {
                 writeln!(self, "-endif. %% prev: {:?}", prev.into_raw())
             }
-            PPCondition::If { cond, form_id: _ } => {
+            PPCondition::If { pp_ctx, form_id: _ } => {
                 writeln!(
                     self,
                     "-if(...). %% {:?}, cond: {:?}",
                     idx.into_raw(),
-                    raw_cond(cond)
+                    raw_cond(pp_ctx)
                 )
             }
             PPCondition::Elif { prev, form_id: _ } => {
@@ -232,28 +237,28 @@ impl Printer<'_> {
 
     fn print_export(&mut self, export: &Export) -> fmt::Result {
         write!(self, "-export(")?;
-        self.print_entries(&export.entries, export.cond)
+        self.print_entries(&export.entries, export.pp_ctx)
     }
 
     fn print_import(&mut self, import: &Import) -> fmt::Result {
         write!(self, "-import({}, ", import.from)?;
-        self.print_entries(&import.entries, import.cond)
+        self.print_entries(&import.entries, import.pp_ctx)
     }
 
     fn print_type_export(&mut self, export: &TypeExport) -> fmt::Result {
         write!(self, "-export_type(")?;
-        self.print_entries(&export.entries, export.cond)
+        self.print_entries(&export.entries, export.pp_ctx)
     }
 
     fn print_entries(
         &mut self,
         entries: &IdxRange<FaEntry>,
-        cond: Option<PPConditionId>,
+        pp_ctx: Option<PPConditionId>,
     ) -> fmt::Result {
         if entries.is_empty() {
-            writeln!(self, "[]). %% cond: {:?}", raw_cond(&cond))
+            writeln!(self, "[]). %% cond: {:?}", raw_cond(&pp_ctx))
         } else {
-            writeln!(self, "[ %% cond: {:?}", raw_cond(&cond))?;
+            writeln!(self, "[ %% cond: {:?}", raw_cond(&pp_ctx))?;
             let mut sep = "";
             for entry_id in entries.clone() {
                 write!(self, "{}    {}", sep, self.forms[entry_id].name)?;
@@ -268,7 +273,7 @@ impl Printer<'_> {
             self,
             "-behaviour({}). %% cond: {:?}",
             behaviour.name,
-            raw_cond(&behaviour.cond)
+            raw_cond(&behaviour.pp_ctx)
         )
     }
 
@@ -276,19 +281,19 @@ impl Printer<'_> {
         let (attr, name, cond) = match alias {
             TypeAlias::Regular {
                 name,
-                cond,
+                pp_ctx,
                 form_id: _,
-            } => ("type", name, cond),
+            } => ("type", name, pp_ctx),
             TypeAlias::Nominal {
                 name,
-                cond,
+                pp_ctx,
                 form_id: _,
-            } => ("nominal", name, cond),
+            } => ("nominal", name, pp_ctx),
             TypeAlias::Opaque {
                 name,
-                cond,
+                pp_ctx,
                 form_id: _,
-            } => ("opaque", name, cond),
+            } => ("opaque", name, pp_ctx),
         };
         let args = BlankArgs(name.arity());
         let name = name.name();
@@ -305,7 +310,7 @@ impl Printer<'_> {
 
     fn print_optional_callbacks(&mut self, cbs: &OptionalCallbacks) -> fmt::Result {
         write!(self, "-optional_callbacks(")?;
-        self.print_entries(&cbs.entries, cbs.cond)
+        self.print_entries(&cbs.entries, cbs.pp_ctx)
     }
 
     fn print_spec(&mut self, spec: &Spec) -> fmt::Result {
@@ -316,7 +321,7 @@ impl Printer<'_> {
             "-spec {}({}) -> .... %% cond: {:?}",
             name,
             args,
-            raw_cond(&spec.cond)
+            raw_cond(&spec.pp_ctx)
         )
     }
 
@@ -328,7 +333,7 @@ impl Printer<'_> {
             "-callback {}({}) -> .... %% cond: {:?}",
             name,
             args,
-            raw_cond(&callback.cond)
+            raw_cond(&callback.pp_ctx)
         )
     }
 
@@ -338,14 +343,14 @@ impl Printer<'_> {
                 self,
                 "-record({}, {{}}). %% cond: {:?}",
                 record.name,
-                raw_cond(&record.cond)
+                raw_cond(&record.pp_ctx)
             )
         } else {
             writeln!(
                 self,
                 "-record({}, {{ %% cond: {:?}",
                 record.name,
-                raw_cond(&record.cond)
+                raw_cond(&record.pp_ctx)
             )?;
             let mut sep = "";
             for field_id in record.fields.clone() {
@@ -360,7 +365,7 @@ impl Printer<'_> {
         writeln!(
             self,
             "-compile(...). %% cond: {:?}",
-            raw_cond(&compile.cond)
+            raw_cond(&compile.pp_ctx)
         )
     }
 
@@ -369,7 +374,7 @@ impl Printer<'_> {
             self,
             "-{}(...). %% cond: {:?}",
             attribute.name,
-            raw_cond(&attribute.cond)
+            raw_cond(&attribute.pp_ctx)
         )
     }
 
@@ -377,7 +382,7 @@ impl Printer<'_> {
         writeln!(
             self,
             "-moduledoc(...). %% cond: {:?}",
-            raw_cond(&attribute.cond)
+            raw_cond(&attribute.pp_ctx)
         )
     }
 
@@ -388,46 +393,54 @@ impl Printer<'_> {
         writeln!(
             self,
             "-moduledoc(...). %% cond: {:?}",
-            raw_cond(&attribute.cond)
+            raw_cond(&attribute.pp_ctx)
         )
     }
 
     fn print_doc_attribute(&mut self, attribute: &DocAttribute) -> fmt::Result {
-        writeln!(self, "-doc(...). %% cond: {:?}", raw_cond(&attribute.cond))
+        writeln!(
+            self,
+            "-doc(...). %% cond: {:?}",
+            raw_cond(&attribute.pp_ctx)
+        )
     }
 
     fn print_doc_metadata_attribute(&mut self, attribute: &DocMetadataAttribute) -> fmt::Result {
-        writeln!(self, "-doc(...). %% cond: {:?}", raw_cond(&attribute.cond))
+        writeln!(
+            self,
+            "-doc(...). %% cond: {:?}",
+            raw_cond(&attribute.pp_ctx)
+        )
     }
 
     fn print_feature_attribute(&mut self, attribute: &FeatureAttribute) -> fmt::Result {
         writeln!(
             self,
             "-feature(...). %% cond: {:?}",
-            raw_cond(&attribute.cond)
+            raw_cond(&attribute.pp_ctx)
         )
     }
 
     fn print_deprecated(&mut self, attribute: &DeprecatedAttribute) -> fmt::Result {
         match attribute {
-            DeprecatedAttribute::Module { cond, .. } => {
-                writeln!(self, "-deprecated(module). %% cond: {:?}", raw_cond(cond))
+            DeprecatedAttribute::Module { pp_ctx, .. } => {
+                writeln!(self, "-deprecated(module). %% cond: {:?}", raw_cond(pp_ctx))
             }
-            DeprecatedAttribute::Fa { fa, cond, .. } => {
-                writeln!(self, "-deprecated({}). %% cond: {:?}", fa, raw_cond(cond))
+            DeprecatedAttribute::Fa { fa, pp_ctx, .. } => {
+                writeln!(self, "-deprecated({}). %% cond: {:?}", fa, raw_cond(pp_ctx))
             }
-            DeprecatedAttribute::Fas { fas, cond, .. } => {
+            DeprecatedAttribute::Fas { fas, pp_ctx, .. } => {
                 writeln!(
                     self,
                     "-deprecated({}). %% cond: {:?}",
                     DeprecatedFas(fas),
-                    raw_cond(cond)
+                    raw_cond(pp_ctx)
                 )
             }
         }
     }
     fn print_ssr(&mut self, ssr: &SsrDefinition) -> fmt::Result {
-        writeln!(self, "ssr:(...). %% cond: {:?}", raw_cond(&ssr.cond))
+        writeln!(self, "ssr:(...). %% cond: {:?}", raw_cond(&ssr.pp_ctx))
     }
 }
 
@@ -483,8 +496,8 @@ impl fmt::Display for BlankArgs {
     }
 }
 
-fn raw_cond(cond: &Option<PPConditionId>) -> Option<RawIdx> {
-    cond.map(|cond| cond.into_raw())
+fn raw_cond(pp_ctx: &Option<PPConditionId>) -> Option<RawIdx> {
+    pp_ctx.map(|pp_ctx| pp_ctx.into_raw())
 }
 
 impl fmt::Write for Printer<'_> {

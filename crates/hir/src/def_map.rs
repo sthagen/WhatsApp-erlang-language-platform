@@ -304,7 +304,7 @@ impl DefMap {
                 FormIdx::OptionalCallbacks(idx) => {
                     let OptionalCallbacks {
                         entries,
-                        cond: _,
+                        pp_ctx: _,
                         form_id: _,
                     } = &form_list[idx];
                     entries.clone().for_each(|fa| {

@@ -144,7 +144,7 @@ pub(crate) fn local_resolve_query(
             }
             PPDirective::Undef {
                 name: undefed,
-                cond: _,
+                pp_ctx: _,
                 form_id: _,
             } if undefed == name.name() => {
                 return MacroResolution::Undef;
@@ -240,7 +240,7 @@ impl<'a> MacroExpCtx<'a> {
                 }
                 PPDirective::Undef {
                     name,
-                    cond: _,
+                    pp_ctx: _,
                     form_id: _,
                 } if name == target.name() => {
                     // TODO: diagnostic it was explicitly undefed
