@@ -124,6 +124,7 @@ mod meck;
 // @fb-only: mod meta_only;
 mod missing_compile_warn_missing_spec;
 mod missing_module;
+mod missing_ms_transform_include;
 mod missing_separator;
 mod misspelled_attribute;
 mod mixed_strict_relaxed_generators;
@@ -1764,6 +1765,7 @@ const GENERIC_LINTERS: &[&dyn GenericDiagnostics] = &[
     &unresolved_macro::LINTER,
     &unresolved_include::LINTER,
     &mixed_strict_relaxed_generators::LINTER,
+    &missing_ms_transform_include::LINTER,
 ];
 
 /// Unified registry for all types of linters

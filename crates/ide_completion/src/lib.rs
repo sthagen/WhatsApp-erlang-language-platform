@@ -224,7 +224,7 @@ fn right_biased_token(node: &SyntaxNode, file_position: FilePosition) -> Option<
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IncludeFile {
-    include_lib: bool,
+    pub include_lib: bool,
     pub path: String,
     pub app_name: String,
 }
