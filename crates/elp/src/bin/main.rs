@@ -33,6 +33,7 @@ use lsp_server::Connection;
 mod args;
 mod build_info_cli;
 mod config_stanza;
+mod daemon;
 mod dialyzer_cli;
 mod elp_parse_cli;
 mod eqwalizer_cli;
@@ -147,13 +148,22 @@ fn try_main(cli: &mut dyn Cli, args: Args) -> Result<()> {
         args::Command::ParseAllElp(args) => {
             elp_parse_cli::parse_all(&args, cli, &query_config, ifdef)?
         }
+        args::Command::Eqwalize(ref eqwalize_args) if eqwalize_args.connect => {
+            daemon::connect_eqwalize(eqwalize_args, cli)?
+        }
         args::Command::Eqwalize(args) => {
             eqwalizer_cli::eqwalize_module(&args, cli, &query_config, ifdef)?
+        }
+        args::Command::EqwalizeAll(ref eqwalize_all_args) if eqwalize_all_args.connect => {
+            daemon::connect_eqwalize_all(eqwalize_all_args, cli)?
         }
         args::Command::EqwalizeAll(args) => {
             eqwalizer_cli::eqwalize_all(&args, cli, &query_config, ifdef)?
         }
         args::Command::DialyzeAll(args) => dialyzer_cli::dialyze_all(&args, cli)?,
+        args::Command::EqwalizeApp(ref eqwalize_app_args) if eqwalize_app_args.connect => {
+            daemon::connect_eqwalize_app(eqwalize_app_args, cli)?
+        }
         args::Command::EqwalizeApp(args) => {
             eqwalizer_cli::eqwalize_app(&args, cli, &query_config, ifdef)?
         }
@@ -175,6 +185,7 @@ fn try_main(cli: &mut dyn Cli, args: Args) -> Result<()> {
         }
         args::Command::Version(_) => writeln!(cli, "elp {}", elp::version())?,
         args::Command::Shell(args) => shell::run_shell(&args, cli, &query_config, ifdef)?,
+        args::Command::Daemon(cmd) => daemon::daemon_command(&cmd, cli, &query_config, ifdef)?,
         args::Command::Help() => {
             let help = batteries::get_usage(args::args());
             writeln!(cli, "{help}")?

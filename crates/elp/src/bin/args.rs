@@ -124,6 +124,8 @@ pub struct Eqwalize {
     pub format: Option<String>,
     /// Run with rebar
     pub rebar: bool,
+    /// Use a persistent daemon for fast turnaround (auto-starts if needed)
+    pub connect: bool,
     /// Exit with a non-zero status code if any errors are found
     pub bail_on_error: bool,
     /// Eqwalize specified modules
@@ -152,6 +154,8 @@ pub struct EqwalizeAll {
     pub format: Option<String>,
     /// Run with rebar
     pub rebar: bool,
+    /// Use a persistent daemon for fast turnaround (auto-starts if needed)
+    pub connect: bool,
     /// Also eqwalize opted-in generated modules from project (deprecated)
     #[bpaf(hide)]
     pub include_generated: bool,
@@ -199,6 +203,8 @@ pub struct EqwalizeApp {
     pub include_generated: bool,
     /// Run with rebar
     pub rebar: bool,
+    /// Use a persistent daemon for fast turnaround (auto-starts if needed)
+    pub connect: bool,
     /// Exit with a non-zero status code if any errors are found
     pub bail_on_error: bool,
     /// app name
@@ -476,6 +482,58 @@ pub struct Shell {
     pub command: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
+pub enum DaemonCommand {
+    Run(DaemonRun),
+    Stop,
+    Status(DaemonStatus),
+}
+
+#[derive(Clone, Debug, Bpaf)]
+pub struct DaemonRun {
+    /// Path to directory with project, or to a JSON file (defaults to `.`)
+    #[bpaf(argument("PROJECT"), fallback(PathBuf::from(".")))]
+    pub project: PathBuf,
+    /// Rebar3 profile to pickup (default is test)
+    #[bpaf(long("as"), argument("PROFILE"), fallback("test".to_string()))]
+    pub profile: String,
+    /// Run with rebar
+    pub rebar: bool,
+    /// Idle timeout in seconds before auto-shutdown (default: 1800, 0=never)
+    #[bpaf(long("idle-timeout"), argument("SECONDS"), fallback(1800u64))]
+    pub idle_timeout: u64,
+}
+
+#[derive(Clone, Debug, Bpaf)]
+pub struct DaemonStatus {
+    /// Path to directory with project, or to a JSON file (defaults to `.`)
+    #[bpaf(argument("PROJECT"), fallback(PathBuf::from(".")))]
+    pub project: PathBuf,
+    /// Rebar3 profile to pickup (default is test)
+    #[bpaf(long("as"), argument("PROFILE"), fallback("test".to_string()))]
+    pub profile: String,
+    /// Run with rebar
+    pub rebar: bool,
+}
+
+pub fn daemon_command_parser() -> impl Parser<DaemonCommand> {
+    let stop = bpaf::pure(DaemonCommand::Stop)
+        .to_options()
+        .command("stop")
+        .help("Stop all running daemons");
+
+    let status = daemon_status()
+        .map(DaemonCommand::Status)
+        .to_options()
+        .command("status")
+        .help("Show daemon status for this project");
+
+    // When no subcommand is given, parse DaemonRun args directly
+    let run = daemon_run().map(DaemonCommand::Run);
+
+    construct!([stop, status, run])
+}
+
 #[derive(Clone, Debug, Bpaf)]
 pub struct ProjectInfo {
     /// Path to directory with project, or to a JSON file (defaults to `.`)
@@ -530,6 +588,7 @@ pub enum Command {
     Ssr(Ssr),
     Version(Version),
     Shell(Shell),
+    Daemon(DaemonCommand),
     Explain(Explain),
     LintList(LintList),
     ProjectInfo(ProjectInfo),
@@ -697,6 +756,12 @@ pub fn command() -> impl Parser<Command> {
         .command("shell")
         .help("Starts an interactive ELP shell");
 
+    let daemon = daemon_command_parser()
+        .map(Command::Daemon)
+        .to_options()
+        .command("daemon")
+        .help("Manage a persistent ELP daemon for fast turnaround");
+
     let explain = explain()
         .map(Command::Explain)
         .to_options()
@@ -732,6 +797,7 @@ pub fn command() -> impl Parser<Command> {
         version,
         run_server,
         shell,
+        daemon,
         eqwalize,
         eqwalize_all,
         eqwalize_app,

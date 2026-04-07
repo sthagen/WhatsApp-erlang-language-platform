@@ -45,22 +45,22 @@ use crate::args::Shell;
 use crate::eqwalizer_cli;
 
 #[derive(Debug, Clone, Deserialize)]
-struct Watchman {
+pub(crate) struct Watchman {
     watch: PathBuf,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct WatchmanClock {
+pub(crate) struct WatchmanClock {
     clock: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct WatchmanChanges {
-    files: Vec<WatchmanFile>,
+pub(crate) struct WatchmanChanges {
+    pub(crate) files: Vec<WatchmanFile>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct WatchmanFile {
+pub(crate) struct WatchmanFile {
     name: String,
     exists: bool,
     #[serde(default)]
@@ -72,21 +72,25 @@ impl Watchman {
         Command::new("watchman")
     }
 
-    fn new(project: &Path) -> Result<Self> {
+    pub(crate) fn new(project: &Path) -> Result<Self> {
         let mut cmd = Self::cmd();
         cmd.arg("watch-project");
         cmd.arg(project.as_os_str());
         Ok(serde_json::from_slice(&cmd.output()?.stdout)?)
     }
 
-    fn get_clock(&self) -> Result<WatchmanClock> {
+    pub(crate) fn get_clock(&self) -> Result<WatchmanClock> {
         let mut cmd = Self::cmd();
         cmd.arg("clock");
         cmd.arg(self.watch.as_os_str());
         Ok(serde_json::from_slice(&cmd.output()?.stdout)?)
     }
 
-    fn get_changes(&self, from: &WatchmanClock, patterns: Vec<&str>) -> Result<WatchmanChanges> {
+    pub(crate) fn get_changes(
+        &self,
+        from: &WatchmanClock,
+        patterns: Vec<&str>,
+    ) -> Result<WatchmanChanges> {
         let mut cmd = Self::cmd();
         cmd.arg("since");
         cmd.arg(self.watch.as_os_str());
@@ -97,7 +101,7 @@ impl Watchman {
 }
 
 #[derive(Debug, Clone)]
-enum ShellError {
+pub(crate) enum ShellError {
     UnexpectedCommand(String),
     UnexpectedOption(String, String),
     UnexpectedArg(String, String),
@@ -119,7 +123,7 @@ impl fmt::Display for ShellError {
 }
 
 #[derive(Debug, Clone)]
-enum ShellCommand {
+pub(crate) enum ShellCommand {
     ShellEqwalize(Eqwalize),
     ShellEqwalizeAll(EqwalizeAll),
     ShellEqwalizeApp(EqwalizeApp),
@@ -127,7 +131,7 @@ enum ShellCommand {
     Quit,
 }
 impl ShellCommand {
-    fn parse(shell: &Shell, line: String) -> Result<Option<ShellCommand>, ShellError> {
+    pub(crate) fn parse(shell: &Shell, line: String) -> Result<Option<ShellCommand>, ShellError> {
         let project = shell.project.clone();
         let rebar = false;
         let profile = "test".to_string();
@@ -150,6 +154,7 @@ impl ShellCommand {
                             profile,
                             format: None,
                             rebar,
+                            connect: false,
                             modules: args.iter().map(|s| s.to_string()).collect(),
                             bail_on_error: false,
                         })));
@@ -176,6 +181,7 @@ impl ShellCommand {
                             profile,
                             format: None,
                             rebar,
+                            connect: false,
                             app: app.into(),
                             include_generated,
                             bail_on_error: false,
@@ -201,6 +207,7 @@ impl ShellCommand {
                         project,
                         profile,
                         rebar,
+                        connect: false,
                         format: None,
                         include_generated,
                         bail_on_error: false,
@@ -277,7 +284,10 @@ fn process_changes_to_vfs_store(loaded: &mut LoadResult) -> bool {
     true
 }
 
-fn should_reload_project(watchman: &Watchman, last_read: &WatchmanClock) -> Result<bool> {
+pub(crate) fn should_reload_project(
+    watchman: &Watchman,
+    last_read: &WatchmanClock,
+) -> Result<bool> {
     let project_paths = vec![
         "BUCK",
         "TARGETS",
@@ -303,7 +313,7 @@ fn should_reload_project(watchman: &Watchman, last_read: &WatchmanClock) -> Resu
     Ok(project_path_changed || suite_file_created)
 }
 
-fn update_changes(
+pub(crate) fn update_changes(
     loaded: &mut LoadResult,
     watchman: &Watchman,
     last_read: &WatchmanClock,

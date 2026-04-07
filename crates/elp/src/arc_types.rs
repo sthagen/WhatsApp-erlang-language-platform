@@ -10,11 +10,13 @@
 
 // @fb-only: /// Types as defined in https://www.internalfb.com/intern/wiki/Linting/adding-linters/#flow-type
 // @fb-only: /// and https://www.internalfb.com/code/fbsource/[1238f73dac0efd4009443fee6a345a680dc9401b]/whatsapp/server/erl/tools/lint/arcanist.py?lines=17
+use std::fmt;
 use std::path::Path;
 
+use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Diagnostic {
     // Filepath
@@ -33,7 +35,7 @@ pub struct Diagnostic {
     doc_path: Option<String>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Error,    // May crash (eg. syntax errors); always shown; need confirmation
@@ -41,6 +43,41 @@ pub enum Severity {
     Autofix,  // Warning that contains an automatic fix in description
     Advice,   // Improvements (eg. leftover comments); shown on change; no confrimation
     Disabled, // Suppressed error message
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Severity::Error => write!(f, "error"),
+            Severity::Warning => write!(f, "warning"),
+            Severity::Autofix => write!(f, "autofix"),
+            Severity::Advice => write!(f, "advice"),
+            Severity::Disabled => write!(f, "disabled"),
+        }
+    }
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let loc = match self.char {
+            Some(c) => format!("{}:{}:{}", self.path, self.line.unwrap_or(0), c),
+            None => format!("{}:{}", self.path, self.line.unwrap_or(0)),
+        };
+        write!(f, "{}: {} [{}]", self.severity, loc, self.name)?;
+        if let Some(desc) = &self.description {
+            for line in desc.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty()
+                    || trimmed.starts_with("```")
+                    || trimmed.starts_with("> [docs")
+                {
+                    continue;
+                }
+                write!(f, "\n  {line}")?;
+            }
+        }
+        writeln!(f)
+    }
 }
 
 impl Diagnostic {

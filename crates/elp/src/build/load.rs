@@ -15,7 +15,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Result;
-use anyhow::bail;
 use crossbeam_channel::Receiver;
 use crossbeam_channel::unbounded;
 use elp_ide::AnalysisHost;
@@ -48,6 +47,33 @@ use crate::document::Document;
 use crate::line_endings::LineEndings;
 use crate::reload::ProjectFolders;
 
+/// Discover the project manifest by walking upward from the given path.
+/// This is the shared discovery logic used by both `load_project_at` and
+/// the daemon's project root discovery.
+pub fn discover_manifest(
+    root: &Path,
+    conf: &DiscoverConfig,
+) -> Result<(ElpConfig, ProjectManifest)> {
+    let root = fs::canonicalize(root)?;
+    let root = AbsPathBuf::assert_utf8(root);
+    let (elp_config, manifest) = match conf.rebar {
+        true => (
+            ElpConfig::default(),
+            ProjectManifest::discover_rebar(
+                &root,
+                Some(conf.rebar_profile.clone()),
+                IncludeParentDirs::Yes,
+            )?,
+        ),
+        false => {
+            let (elp_config, manifest) = ProjectManifest::discover(&root)?;
+            (elp_config, Some(manifest))
+        }
+    };
+    let manifest = manifest.ok_or_else(|| anyhow::anyhow!("no projects"))?;
+    Ok((elp_config, manifest))
+}
+
 pub fn load_project_at(
     cli: &dyn Cli,
     root: &Path,
@@ -57,31 +83,33 @@ pub fn load_project_at(
     query_config: &BuckQueryConfig,
     ifdef: bool,
 ) -> Result<LoadResult> {
-    let root = fs::canonicalize(root)?;
-    let root = AbsPathBuf::assert_utf8(root);
-    let (elp_config, manifest): (ElpConfig, Option<ProjectManifest>) = match conf.rebar {
-        true => (
-            ElpConfig::default(),
-            ProjectManifest::discover_rebar(
-                &root,
-                Some(conf.rebar_profile),
-                IncludeParentDirs::Yes,
-            )?,
-        ),
-        false => {
-            let (elp_config, manifest) = ProjectManifest::discover(&root)?;
-            (elp_config, Some(manifest))
-        }
-    };
-    let manifest = if let Some(manifest) = manifest {
-        manifest
-    } else {
-        bail!("no projects")
-    };
+    let (elp_config, manifest) = discover_manifest(root, &conf)?;
+    load_project_from_manifest(
+        cli,
+        &manifest,
+        &elp_config,
+        include_otp,
+        eqwalizer_mode,
+        query_config,
+        ifdef,
+    )
+}
 
-    log::info!("Discovered project: {manifest:?}");
+/// Load a project from an already-discovered manifest.
+/// Use this when the manifest has been discovered separately (e.g., by the daemon
+/// to avoid redundant discovery).
+pub fn load_project_from_manifest(
+    cli: &dyn Cli,
+    manifest: &ProjectManifest,
+    elp_config: &ElpConfig,
+    include_otp: IncludeOtp,
+    eqwalizer_mode: elp_eqwalizer::Mode,
+    query_config: &BuckQueryConfig,
+    ifdef: bool,
+) -> Result<LoadResult> {
+    log::info!("Loading project: {manifest:?}");
     let pb = cli.spinner("Loading build info");
-    let project = Project::load(&manifest, &elp_config, query_config, &|_progress| {})?;
+    let project = Project::load(manifest, elp_config, query_config, &|_progress| {})?;
     pb.finish();
 
     load_project(cli, project, include_otp, eqwalizer_mode, ifdef)

@@ -16,6 +16,7 @@ Available commands:
     version               Print version
     server                Run lsp server
     shell                 Starts an interactive ELP shell
+    daemon                Manage a persistent ELP daemon for fast turnaround
     eqwalize              Eqwalize specified module
     eqwalize-all          Eqwalize all opted-in modules in a project
     eqwalize-app          Eqwalize all opted-in modules in specified application
