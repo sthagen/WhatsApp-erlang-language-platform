@@ -129,7 +129,7 @@ fn setup_cli_telemetry(args: &Args) {
     }
 }
 
-fn try_main(cli: &mut dyn Cli, args: Args) -> Result<()> {
+fn try_main(cli: &mut dyn Cli, mut args: Args) -> Result<()> {
     let logger = setup_logging(&args.log_file, args.no_log_buffering)?;
     setup_cli_telemetry(&args);
 
@@ -140,60 +140,61 @@ fn try_main(cli: &mut dyn Cli, args: Args) -> Result<()> {
     let query_config = args.query_config();
     let use_color = args.should_use_color();
     let ifdef = args.ifdef;
-    match args.command {
+    args.command.normalize();
+    match &args.command {
         args::Command::RunServer(_) => run_server(logger)?,
         args::Command::ParseAll(args) => {
-            erlang_service_cli::parse_all(&args, cli, &query_config, ifdef)?
+            erlang_service_cli::parse_all(args, cli, &query_config, ifdef)?
         }
         args::Command::ParseAllElp(args) => {
-            elp_parse_cli::parse_all(&args, cli, &query_config, ifdef)?
+            elp_parse_cli::parse_all(args, cli, &query_config, ifdef)?
         }
-        args::Command::Eqwalize(ref eqwalize_args) if eqwalize_args.connect => {
+        args::Command::Eqwalize(eqwalize_args) if eqwalize_args.connect => {
             daemon::connect_eqwalize(eqwalize_args, cli)?
         }
         args::Command::Eqwalize(args) => {
-            eqwalizer_cli::eqwalize_module(&args, cli, &query_config, ifdef)?
+            eqwalizer_cli::eqwalize_module(args, cli, &query_config, ifdef)?
         }
-        args::Command::EqwalizeAll(ref eqwalize_all_args) if eqwalize_all_args.connect => {
+        args::Command::EqwalizeAll(eqwalize_all_args) if eqwalize_all_args.connect => {
             daemon::connect_eqwalize_all(eqwalize_all_args, cli)?
         }
         args::Command::EqwalizeAll(args) => {
-            eqwalizer_cli::eqwalize_all(&args, cli, &query_config, ifdef)?
+            eqwalizer_cli::eqwalize_all(args, cli, &query_config, ifdef)?
         }
-        args::Command::DialyzeAll(args) => dialyzer_cli::dialyze_all(&args, cli)?,
-        args::Command::EqwalizeApp(ref eqwalize_app_args) if eqwalize_app_args.connect => {
+        args::Command::DialyzeAll(args) => dialyzer_cli::dialyze_all(args, cli)?,
+        args::Command::EqwalizeApp(eqwalize_app_args) if eqwalize_app_args.connect => {
             daemon::connect_eqwalize_app(eqwalize_app_args, cli)?
         }
         args::Command::EqwalizeApp(args) => {
-            eqwalizer_cli::eqwalize_app(&args, cli, &query_config, ifdef)?
+            eqwalizer_cli::eqwalize_app(args, cli, &query_config, ifdef)?
         }
         args::Command::EqwalizeStats(args) => {
-            eqwalizer_cli::eqwalize_stats(&args, cli, &query_config, ifdef)?
+            eqwalizer_cli::eqwalize_stats(args, cli, &query_config, ifdef)?
         }
         args::Command::EqwalizeTarget(args) => {
-            eqwalizer_cli::eqwalize_target(&args, cli, &query_config, ifdef)?
+            eqwalizer_cli::eqwalize_target(args, cli, &query_config, ifdef)?
         }
         args::Command::BuildInfo(args) => build_info_cli::save_build_info(args, &query_config)?,
         args::Command::ProjectInfo(args) => build_info_cli::save_project_info(args, &query_config)?,
         args::Command::Lint(args) => lint_cli::run_lint_command(args, cli, &query_config, ifdef)?,
         args::Command::Ssr(ssr_args) => {
-            ssr_cli::run_ssr_command(&ssr_args, cli, &query_config, use_color, ifdef)?
+            ssr_cli::run_ssr_command(ssr_args, cli, &query_config, use_color, ifdef)?
         }
         args::Command::GenerateCompletions(args) => {
             let instructions = args::gen_completions(&args.shell);
             writeln!(cli, "#Please run this:\n{instructions}")?
         }
         args::Command::Version(_) => writeln!(cli, "elp {}", elp::version())?,
-        args::Command::Shell(args) => shell::run_shell(&args, cli, &query_config, ifdef)?,
-        args::Command::Daemon(cmd) => daemon::daemon_command(&cmd, cli, &query_config, ifdef)?,
+        args::Command::Shell(args) => shell::run_shell(args, cli, &query_config, ifdef)?,
+        args::Command::Daemon(cmd) => daemon::daemon_command(cmd, cli, &query_config, ifdef)?,
         args::Command::Help() => {
             let help = batteries::get_usage(args::args());
             writeln!(cli, "{help}")?
         }
-        args::Command::Explain(args) => explain_cli::explain(&args, cli)?,
-        args::Command::LintList(args) => lint_list_cli::lint_list(&args, cli)?,
-        args::Command::Glean(args) => glean::index(&args, cli, &query_config, ifdef)?,
-        args::Command::ConfigStanza(args) => config_stanza::config_stanza(&args, cli)?,
+        args::Command::Explain(args) => explain_cli::explain(args, cli)?,
+        args::Command::LintList(args) => lint_list_cli::lint_list(args, cli)?,
+        args::Command::Glean(args) => glean::index(args, cli, &query_config, ifdef)?,
+        args::Command::ConfigStanza(args) => config_stanza::config_stanza(args, cli)?,
     }
 
     log::logger().flush();

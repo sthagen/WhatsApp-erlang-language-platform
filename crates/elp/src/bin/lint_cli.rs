@@ -103,13 +103,11 @@ fn meets_severity_threshold(
 }
 
 pub fn run_lint_command(
-    mut args: Lint,
+    args: &Lint,
     cli: &mut dyn Cli,
     query_config: &BuckQueryConfig,
     ifdef: bool,
 ) -> Result<()> {
-    args.normalize();
-    let args = &args;
     let start_time = SystemTime::now();
     let memory_start = MemoryUsage::now();
 

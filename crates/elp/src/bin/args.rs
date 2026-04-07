@@ -657,6 +657,14 @@ impl Args {
     }
 }
 
+impl Command {
+    pub fn normalize(&mut self) {
+        if let Command::Lint(args) = self {
+            args.normalize()
+        }
+    }
+}
+
 pub fn command() -> impl Parser<Command> {
     let parse_elp = parse_all_elp()
         .map(Command::ParseAllElp)

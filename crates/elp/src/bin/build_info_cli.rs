@@ -31,7 +31,7 @@ use fxhash::FxHashMap;
 use crate::args::BuildInfo;
 use crate::args::ProjectInfo;
 
-pub(crate) fn save_build_info(args: BuildInfo, query_config: &BuckQueryConfig) -> Result<()> {
+pub(crate) fn save_build_info(args: &BuildInfo, query_config: &BuckQueryConfig) -> Result<()> {
     let root = fs::canonicalize(&args.project)?;
     let root = AbsPathBuf::assert_utf8(root);
     let (elp_config, manifest) = ProjectManifest::discover(&root)?;
@@ -42,8 +42,8 @@ pub(crate) fn save_build_info(args: BuildInfo, query_config: &BuckQueryConfig) -
     Ok(())
 }
 
-pub(crate) fn save_project_info(args: ProjectInfo, query_config: &BuckQueryConfig) -> Result<()> {
-    let mut writer: Box<dyn Write> = match args.to {
+pub(crate) fn save_project_info(args: &ProjectInfo, query_config: &BuckQueryConfig) -> Result<()> {
+    let mut writer: Box<dyn Write> = match &args.to {
         Some(to) => Box::new(
             std::fs::OpenOptions::new()
                 .write(true)
