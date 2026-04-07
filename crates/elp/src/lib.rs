@@ -46,6 +46,7 @@ pub mod server;
 mod snapshot;
 mod task_pool;
 mod to_proto;
+pub mod watchman;
 
 pub fn from_json<T: DeserializeOwned>(what: &'static str, json: serde_json::Value) -> Result<T> {
     let res = serde_path_to_error::deserialize(&json)

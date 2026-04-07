@@ -41,6 +41,10 @@ use codespan_reporting::term::termcolor::WriteColor;
 use elp::build::load;
 use elp::build::types::LoadResult;
 use elp::cli::Cli;
+use elp::watchman::Watchman;
+use elp::watchman::WatchmanClock;
+use elp::watchman::should_reload_project;
+use elp::watchman::update_changes;
 use elp_eqwalizer::Mode;
 use elp_ide::elp_ide_db::elp_base_db::IncludeOtp;
 use elp_log::telemetry;
@@ -60,9 +64,6 @@ use crate::args::EqwalizeTarget;
 use crate::args::Shell;
 use crate::eqwalizer_cli;
 use crate::shell::ShellCommand;
-use crate::shell::Watchman;
-use crate::shell::should_reload_project;
-use crate::shell::update_changes;
 
 // ---------------------------------------------------------------------------
 // Socket path utilities
@@ -362,7 +363,7 @@ fn handle_connection(
     project: &Path,
     loaded: &mut LoadResult,
     watchman: &Watchman,
-    last_read: &mut crate::shell::WatchmanClock,
+    last_read: &mut WatchmanClock,
     manifest: &ProjectManifest,
     elp_config: &ElpConfig,
     query_config: &BuckQueryConfig,
