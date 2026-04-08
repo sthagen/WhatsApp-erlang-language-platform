@@ -705,7 +705,12 @@ pub(crate) fn xref_check(spec: &str) {
             let idx = annotations
                 .iter()
                 .position(|a| a == &tuple)
-                .unwrap_or_else(|| panic!("Expected to find {:?} in {:?}", &tuple, &annotations));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Got computed value {:?}, annotations {:?}",
+                        &tuple, &annotations
+                    )
+                });
             annotations.remove(idx);
         }
         assert_eq!(annotations, vec![], "Expected no more annotations");
