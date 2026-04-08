@@ -285,6 +285,15 @@ format_error({call_to_redefined_bif,{F,A}}) ->
 format_error({redefine_bif_import,{F,A}}) ->
     io_lib:format("import directive overrides auto-imported BIF ~w/~w~n"
 		  " - use \"-compile({no_auto_import,[~w/~w]}).\" to resolve name clash", [F,A,F,A]);
+format_error({obsolete_bool_op, OldOp, NewOp}) ->
+    "use the short circuiting " ++ NewOp ++ " instead.\nThe "
+    ++ OldOp ++ " "
+    "operator, which always evaluates both sides, could be "
+    "removed in a future version of Erlang/OTP. "
+    "Note that the 'and' and 'or' operators have unexpected precedence, so "
+    "that e.g. `X > 3 or is_tuple(X)` parses as `X > (3 or is_tuple(X))`. "
+    "Compile directive 'nowarn_obsolete_bool_op' can be used to suppress "
+    "warnings in selected modules.";
 format_error({deprecated, MFA, String, Rel}) ->
     io_lib:format("~s is deprecated and will be removed in ~s; ~s",
 		  [format_mfa(MFA), Rel, String]);
@@ -683,6 +692,9 @@ start(File, Opts) ->
          {obsolete_guard,
           bool_option(warn_obsolete_guard, nowarn_obsolete_guard,
                       true, Opts)},
+         {obsolete_bool_op,
+          bool_option(warn_obsolete_bool_op, nowarn_obsolete_bool_op,
+                      false, Opts)},
 	 {untyped_record,
 	  bool_option(warn_untyped_record, nowarn_untyped_record,
 		      false, Opts)},
@@ -1552,8 +1564,8 @@ import(Anno, {Mod,Fs}, St00) ->
 				  (not bif_clash_specifically_disabled(St0,{F,A})),
 			      AutoImpSup = is_autoimport_suppressed(St0#lint.no_auto,{F,A}),
 			      {Err,if
-				       Warn and (not AutoImpSup) ->
-					   add_error
+				       Warn, not AutoImpSup ->
+					   add_warning
 					     (Anno,
 					      {redefine_bif_import, {F,A}},
 					      St0);
@@ -2024,7 +2036,7 @@ bit_type(Anno, Size0, Type, St) ->
 
 bit_size_check(_Anno, unknown, _, St) -> {unknown,St};
 bit_size_check(_Anno, undefined, #bittype{type=Type}, St) ->
-    true = (Type =:= utf8) or (Type =:= utf16) or (Type =:= utf32), %Assertion.
+    true = Type =:= utf8 orelse Type =:= utf16 orelse Type =:= utf32, %Assertion.
     {undefined,St};
 bit_size_check(Anno, all, #bittype{type=Type}, St) ->
     case Type of
@@ -2200,13 +2212,22 @@ gexpr({op,_Anno,EqOp,L,R}, Vt, St0) when EqOp =:= '=:='; EqOp =:= '=/=' ->
 gexpr({op,Anno,Op,L,R}, Vt, St0) ->
     {Avt,St1} = gexpr_list([L,R], Vt, St0),
     case is_gexpr_op(Op, 2) of
-        true -> {Avt,St1};
+        true -> {Avt,warn_obsolete_op(Op, 2, Anno, St1)};
         false -> {Avt,add_error(Anno, illegal_guard_expr, St1)}
     end;
 %% Everything else is illegal! You could put explicit tests here to
 %% better error diagnostics.
 gexpr(E, _Vt, St) ->
     {[],add_error(element(2, E), illegal_guard_expr, St)}.
+
+warn_obsolete_op(Op, A, Anno, St) ->
+    case {Op, A} of
+        {'and', 2} ->
+	    maybe_add_warning(Anno, {obsolete_bool_op, "'and'", "'andalso'"}, St);
+        {'or', 2} ->
+	    maybe_add_warning(Anno, {obsolete_bool_op, "'or'", "'orelse'"}, St);
+        _ -> St
+    end.
 
 %% gexpr_list(Expressions, VarTable, State) ->
 %%      {UsedVarTable,State'}
@@ -2318,7 +2339,7 @@ is_gexpr({record,A,Name,Inits}, Info0) ->
     is_gexpr_fields(Inits, A, Name, Info);
 is_gexpr({bin,_A,Fs}, Info) ->
     all(fun ({bin_element,_Anno,E,Sz,_Ts}) ->
-                is_gexpr(E, Info) and (Sz =:= default orelse is_gexpr(Sz, Info))
+                is_gexpr(E, Info) andalso (Sz =:= default orelse is_gexpr(Sz, Info))
         end, Fs);
 is_gexpr({call,_A,{atom,_Af,F},As}, {_,IsOverridden}=Info) ->
     A = length(As),
@@ -2612,8 +2633,9 @@ expr({op,Anno,Op,L,R}, Vt, St0) when Op =:= 'orelse'; Op =:= 'andalso' ->
 expr({op,_Anno,EqOp,L,R}, Vt, St0) when EqOp =:= '=:='; EqOp =:= '=/=' ->
     St = expr_check_match_zero(R, expr_check_match_zero(L, St0)),
     expr_list([L,R], Vt, St);                   %They see the same variables
-expr({op,_Anno,_Op,L,R}, Vt, St) ->
-    expr_list([L,R], Vt, St);                   %They see the same variables
+expr({op,Anno,Op,L,R}, Vt, St) ->
+    St1 = warn_obsolete_op(Op, 2, Anno, St),
+    expr_list([L,R], Vt, St1);                  %They see the same variables
 %% The following are not allowed to occur anywhere!
 expr({remote,_Anno,M,_F}, _Vt, St) ->
     {[],add_error(erl_parse:first_anno(M), illegal_expr, St)};
