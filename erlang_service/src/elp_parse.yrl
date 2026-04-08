@@ -764,7 +764,7 @@ Erlang code.
     | {'b_generate_strict', anno(), af_pattern(), abstract_expr()}
     | af_zip_generator().
 
--type af_zip_generator() :: [af_generator(), ...].
+-type af_zip_generator() :: {'zip', anno(), [af_generator(), ...]}.
 
 -type af_filter() :: abstract_expr().
 
@@ -1054,7 +1054,9 @@ Erlang code.
     | '>'
     | '=:='
     | '=/='
-    | '!'.
+    | '!'
+    | 'andalso'
+    | 'orelse'.
 
 -type af_unary_op(T) :: {'op', anno(), unary_op(), T}.
 
