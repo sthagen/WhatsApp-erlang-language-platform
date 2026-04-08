@@ -315,6 +315,8 @@ make_code(elp_lint, {obsolete_bool_op, _OldOp, _NewOp}) ->
     "L1325";
 make_code(elp_lint, {export_var_subexpr, _V, {_What, _Where}}) ->
     "L1326";
+make_code(elp_lint, compr_assign) ->
+    "L1327";
 make_code(elp_lint, _Other) ->
     "L1399";
 %% stdlib-3.15.2/src/erl_scan.erl

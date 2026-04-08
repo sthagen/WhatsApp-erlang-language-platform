@@ -172,6 +172,7 @@ value_option(Flag, Default, On, OnVal, Off, OffVal, Opts) ->
                    :: #{ta() => #typeinfo{}},
                exp_types=gb_sets:empty()        %Exported types
                    :: gb_sets:set(ta()),
+               features = [],                   %Enabled features
                feature_keywords =               %Keywords in
                                                 %configurable features
                    feature_keywords() :: #{atom() => atom()},
@@ -339,6 +340,11 @@ format_error(update_literal) ->
     "expression updates a literal";
 format_error(illegal_zip_generator) ->
     "only generators are allowed in a zip generator.";
+format_error(compr_assign) ->
+    "matches using '=' are not allowed in comprehension qualifiers "
+    "unless the experimental 'compr_assign' language feature is enabled. "
+    "With 'compr_assign' enabled, a match 'P = E' will behave as a "
+    "strict generator 'P <-:- [E]'.";
 %% --- patterns and guards ---
 format_error(illegal_pattern) -> "illegal pattern";
 format_error(illegal_map_key) -> "illegal map key in pattern";
@@ -637,9 +643,6 @@ module(Forms, FileName) ->
       ErrorInfo :: error_info()).
 
 module(Forms, FileName, Opts0) ->
-    %% FIXME Hmm, this is not coherent with the semantics of features
-    %% We want the options given on the command line to take
-    %% precedence over options in the module.
     Opts = Opts0 ++ compiler_options(Forms),
     St = forms(Forms, start(FileName, Opts)),
     return_status(St).
@@ -762,6 +765,7 @@ start(File, Opts) ->
 				     nowarn_format, 0, Opts),
 	  enabled_warnings = Enabled,
           nowarn_bif_clash = nowarn_function(nowarn_bif_clash, Opts),
+          features = proplists:get_value(features, Opts, []),
           file = File
          }.
 
@@ -3781,11 +3785,22 @@ lc_quals([F|Qs], Vt, Uvt, St0) ->
     Info = is_guard_test2_info(St0),
     {Fvt,St1} = case is_guard_test2(F, Info) of
 		    true -> guard_test(F, Vt, St0);
-		    false -> expr(F, Vt, St0)
+		    false -> expr(F, Vt, check_compr_assign(F, St0))
 		end,
     lc_quals(Qs, vtupdate(Fvt, Vt), Uvt, St1);
 lc_quals([], Vt, Uvt, St) ->
     {Vt, Uvt, St}.
+
+check_compr_assign({match,Anno,_,_}, St) ->
+    case is_feature_enabled(compr_assign, St) of
+        true -> St;
+        false -> add_error(Anno, compr_assign, St)
+    end;
+check_compr_assign(_, St) ->
+    St.
+
+is_feature_enabled(Name, St) ->
+    lists:member(Name, St#lint.features).
 
 is_guard_test2_info(#lint{records=RDs,locals=Locals,imports=Imports}) ->
     {RDs,fun(FA) ->
