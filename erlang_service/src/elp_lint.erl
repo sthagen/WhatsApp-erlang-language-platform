@@ -737,6 +737,16 @@ start(File, Opts) ->
 is_warn_enabled(Type, #lint{enabled_warnings=Enabled}) ->
     ordsets:is_element(Type, Enabled).
 
+maybe_add_warning(Anno, W, St) ->
+    Tag = if
+              is_tuple(W) -> element(1, W);
+              is_atom(W) -> W
+          end,
+    case is_warn_enabled(Tag, St) of
+        true -> add_warning(Anno, W, St);
+        false -> St
+    end.
+
 %% return_status(State) ->
 %%      {ok,[Warning]} | {error,[Error],[Warning]}
 %%  Pack errors and warnings properly and return ok | error.
@@ -1712,9 +1722,11 @@ pattern({var,Anno,V}, _Vt, Old, St) ->
 pattern({char,_Anno,_C}, _Vt, _Old, St) -> {[],[],St};
 pattern({integer,_Anno,_I}, _Vt, _Old, St) -> {[],[],St};
 pattern({float,Anno,F}, _Vt, _Old, St0) ->
-    St = case F == 0 andalso is_warn_enabled(match_float_zero, St0) of
-             true -> add_warning(Anno, match_float_zero, St0);
-             false -> St0
+    St = if
+             F == 0 ->
+                 maybe_add_warning(Anno, match_float_zero, St0);
+             true ->
+                 St0
          end,
     {[], [], St};
 pattern({atom,Anno,A}, _Vt, _Old, St) ->
@@ -2597,9 +2609,11 @@ expr({unchecked_cast, _Anno, Expr, _Type}, Vt, St) ->
 %% that we do not warn when it's being used as arguments for expressions in
 %% in general: `A =:= abs(0.0)` is fine.
 expr_check_match_zero({float,Anno,F}, St) ->
-    case F == 0 andalso is_warn_enabled(match_float_zero, St) of
-        true -> add_warning(Anno, match_float_zero, St);
-        false -> St
+    if
+        F == 0 ->
+            maybe_add_warning(Anno, match_float_zero, St);
+        true ->
+            St
     end;
 expr_check_match_zero({cons,_Anno,H,T}, St) ->
     expr_check_match_zero(H, expr_check_match_zero(T, St));
@@ -4293,12 +4307,7 @@ deprecated_type(Anno, M, N, As, St) ->
     NAs = length(As),
     case otp_internal:obsolete_type(M, N, NAs) of
         {deprecated, String} when is_list(String) ->
-            case is_warn_enabled(deprecated_type, St) of
-                true ->
-                    add_warning(Anno, {deprecated_type, {M,N,NAs}, String}, St);
-                false ->
-                    St
-            end;
+            maybe_add_warning(Anno, {deprecated_type, {M,N,NAs}, String}, St);
         {removed, String} ->
             add_warning(Anno, {removed_type, {M,N,NAs}, String}, St);
         no ->
@@ -4311,12 +4320,7 @@ obsolete_guard({call,Anno,{atom,Ar,F},As}, St0) ->
 	false ->
 	    deprecated_function(Anno, erlang, F, As, St0);
 	true ->
-	    St = case is_warn_enabled(obsolete_guard, St0) of
-		     true ->
-			 add_warning(Ar, {obsolete_guard, {F, Arity}}, St0);
-		     false ->
-			 St0
-		 end,
+	    St = maybe_add_warning(Ar, {obsolete_guard, {F, Arity}}, St0),
 	    test_overriden_by_local(Ar, F, Arity, St)
     end;
 obsolete_guard(_G, St) ->
