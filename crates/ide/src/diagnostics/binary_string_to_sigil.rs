@@ -16,7 +16,6 @@ use elp_ide_assists::Assist;
 use elp_ide_db::DiagnosticCode;
 use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChangeBuilder;
-use elp_project_model::otp;
 use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
@@ -44,7 +43,8 @@ impl Linter for BinaryStringToSigilLinter {
     }
 
     fn is_enabled(&self) -> bool {
-        otp::supports_eep66_sigils()
+        false
+        // otp::supports_eep66_sigils()
     }
 }
 
@@ -120,6 +120,7 @@ mod tests {
 
     use crate::diagnostics::Diagnostic;
     use crate::diagnostics::DiagnosticCode;
+    use crate::diagnostics::DiagnosticsConfig;
     use crate::tests;
 
     fn filter(d: &Diagnostic) -> bool {
@@ -129,14 +130,16 @@ mod tests {
     #[track_caller]
     fn check_diagnostics(fixture: &str) {
         if otp::supports_eep66_sigils() {
-            tests::check_filtered_diagnostics(fixture, &filter)
+            let config = DiagnosticsConfig::default().enable(DiagnosticCode::BinaryStringToSigil);
+            tests::check_filtered_diagnostics_with_config(config, &vec![], fixture, &filter)
         }
     }
 
     #[track_caller]
     fn check_fix(fixture_before: &str, fixture_after: Expect) {
         if otp::supports_eep66_sigils() {
-            tests::check_fix(fixture_before, fixture_after)
+            let config = DiagnosticsConfig::default().enable(DiagnosticCode::BinaryStringToSigil);
+            tests::check_fix_with_config(config, fixture_before, fixture_after)
         }
     }
 
