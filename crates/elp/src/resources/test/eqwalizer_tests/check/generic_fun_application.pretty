@@ -538,22 +538,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │         ^^^^^^^^^^^^^^^^^^^
     │         │
     │         Arg 1 of 'fun1_id_pos_a/1'.
-Expression has type:   fun((Z) -> Z) with 1 type parameter
-Context expected type: fun((dynamic()) -> dynamic()) with 0 type parameters
-    │         
-
-Because in the expression's type:
-  Here the type is:     fun((Z) -> Z) with 1 type parameter
-  Context expects type: fun((dynamic()) -> dynamic()) with 0 type parameters
-  The number of type parameters doesn't match.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:346:9
-    │
-346 │         fun fun1_id_pos_a/1),
-    │         ^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         Arg 1 of 'fun1_id_pos_a/1'.
 Expression has type:   fun((Z) -> Z) | fun((dynamic()) -> dynamic())
 Context expected type: fun((A) -> A)
     │         
@@ -563,24 +547,6 @@ Because in the expression's type:
   However, the following candidate doesn't match:
   Here the type is:     fun((Z) -> Z) with 1 type parameter
   Context expects type: fun((A) -> A) with 0 type parameters
-  The number of type parameters doesn't match.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:346:9
-    │
-346 │         fun fun1_id_pos_a/1),
-    │         ^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         Arg 1 of 'fun1_id_pos_a/1'.
-Expression has type:   fun((Z) -> Z) | fun((dynamic()) -> dynamic())
-Context expected type: fun((dynamic()) -> dynamic())
-    │         
-
-Because in the expression's type:
-  The type is a union type with some valid candidates: fun((dynamic()) -> dynamic())
-  However, the following candidate doesn't match:
-  Here the type is:     fun((Z) -> Z) with 1 type parameter
-  Context expects type: fun((dynamic()) -> dynamic()) with 0 type parameters
   The number of type parameters doesn't match.
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
@@ -624,22 +590,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │         ^^^^^^^^^^^^^^^^^^^
     │         │
     │         Arg 1 of 'fun1_id_pos_z/1'.
-Expression has type:   fun((Z) -> Z) with 1 type parameter
-Context expected type: fun((dynamic()) -> dynamic()) with 0 type parameters
-    │         
-
-Because in the expression's type:
-  Here the type is:     fun((Z) -> Z) with 1 type parameter
-  Context expects type: fun((dynamic()) -> dynamic()) with 0 type parameters
-  The number of type parameters doesn't match.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:358:9
-    │
-358 │         fun fun1_id_pos_z/1),
-    │         ^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         Arg 1 of 'fun1_id_pos_z/1'.
 Expression has type:   fun((Z) -> Z) | fun((dynamic()) -> dynamic())
 Context expected type: fun((Z) -> Z)
     │         
@@ -649,24 +599,6 @@ Because in the expression's type:
   However, the following candidate doesn't match:
   Here the type is:     fun((Z) -> Z) with 1 type parameter
   Context expects type: fun((Z) -> Z) with 0 type parameters
-  The number of type parameters doesn't match.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:358:9
-    │
-358 │         fun fun1_id_pos_z/1),
-    │         ^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         Arg 1 of 'fun1_id_pos_z/1'.
-Expression has type:   fun((Z) -> Z) | fun((dynamic()) -> dynamic())
-Context expected type: fun((dynamic()) -> dynamic())
-    │         
-
-Because in the expression's type:
-  The type is a union type with some valid candidates: fun((dynamic()) -> dynamic())
-  However, the following candidate doesn't match:
-  Here the type is:     fun((Z) -> Z) with 1 type parameter
-  Context expects type: fun((dynamic()) -> dynamic()) with 0 type parameters
   The number of type parameters doesn't match.
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
@@ -998,4 +930,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   {}
 Context expected type: [dynamic()]
 
-81 ERRORS
+77 ERRORS
