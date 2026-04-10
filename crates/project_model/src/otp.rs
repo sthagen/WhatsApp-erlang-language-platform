@@ -22,7 +22,6 @@ use paths::AbsPathBuf;
 use paths::Utf8Path;
 use paths::Utf8PathBuf;
 
-use crate::AppName;
 use crate::OtpConfig;
 use crate::ProjectAppData;
 use crate::project_cache_enabled;
@@ -60,17 +59,12 @@ pub static OTP_APPS: LazyLock<Vec<ProjectAppData>> = LazyLock::new(|| {
     apps
 });
 
-pub static OTP_ERTS_DIR: LazyLock<AbsPathBuf> = LazyLock::new(get_erts_dir);
-pub static OTP_ERLANG_MODULE: LazyLock<(PathBuf, String)> = LazyLock::new(get_erlang_module);
-pub static OTP_ERLANG_APP: LazyLock<ProjectAppData> = LazyLock::new(|| {
-    ProjectAppData::fixture_app_data(
-        AppName("erts".to_string()),
-        OTP_ERTS_DIR.clone(),
-        Vec::default(),
-        vec![OTP_ERTS_DIR.join("src")],
-        Vec::default(),
-    )
-});
+pub static ERTS_APP: LazyLock<ProjectAppData> =
+    LazyLock::new(|| find_otp_app("erts").expect("erts app must exist in OTP installation"));
+pub static STDLIB_APP: LazyLock<ProjectAppData> =
+    LazyLock::new(|| find_otp_app("stdlib").expect("stdlib app must exist in OTP installation"));
+pub static KERNEL_APP: LazyLock<ProjectAppData> =
+    LazyLock::new(|| find_otp_app("kernel").expect("kernel app must exist in OTP installation"));
 pub static OTP_VERSION: LazyLock<Option<String>> = LazyLock::new(|| Otp::otp_release().ok());
 
 pub fn otp_supported_by_eqwalizer() -> bool {
@@ -106,21 +100,6 @@ pub fn supports_binary_encode_hex_with_case() -> bool {
         .as_ref()
         .map(|v| v.as_str() >= "26")
         .unwrap_or(true)
-}
-
-fn get_erts_dir() -> AbsPathBuf {
-    OTP_APPS
-        .iter()
-        .find(|app| app.name == AppName("erts".to_string()))
-        .expect("erts app must exist in OTP installation")
-        .dir
-        .clone()
-}
-
-fn get_erlang_module() -> (PathBuf, String) {
-    let erlang_path = OTP_ERTS_DIR.join("src/erlang.erl");
-    let contents = std::fs::read_to_string(&erlang_path).unwrap();
-    (erlang_path.into(), contents)
 }
 
 /// Find an OTP app's ProjectAppData by app name (e.g., "stdlib").

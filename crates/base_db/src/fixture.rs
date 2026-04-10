@@ -30,9 +30,10 @@ use elp_project_model::ProjectManifest;
 use elp_project_model::buck::BuckQueryConfig;
 use elp_project_model::buck::IncludeMapping;
 use elp_project_model::json::JsonConfig;
-use elp_project_model::otp::OTP_ERLANG_APP;
-use elp_project_model::otp::OTP_ERLANG_MODULE;
+use elp_project_model::otp::ERTS_APP;
+use elp_project_model::otp::KERNEL_APP;
 use elp_project_model::otp::Otp;
+use elp_project_model::otp::STDLIB_APP;
 use elp_project_model::otp::find_otp_app;
 use elp_project_model::otp::read_otp_app_sources;
 use elp_project_model::rebar::RebarProject;
@@ -183,7 +184,7 @@ impl ChangeFixture {
             fixture,
             mut diagnostics_enabled,
             expect_parse_errors,
-            otp_apps: requested_otp_apps,
+            otp_apps: mut requested_otp_apps,
         } = fixture_with_meta.clone();
 
         let builder = Builder::new(diagnostics_enabled.clone());
@@ -277,22 +278,20 @@ impl ChangeFixture {
             inc_file_id(&mut file_id);
         }
         if builder.needs_otp() {
-            // We need to add the erlang module to the file contents too.
-            let erts_app: ProjectAppData = OTP_ERLANG_APP.clone();
-            app_map.combine(erts_app.clone());
-            change.change_file(file_id, Some(Arc::from(OTP_ERLANG_MODULE.1.clone())));
-            app_files.insert(
-                erts_app.name,
-                file_id,
-                VfsPath::new_real_path(OTP_ERLANG_MODULE.0.to_string_lossy().to_string()),
-            );
-            // We bump the file_id in case we decide to add another
-            // file later, but do not push the current one to files,
-            // as it is not part of the as-written test fixture.
-            inc_file_id(&mut file_id);
+            // When eqwalizer is enabled, we need erts, stdlib, and kernel
+            // so that eqwalizer can resolve type declarations (e.g.,
+            // calendar:date() referenced in erlang.erl specs).
+            // These form the minimal Erlang release.
+            for implicit_app in &["erts", "stdlib", "kernel"] {
+                let name = implicit_app.to_string();
+                if !requested_otp_apps.contains(&name) {
+                    requested_otp_apps.push(name);
+                }
+            }
         }
 
-        // Load real OTP apps requested via `//- otp_apps:` directive
+        // Load OTP apps (explicitly requested via `//- otp_apps:` directive
+        // plus implicit ones from `//- eqwalizer`)
         for otp_app_name in &requested_otp_apps {
             let app_data = find_otp_app(otp_app_name).unwrap_or_else(|| {
                 panic!(
@@ -443,7 +442,9 @@ impl ChangeFixture {
             let mut project_apps = ProjectApps::new(&projects, IncludeOtp::No);
 
             let last_project = ProjectId(projects.len() as u32 - 1);
-            project_apps.all_apps.push((last_project, &OTP_ERLANG_APP));
+            project_apps.all_apps.push((last_project, &ERTS_APP));
+            project_apps.all_apps.push((last_project, &STDLIB_APP));
+            project_apps.all_apps.push((last_project, &KERNEL_APP));
             project_apps
         } else {
             ProjectApps::new(&projects, IncludeOtp::Yes)
