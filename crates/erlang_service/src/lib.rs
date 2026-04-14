@@ -54,6 +54,8 @@ use tempfile::TempPath;
 use text_size::TextRange;
 use text_size::TextSize;
 
+// @fb-only: mod meta_only;
+// @fb-only: pub use meta_only::caf;
 pub mod common_test;
 
 lazy_static! {
@@ -218,12 +220,12 @@ impl From<ReplyStatus> for u8 {
     }
 }
 
-type Tag = &'static [u8; 3];
+pub(crate) type Tag = &'static [u8; 3];
 type Id = u64;
 type Payload = Vec<u8>;
 
 #[derive(Debug)]
-enum Response {
+pub(crate) enum Response {
     Callback(Payload, Id),
     Ok(Payload),
     Err(Payload),
@@ -239,7 +241,10 @@ impl Response {
         }
     }
 
-    fn decode_segments(self, mut f: impl FnMut(&[u8; 3], Vec<u8>) -> Result<()>) -> Result<()> {
+    pub(crate) fn decode_segments(
+        self,
+        mut f: impl FnMut(&[u8; 3], Vec<u8>) -> Result<()>,
+    ) -> Result<()> {
         match self {
             Response::Ok(payload) => {
                 let mut payload = &*payload;
@@ -369,7 +374,7 @@ impl Connection {
         })
     }
 
-    fn request_reply(&self, tag: Tag, request: Vec<u8>, unwind: impl Fn()) -> Response {
+    pub(crate) fn request_reply(&self, tag: Tag, request: Vec<u8>, unwind: impl Fn()) -> Response {
         self.request_reply_handle(tag, request, unwind, |callback| {
             panic!("Got unexpected callback processing {tag:?}: {callback:?}");
         })

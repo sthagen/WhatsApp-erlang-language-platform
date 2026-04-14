@@ -54,6 +54,8 @@ pub enum HlMod {
     TypeDynamic,
     // Format specifier in a format string (e.g., ~p, ~s in io:format)
     FormatSpecifier,
+    // Disabled code (e.g., branches disabled by config flags)
+    DisabledCode,
 }
 
 impl HlTag {
@@ -83,13 +85,14 @@ impl fmt::Display for HlTag {
 }
 
 impl HlMod {
-    const ALL: &'static [HlMod; 6] = &[
+    const ALL: &'static [HlMod; 7] = &[
         HlMod::Bound,
         HlMod::ExportedFunction,
         HlMod::ExportedType,
         HlMod::DeprecatedFunction,
         HlMod::TypeDynamic,
         HlMod::FormatSpecifier,
+        HlMod::DisabledCode,
     ];
 
     fn as_str(self) -> &'static str {
@@ -100,6 +103,7 @@ impl HlMod {
             HlMod::DeprecatedFunction => "deprecated_function",
             HlMod::TypeDynamic => "type_dynamic",
             HlMod::FormatSpecifier => "format_specifier",
+            HlMod::DisabledCode => "disabled_code",
         }
     }
 

@@ -105,6 +105,7 @@ pub trait EqwalizerProgressReporter: Send + Sync + RefUnwindSafe {
 #[salsa::database(
     LineIndexDatabaseStorage,
     docs::DocDatabaseStorage,
+    // @fb-only: meta_only::MetaOnlyDatabaseStorage,
     elp_base_db::SourceDatabaseExtStorage,
     elp_base_db::SourceDatabaseStorage,
     eqwalizer::EqwalizerDatabaseStorage,

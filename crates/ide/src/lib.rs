@@ -756,8 +756,9 @@ impl Analysis {
         &self,
         file_id: FileId,
         types: Option<Arc<Vec<(Pos, Type)>>>,
+        config: HighlightConfig,
     ) -> Cancellable<Vec<HlRange>> {
-        self.with_db(|db| syntax_highlighting::highlight(db, file_id, types, None))
+        self.with_db(|db| syntax_highlighting::highlight(db, file_id, types, None, config))
     }
 
     /// Computes all ranges to highlight for a given item in a file.
@@ -773,9 +774,10 @@ impl Analysis {
         &self,
         types: Option<Arc<Vec<(Pos, Type)>>>,
         frange: FileRange,
+        config: HighlightConfig,
     ) -> Cancellable<Vec<HlRange>> {
         self.with_db(|db| {
-            syntax_highlighting::highlight(db, frange.file_id, types, Some(frange.range))
+            syntax_highlighting::highlight(db, frange.file_id, types, Some(frange.range), config)
         })
     }
 

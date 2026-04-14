@@ -207,6 +207,7 @@ process_request_async(Module, Id, Data, AdditionalParams) ->
     ).
 
 -spec handle_request(binary(), state()) -> {noreply, state()}.
+%% erlfmt:ignore @fb-only
 handle_request(<<"ACP", _:64/big, Data/binary>>, State) ->
     Paths = collect_paths(Data),
     code:add_pathsa(Paths),
@@ -226,6 +227,8 @@ handle_request(<<"DCP", Id:64/big, Data/binary>>, State) ->
     request(erlang_service_edoc, Id, Data, [eep48, no_ast], infinity, State);
 handle_request(<<"CTI", Id:64/big, Sz:32, AstBinary:Sz/binary, Data/binary>>, State) ->
     request(erlang_service_ct, Id, Data, [AstBinary], 10_000, State);
+% @fb-only: handle_request(<<"CAF", Id:64/big, Sz:32, Content:Sz/binary, Data/binary>>, State) ->
+    % @fb-only: request(erlang_service_caf, Id, Data, [Content], 10_000, State);
 %% Start of callback responses
 handle_request(
     <<"REP", OrigId:64/big, Status:8, Data/binary>>,

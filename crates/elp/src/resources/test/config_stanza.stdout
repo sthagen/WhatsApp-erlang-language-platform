@@ -45,6 +45,11 @@
     "minimum": 0,
     "type": "integer"
   },
+  "elp.highlightDisabledCode.enable": {
+    "default": true,
+    "markdownDescription": "Whether to highlight disabled code branches.",
+    "type": "boolean"
+  },
   "elp.highlightDynamic.enable": {
     "default": false,
     "markdownDescription": "If enabled, highlight variables with type `dynamic()` when Eqwalizer results are available.",

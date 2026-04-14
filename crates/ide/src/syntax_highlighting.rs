@@ -9,6 +9,7 @@
  */
 
 mod highlights;
+// @fb-only: mod meta_only;
 pub(crate) mod tags;
 
 use std::sync::Arc;
@@ -50,7 +51,9 @@ pub struct HlRange {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct HighlightConfig {}
+pub struct HighlightConfig {
+    pub disabled_code: bool,
+}
 
 // Feature: Semantic Syntax Highlighting
 //
@@ -63,6 +66,7 @@ pub(crate) fn highlight(
     file_id: FileId,
     types: Option<Arc<Vec<(Pos, Type)>>>,
     range_to_highlight: Option<TextRange>,
+    config: HighlightConfig,
 ) -> Vec<HlRange> {
     let _p = tracing::info_span!("highlight").entered();
     let sema = Semantic::new(db);
@@ -90,6 +94,9 @@ pub(crate) fn highlight(
     deprecated_func_highlight(&sema, file_id, range_to_highlight, &mut hl);
     dynamic_usages_highlight(types, range_to_highlight, &mut hl);
     format_specifier_highlight(&sema, file_id, range_to_highlight, &mut hl);
+    if config.disabled_code {
+        // @fb-only: meta_only::disabled_code_highlight(db, &sema, file_id, range_to_highlight, &mut hl);
+    }
     hl.to_vec()
 }
 
@@ -482,6 +489,7 @@ mod tests {
     use itertools::Itertools;
     use stdx::trim_indent;
 
+    use crate::HighlightConfig;
     use crate::HlMod;
     use crate::HlTag;
     use crate::syntax_highlighting::highlight;
@@ -521,7 +529,15 @@ mod tests {
         } else {
             None
         };
-        let highlights = highlight(&db, file_id, types, range);
+        let highlights = highlight(
+            &db,
+            file_id,
+            types,
+            range,
+            HighlightConfig {
+                disabled_code: true,
+            },
+        );
         let ranges: Vec<_> = highlights
             .iter()
             .filter(|h| h.highlight != HlTag::None.into()) // Means with no modifiers either
@@ -640,7 +656,15 @@ mod tests {
         let fixture_str = trim_indent(fixture);
         let (db, fixture) = RootDatabase::with_fixture(&fixture_str);
         let file_id = fixture.files[0];
-        let highlights = highlight(&db, file_id, None, None);
+        let highlights = highlight(
+            &db,
+            file_id,
+            None,
+            None,
+            HighlightConfig {
+                disabled_code: true,
+            },
+        );
         let file_text = db.file_text(file_id);
         let mut format_highlights: Vec<_> = highlights
             .iter()

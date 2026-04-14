@@ -97,6 +97,7 @@ define_semantic_token_modifiers![
         (DEPRECATED_FUNCTION, "deprecated_function"),
         (TYPE_DYNAMIC, "type_dynamic"),
         (FORMAT_SPECIFIER, "format_specifier"),
+        (DISABLED_CODE, "disabled_code"),
     }
 ];
 
