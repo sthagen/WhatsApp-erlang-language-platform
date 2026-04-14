@@ -499,6 +499,8 @@ impl<'a> MatchFinder<'a> {
                     let body_origin = in_clause_expr.body().origin;
                     let pattern_body = rule.get_body(self.sema).expect("Cannot get pattern_body");
                     let pattern_body = fold_body(self.strategy, &pattern_body);
+                    let placeholder_cache =
+                        matching::PlaceholderCache::build(&pattern_body, self.sema.db.upcast());
                     let code_body = &body_origin
                         .get_body(self.sema)
                         .expect("Could not get code Body");
@@ -514,6 +516,7 @@ impl<'a> MatchFinder<'a> {
                             self.sema,
                             &code_body,
                             &pattern_body,
+                            &placeholder_cache,
                         )
                         .map_err(|e| MatchFailureReason {
                             reason: e.reason.unwrap_or_else(|| {

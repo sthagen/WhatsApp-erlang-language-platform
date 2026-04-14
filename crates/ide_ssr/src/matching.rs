@@ -80,6 +80,60 @@ impl SsrPlaceholder {
     }
 }
 
+/// Pre-computed placeholder information for a pattern body.
+/// This avoids repeated Salsa intern lookups (`is_ssr_placeholder(db)`)
+/// during matching, which was a major source of RwLock contention
+/// when many threads were matching patterns simultaneously.
+pub struct PlaceholderCache {
+    /// Maps each pattern AnyExprId that is a placeholder to its SsrPlaceholder.
+    placeholders: FxHashMap<AnyExprId, SsrPlaceholder>,
+}
+
+impl PlaceholderCache {
+    /// Build a placeholder cache by scanning all nodes in the pattern body.
+    /// This does the Salsa intern lookups once upfront, so the matching
+    /// hot path never needs to access the database for placeholder checks.
+    pub fn build(pattern_body: &FoldBody, db: &dyn InternDatabase) -> Self {
+        let mut placeholders = FxHashMap::default();
+        // Use FoldBody indexing (pattern_body[id]) instead of raw body iteration
+        // so that InvisibleParens strategy is respected: paren ExprIds transparently
+        // resolve to their inner expression, allowing paren-wrapped placeholders
+        // to be found in the cache during matching.
+        for (expr_id, _expr) in pattern_body.body.exprs.iter() {
+            if let Expr::Var(var) = &pattern_body[expr_id]
+                && let Some(placeholder) = SsrPlaceholder::from_var(*var, db)
+            {
+                placeholders.insert(AnyExprId::Expr(expr_id), placeholder);
+            }
+        }
+        for (pat_id, _pat) in pattern_body.body.pats.iter() {
+            if let Pat::Var(var) = &pattern_body[pat_id]
+                && let Some(placeholder) = SsrPlaceholder::from_var(*var, db)
+            {
+                placeholders.insert(AnyExprId::Pat(pat_id), placeholder);
+            }
+        }
+        for (type_id, _type_expr) in pattern_body.body.type_exprs.iter() {
+            if let TypeExpr::Var(var) = &pattern_body[type_id]
+                && let Some(placeholder) = SsrPlaceholder::from_var(*var, db)
+            {
+                placeholders.insert(AnyExprId::TypeExpr(type_id), placeholder);
+            }
+        }
+        PlaceholderCache { placeholders }
+    }
+
+    /// Check if a pattern AnyExprId is a placeholder.
+    fn is_placeholder(&self, id: &AnyExprId) -> bool {
+        self.placeholders.contains_key(id)
+    }
+
+    /// Get the placeholder for a pattern AnyExprId, if it is one.
+    fn get_placeholder(&self, id: &AnyExprId) -> Option<&SsrPlaceholder> {
+        self.placeholders.get(id)
+    }
+}
+
 // Creates a match error.
 macro_rules! match_error {
     ($e:expr) => {{
@@ -281,6 +335,9 @@ impl PlaceholderMatch {
     ) -> bool {
         let debug_print = false;
         if let SubId::AnyExprId(code_id) = self.code_id {
+            // The "pattern body" here is the code body itself (equivalence check).
+            // Regular code bodies have no SSR placeholders, so the cache is empty.
+            let placeholder_cache = PlaceholderCache::build(body, sema.db.upcast());
             get_match(
                 debug_print,
                 rule,
@@ -291,6 +348,7 @@ impl PlaceholderMatch {
                 sema,
                 body,
                 body,
+                &placeholder_cache,
             )
             .is_ok()
         } else {
@@ -352,6 +410,7 @@ pub(crate) fn get_match(
     sema: &Semantic,
     code_body: &FoldBody,
     pattern_body: &FoldBody,
+    placeholder_cache: &PlaceholderCache,
 ) -> Result<Match, MatchFailed> {
     record_match_fails_reasons_scope(debug_active, || {
         Matcher::new(
@@ -362,6 +421,7 @@ pub(crate) fn get_match(
             code_body_origin,
             pattern_body,
             code_body,
+            placeholder_cache,
         )
         .try_match(debug_active, &SubId::AnyExprId(*code))
     })
@@ -391,9 +451,13 @@ struct Matcher<'a> {
     pattern_body: &'a FoldBody<'a>,
     code_body: &'a FoldBody<'a>,
     code_body_origin: &'a BodyOrigin,
+    /// Pre-computed placeholder information for the pattern body.
+    /// Avoids Salsa intern lookups in the matching hot path.
+    placeholder_cache: &'a PlaceholderCache,
 }
 
 impl<'a> Matcher<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         sema: &'a Semantic<'a>,
         rule: &'a SsrPattern,
@@ -402,6 +466,7 @@ impl<'a> Matcher<'a> {
         code_body_origin: &'a BodyOrigin,
         pattern_body: &'a FoldBody<'a>,
         code_body: &'a FoldBody<'a>,
+        placeholder_cache: &'a PlaceholderCache,
     ) -> Matcher<'a> {
         Matcher {
             sema,
@@ -411,6 +476,7 @@ impl<'a> Matcher<'a> {
             pattern_body,
             code_body,
             code_body_origin,
+            placeholder_cache,
         }
     }
 
@@ -505,12 +571,10 @@ impl<'a> Matcher<'a> {
         code: &SubId,
         phase: &mut Phase<'_>,
     ) -> Result<bool, MatchFailed> {
-        if self.is_placeholder(pattern)
-            && let Some(placeholder) = self.get_placeholder_for_node(pattern)
-        {
+        if let Some(placeholder) = self.get_placeholder_for_node(pattern) {
             if let Phase::Second(matches_out) = phase {
                 // check constraints
-                if let Some(condition) = self.rule.conditions.get(&placeholder) {
+                if let Some(condition) = self.rule.conditions.get(placeholder) {
                     self.check_condition(code, condition)?;
                 }
                 if let Some(original_range) = self.get_code_range(code) {
@@ -819,19 +883,9 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    fn get_placeholder_for_node(&self, id: &SubId) -> Option<SsrPlaceholder> {
+    fn get_placeholder_for_node(&self, id: &SubId) -> Option<&SsrPlaceholder> {
         match id {
-            SubId::AnyExprId(any_expr) => self.get_placeholder(any_expr),
-            _ => None,
-        }
-    }
-
-    fn get_placeholder(&self, pattern_expr: &AnyExprId) -> Option<SsrPlaceholder> {
-        let db = self.sema.db.upcast();
-        match self.pattern_body.get_any(*pattern_expr) {
-            AnyExprRef::Expr(Expr::Var(var)) => SsrPlaceholder::from_var(*var, db),
-            AnyExprRef::Pat(Pat::Var(var)) => SsrPlaceholder::from_var(*var, db),
-            AnyExprRef::TypeExpr(TypeExpr::Var(var)) => SsrPlaceholder::from_var(*var, db),
+            SubId::AnyExprId(any_expr) => self.placeholder_cache.get_placeholder(any_expr),
             _ => None,
         }
     }
@@ -877,22 +931,12 @@ impl<'a> Matcher<'a> {
         id.variant_str(self.pattern_body, self.sema.db.upcast())
     }
 
-    /// Check if the pattern_body SubId is a placeholder
-    fn is_placeholder(&self, id: &SubId) -> bool {
-        let pattern_str = self.get_pattern_str(id);
-
-        pattern_str == "Pat::SsrPlaceholder"
-            || pattern_str == "Expr::SsrPlaceholder"
-            || pattern_str == "TypeExpr::SsrPlaceholder"
-            || pattern_str == "Term::SsrPlaceholder"
-    }
-
     fn is_placeholder_expr(&self, id: &SubId) -> bool {
-        let db = self.sema.db.upcast();
         match id {
-            SubId::AnyExprId(any_expr_id) => match self.pattern_body.get_any(*any_expr_id) {
-                AnyExprRef::Expr(Expr::Var(var)) if var.is_ssr_placeholder(db) => true,
-                AnyExprRef::Pat(Pat::Var(var)) if var.is_ssr_placeholder(db) => true,
+            SubId::AnyExprId(any_expr_id) => match any_expr_id {
+                AnyExprId::Expr(_) | AnyExprId::Pat(_) => {
+                    self.placeholder_cache.is_placeholder(any_expr_id)
+                }
                 _ => false,
             },
             _ => false,
