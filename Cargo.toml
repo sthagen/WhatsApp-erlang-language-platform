@@ -86,7 +86,7 @@ profile = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-04-1
 quote = "1.0.36"
 range-set = "0.0.10"
 rayon = "1.10.0"
-regex = "1.10.6"
+regex = "1.12.3"
 rowan = "0.15.15"
 rust-ini = "0.18"
 rustc-hash = "1.1.0"
