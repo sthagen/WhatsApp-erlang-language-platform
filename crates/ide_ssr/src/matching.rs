@@ -787,9 +787,9 @@ impl<'a> Matcher<'a> {
         code: &SubId,
     ) -> Result<(), MatchFailed> {
         let code_expr = &code.sub_id_ref(self.code_body);
-        let code_node_type = code.variant_str(self.code_body, self.sema.db.upcast());
+        let code_node_type = code.variant_str(self.code_body);
         let pattern_expr = pattern.sub_id_ref(self.pattern_body);
-        let pattern_node_type = pattern.variant_str(self.pattern_body, self.sema.db.upcast());
+        let pattern_node_type = pattern.variant_str(self.pattern_body);
 
         if self.attempt_match_placeholder(pattern, code, phase)? {
             return Ok(());
@@ -924,11 +924,11 @@ impl<'a> Matcher<'a> {
     }
 
     fn get_code_str(&self, id: &SubId) -> Cow<'static, str> {
-        id.variant_str(self.code_body, self.sema.db.upcast())
+        id.variant_str(self.code_body)
     }
 
     fn get_pattern_str(&self, id: &SubId) -> Cow<'static, str> {
-        id.variant_str(self.pattern_body, self.sema.db.upcast())
+        id.variant_str(self.pattern_body)
     }
 
     fn is_placeholder_expr(&self, id: &SubId) -> bool {
@@ -982,9 +982,9 @@ impl SubId {
         }
     }
 
-    pub fn variant_str(&self, body: &FoldBody, db: &dyn InternDatabase) -> Cow<'static, str> {
+    pub fn variant_str(&self, body: &FoldBody) -> Cow<'static, str> {
         match self {
-            SubId::AnyExprId(e) => Cow::Borrowed(body.get_any(*e).variant_str(db)),
+            SubId::AnyExprId(e) => Cow::Borrowed(body.get_any(*e).variant_str()),
             SubId::Atom(_) => Cow::Borrowed("Atom"),
             SubId::Var(_) => Cow::Borrowed("Var"),
             SubId::UnaryOp(op) => Cow::Borrowed(match op {
