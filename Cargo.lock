@@ -149,9 +149,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "camino"
-version = "1.1.10"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da45bc31171d8d6960122e222a67740df867c1dd53b4d51caa297084c185cab"
+checksum = "e629a66d692cb9ff1a1c664e41771b3dcaf961985a9774c0eb0bd1b51cf60a48"
 
 [[package]]
 name = "cc"
@@ -786,18 +786,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "filetime"
-version = "0.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35c0522e981e68cbfa8c3f978441a5f34b30b96e146b33cd3359176b50fe8586"
-dependencies = [
- "cfg-if",
- "libc",
- "libredox",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "fixedbitset"
 version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1328,7 +1316,6 @@ checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
  "bitflags 2.9.1",
  "libc",
- "redox_syscall 0.5.12",
 ]
 
 [[package]]
@@ -1461,12 +1448,11 @@ checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "notify"
-version = "8.0.0"
+version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fee8403b3d66ac7b26aee6e40a897d85dc5ce26f44da36b8b73e987cc52e943"
+checksum = "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
 dependencies = [
  "bitflags 2.9.1",
- "filetime",
  "fsevent-sys",
  "inotify",
  "kqueue",
@@ -1475,7 +1461,7 @@ dependencies = [
  "mio",
  "notify-types",
  "walkdir",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1680,7 +1666,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 [[package]]
 name = "paths"
 version = "0.0.0"
-source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-01-12#d43c6362439e7e4e515b83652026758231af6cc0"
+source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-04-13#7b6e1249b7320e16792e31ce67bb2e5f4acd6a8b"
 dependencies = [
  "camino",
 ]
@@ -1693,9 +1679,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "perf-event"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5396562cd2eaa828445d6d34258ae21ee1eb9d40fe626ca7f51c8dccb4af9d66"
+checksum = "b4d6393d9238342159080d79b78cb59c67399a8e7ecfa5d410bd614169e4e823"
 dependencies = [
  "libc",
  "perf-event-open-sys",
@@ -1703,9 +1689,9 @@ dependencies = [
 
 [[package]]
 name = "perf-event-open-sys"
-version = "1.0.1"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce9bedf5da2c234fdf2391ede2b90fabf585355f33100689bc364a3ea558561a"
+checksum = "7c44fb1c7651a45a3652c4afc6e754e40b3d6e6556f1487e2b230bfc4f33c2a8"
 dependencies = [
  "libc",
 ]
@@ -1794,7 +1780,7 @@ dependencies = [
 [[package]]
 name = "profile"
 version = "0.0.0"
-source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-01-12#d43c6362439e7e4e515b83652026758231af6cc0"
+source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-04-13#7b6e1249b7320e16792e31ce67bb2e5f4acd6a8b"
 dependencies = [
  "cfg-if",
  "libc",
@@ -2150,7 +2136,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "stdx"
 version = "0.0.0"
-source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-01-12#d43c6362439e7e4e515b83652026758231af6cc0"
+source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-04-13#7b6e1249b7320e16792e31ce67bb2e5f4acd6a8b"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-utils",
@@ -2565,7 +2551,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vfs"
 version = "0.0.0"
-source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-01-12#d43c6362439e7e4e515b83652026758231af6cc0"
+source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-04-13#7b6e1249b7320e16792e31ce67bb2e5f4acd6a8b"
 dependencies = [
  "crossbeam-channel",
  "fst",
@@ -2580,7 +2566,7 @@ dependencies = [
 [[package]]
 name = "vfs-notify"
 version = "0.0.0"
-source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-01-12#d43c6362439e7e4e515b83652026758231af6cc0"
+source = "git+https://github.com/rust-lang/rust-analyzer?rev=2026-04-13#7b6e1249b7320e16792e31ce67bb2e5f4acd6a8b"
 dependencies = [
  "crossbeam-channel",
  "notify",
