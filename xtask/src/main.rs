@@ -11,11 +11,14 @@
 //! This provides extra build system commands, most notably:
 //! `cargo xtask codegen` for code generation.
 
+#[cfg(not(buck_build))]
 use std::env;
+#[cfg(not(buck_build))]
 use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Result;
+#[cfg(not(buck_build))]
 use anyhow::bail;
 use bpaf::Bpaf;
 use bpaf::Parser;
@@ -77,6 +80,19 @@ fn command() -> impl Parser<Command> {
 #[derive(Clone, Debug, Bpaf)]
 struct CodeGen {}
 
+#[cfg(buck_build)]
+pub fn project_root() -> PathBuf {
+    let rustfmt_toml = buck_resources::get("whatsapp/elp/xtask/rustfmt_toml")
+        .expect("failed to get rustfmt_toml resource");
+    rustfmt_toml
+        .canonicalize()
+        .expect("failed to canonicalize rustfmt_toml path")
+        .parent()
+        .expect("rustfmt_toml has no parent directory")
+        .to_path_buf()
+}
+
+#[cfg(not(buck_build))]
 pub fn project_root() -> PathBuf {
     Path::new(
         &env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| env!("CARGO_MANIFEST_DIR").to_owned()),
@@ -89,6 +105,18 @@ pub fn project_root() -> PathBuf {
 
 const PREAMBLE: &str = "\x40generated file, do not edit by hand, see `xtask/src/codegen.rs`";
 
+#[cfg(buck_build)]
+pub fn reformat(text: &str) -> Result<String> {
+    let sh = Shell::new()?;
+    let rustfmt = buck_resources::get("whatsapp/elp/xtask/rustfmt")?;
+    let rustfmt_toml = buck_resources::get("whatsapp/elp/xtask/rustfmt_toml")?;
+    let stdout = cmd!(sh, "{rustfmt} --config-path {rustfmt_toml}")
+        .stdin(text)
+        .read()?;
+    Ok(format!("//! {PREAMBLE}\n\n{stdout}\n"))
+}
+
+#[cfg(not(buck_build))]
 pub fn reformat(text: &str) -> Result<String> {
     let sh = Shell::new()?;
     ensure_rustfmt(&sh)?;
@@ -99,6 +127,7 @@ pub fn reformat(text: &str) -> Result<String> {
     Ok(format!("//! {PREAMBLE}\n\n{stdout}\n"))
 }
 
+#[cfg(not(buck_build))]
 fn ensure_rustfmt(sh: &Shell) -> Result<()> {
     let out = cmd!(sh, "rustfmt --version").read()?;
     if !out.contains("stable") {

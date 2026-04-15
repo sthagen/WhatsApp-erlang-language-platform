@@ -3,9 +3,9 @@
 #![allow(dead_code)]
 #[doc = r" TODO: remove this pragma"]
 use crate::{
-    ast::{support, AstChildren, AstNode},
     SyntaxKind::{self, *},
     SyntaxNode, SyntaxToken,
+    ast::{AstChildren, AstNode, support},
 };
 #[doc = r" Via NodeType::Node 2 struct inner"]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
