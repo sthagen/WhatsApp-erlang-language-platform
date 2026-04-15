@@ -159,3 +159,13 @@ type_containment_6() -> fun pair_swap/1.
 
 -spec type_containment_7() -> fun(({atom() | binary(), binary()}) -> {atom() | binary(), atom() | binary()}).
 type_containment_7() -> fun pair_id/1.
+
+-spec gen_shape(#{a := {X}, b := {X}, dynamic() => dynamic()}) -> {X, X}.
+gen_shape(#{a := {A}, b := {B}}) -> {A, B}.
+
+-spec app_gen_shape(fun((#{a := {atom()}, dynamic() => dynamic()}) -> {atom(), atom()})) -> {atom(), atom()}.
+app_gen_shape(F) -> F(#{a => {a}, b => {b}}).
+
+-spec shape_containment() -> {atom(), atom()}.
+shape_containment() ->
+    app_gen_shape(fun gen_shape/1).
