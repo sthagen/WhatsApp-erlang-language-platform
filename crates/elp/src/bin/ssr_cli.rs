@@ -142,6 +142,11 @@ pub fn run_ssr_command(
     if args.is_format_normal() && args.report_system_stats {
         print_memory_usage(loaded.analysis_host, loaded.vfs, cli)?;
         writeln!(cli, "{}", memory_used)?;
+    } else {
+        // Leak the loaded project data to skip expensive destructor cascade.
+        // The Salsa database accumulates large caches whose Arc drop chain
+        // can hang for significant time. The OS reclaims all memory on process exit.
+        std::mem::forget(loaded);
     }
     r
 }

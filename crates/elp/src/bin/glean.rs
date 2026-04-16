@@ -181,11 +181,15 @@ fn index_inner(
     query_config: &BuckQueryConfig,
     ifdef: bool,
 ) -> Result<(IndexerMetrics, Vec<String>)> {
-    let (indexer, _loaded) = GleanIndexer::new(args, cli, query_config, ifdef)?;
+    let (indexer, loaded) = GleanIndexer::new(args, cli, query_config, ifdef)?;
     let config = IndexConfig { multi: args.multi };
     let (facts, module_index, errored_paths) = indexer.index(config)?;
     let mut metrics = IndexerMetrics::from_facts(&facts, errored_paths.len());
     metrics.output_bytes = write_results(facts, module_index, cli, args)?;
+    // Leak the loaded project data to skip expensive destructor cascade.
+    // The Salsa database accumulates large caches whose Arc drop chain
+    // can hang for significant time. The OS reclaims all memory on process exit.
+    std::mem::forget(loaded);
     Ok((metrics, errored_paths))
 }
 
