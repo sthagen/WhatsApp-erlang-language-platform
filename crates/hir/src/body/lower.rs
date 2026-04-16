@@ -52,7 +52,6 @@ use crate::Expr;
 use crate::ExprId;
 use crate::ExprSource;
 use crate::FunType;
-use crate::FunctionBody;
 use crate::FunctionClauseId;
 use crate::IfClause;
 use crate::InFile;
@@ -80,7 +79,6 @@ use crate::TypeExpr;
 use crate::TypeExprId;
 use crate::Var;
 use crate::db::DefDatabase;
-use crate::def_map::FunctionDefId;
 use crate::expr::Guards;
 use crate::expr::MacroCallName;
 use crate::expr::MaybeExpr;
@@ -298,41 +296,6 @@ impl<'a> Ctx<'a> {
         self.body.shrink_to_fit();
         self.source_map.diagnostics = self.diagnostics;
         (Arc::new(self.body), self.source_map)
-    }
-
-    pub fn lower_function(
-        mut self,
-        function_id: InFile<FunctionDefId>,
-        clause_ids: Vec<FunctionClauseId>,
-        function_asts: &[ast::FunDecl],
-    ) -> (FunctionBody, Vec<Arc<BodySourceMap>>) {
-        let mut source_maps = Vec::default();
-        let file_id = function_id.file_id;
-        let clauses = function_asts
-            .iter()
-            .zip(clause_ids.iter())
-            .filter_map(|(f, clause_id)| {
-                let clause = f.clause()?;
-                Some((clause, clause_id))
-            })
-            .flat_map(|(clause, clause_id)| {
-                self.lower_clause_or_macro_body(clause, &InFile::new(file_id, *clause_id), None)
-            })
-            .map(|(body, source_map)| {
-                source_maps.push(Arc::new(source_map));
-                Arc::new(body)
-            })
-            .collect();
-
-        (
-            FunctionBody {
-                function_id,
-                clause_ids,
-                clauses,
-                spec: None, // Will be filled in later
-            },
-            source_maps,
-        )
     }
 
     pub fn lower_function_clause(

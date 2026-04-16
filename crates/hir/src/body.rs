@@ -573,18 +573,57 @@ impl FunctionBody {
         let def_map = db.def_map(function_id.file_id);
         if let Some(fun_def) = def_map.get_by_function_id(&function_id) {
             let fun_asts = fun_def.source(db.upcast());
-
-            let mut ctx = lower::Ctx::new(db, BodyOrigin::Invalid(function_id.file_id));
             let form_list = db.file_form_list(function_id.file_id);
-            let first_clause_id = fun_def.function_clause_ids[0];
-            ctx.set_macro_defs_from_preprocessor(
-                function_id.file_id,
-                form_list[first_clause_id].pp_ctx.env,
-            );
-            let name = &fun_def.function_clauses[0].name;
-            ctx.set_function_info(name);
-            let (mut body, source_maps) =
-                ctx.lower_function(function_id, fun_def.function_clause_ids.clone(), &fun_asts);
+            let mut source_maps = Vec::with_capacity(fun_def.function_clause_ids.len());
+            let clauses: Arena<Arc<FunctionClauseBody>> = fun_def
+                .function_clause_ids
+                .iter()
+                .zip(fun_asts.iter())
+                .flat_map(|(&clause_id, fun_ast)| {
+                    let clause_id_in_file = InFile::new(function_id.file_id, clause_id);
+                    match fun_ast.clause() {
+                        Some(ast::FunctionOrMacroClause::FunctionClause(_)) => {
+                            // Non-macro clause: delegate to per-clause salsa
+                            // query, sharing Arc<FunctionClauseBody> instances
+                            // with the per-clause cache.
+                            let (clause_body, source_map) =
+                                db.function_clause_body_with_source(clause_id_in_file);
+                            vec![(clause_body, source_map)]
+                        }
+                        Some(clause_ast) => {
+                            // Macro clause: lower directly, since macro
+                            // expansion can produce multiple clauses that
+                            // share this clause_id.
+                            let function = &form_list[clause_id];
+                            let body_origin = BodyOrigin::new(
+                                function_id.file_id,
+                                FormIdx::FunctionClause(clause_id),
+                            );
+                            let mut ctx = lower::Ctx::new(db, body_origin);
+                            ctx.set_macro_defs_from_preprocessor(
+                                function_id.file_id,
+                                function.pp_ctx.env,
+                            );
+                            ctx.set_function_info(&function.name);
+                            ctx.lower_clause_or_macro_body(clause_ast, &clause_id_in_file, None)
+                                .map(|(body, source_map)| (Arc::new(body), Arc::new(source_map)))
+                                .collect()
+                        }
+                        None => vec![],
+                    }
+                })
+                .map(|(clause_body, source_map)| {
+                    source_maps.push(source_map);
+                    clause_body
+                })
+                .collect();
+
+            let mut body = FunctionBody {
+                function_id,
+                clause_ids: fun_def.function_clause_ids.clone(),
+                clauses,
+                spec: None,
+            };
             if let Some(spec) = &fun_def.spec {
                 let spec = db.spec_body(InFile::new(spec.file.file_id, spec.spec_id));
                 body.spec = Some(spec);
