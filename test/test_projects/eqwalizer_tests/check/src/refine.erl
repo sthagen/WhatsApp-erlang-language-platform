@@ -377,3 +377,11 @@ use_private_record_neg() ->
     {foo, _Id, Name} = Rec,
     eqwalizer:reveal_type(Name),
     Name.
+
+-type alias() :: integer().
+
+-spec keep_alias(atom() | alias()) -> alias().
+keep_alias(A) when is_atom(A) -> 0;
+keep_alias(A) ->
+    eqwalizer:reveal_type(A),
+    A.
