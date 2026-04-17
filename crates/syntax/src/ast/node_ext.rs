@@ -682,6 +682,22 @@ impl From<nodes::RecordExprBase> for nodes::Expr {
             nodes::RecordExprBase::RecordFieldExpr(expr) => nodes::Expr::RecordFieldExpr(expr),
             nodes::RecordExprBase::RecordIndexExpr(expr) => nodes::Expr::RecordIndexExpr(expr),
             nodes::RecordExprBase::RecordUpdateExpr(expr) => nodes::Expr::RecordUpdateExpr(expr),
+            nodes::RecordExprBase::AnonRecordExpr(expr) => nodes::Expr::AnonRecordExpr(expr),
+            nodes::RecordExprBase::AnonRecordFieldExpr(expr) => {
+                nodes::Expr::AnonRecordFieldExpr(expr)
+            }
+            nodes::RecordExprBase::AnonRecordUpdateExpr(expr) => {
+                nodes::Expr::AnonRecordUpdateExpr(expr)
+            }
+            nodes::RecordExprBase::QualifiedRecordExpr(expr) => {
+                nodes::Expr::QualifiedRecordExpr(expr)
+            }
+            nodes::RecordExprBase::QualifiedRecordFieldExpr(expr) => {
+                nodes::Expr::QualifiedRecordFieldExpr(expr)
+            }
+            nodes::RecordExprBase::QualifiedRecordUpdateExpr(expr) => {
+                nodes::Expr::QualifiedRecordUpdateExpr(expr)
+            }
         }
     }
 }
@@ -727,6 +743,8 @@ impl From<nodes::CatchPat> for nodes::Expr {
             nodes::CatchPat::RecordExpr(record) => nodes::Expr::RecordExpr(record),
             nodes::CatchPat::RecordIndexExpr(index) => nodes::Expr::RecordIndexExpr(index),
             nodes::CatchPat::UnaryOpExpr(unary_op) => nodes::Expr::UnaryOpExpr(unary_op),
+            nodes::CatchPat::AnonRecordExpr(anon) => nodes::Expr::AnonRecordExpr(anon),
+            nodes::CatchPat::QualifiedRecordExpr(qual) => nodes::Expr::QualifiedRecordExpr(qual),
         }
     }
 }

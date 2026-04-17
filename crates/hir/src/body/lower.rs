@@ -714,6 +714,13 @@ impl<'a> Ctx<'a> {
                 self.lower_optional_pat(cond.rhs());
                 self.alloc_pat(Pat::Missing, Some(expr))
             }
+            // TODO(T262108365): lower native records (EEP 79) properly
+            ast::Expr::AnonRecordExpr(_)
+            | ast::Expr::AnonRecordFieldExpr(_)
+            | ast::Expr::AnonRecordUpdateExpr(_)
+            | ast::Expr::QualifiedRecordExpr(_)
+            | ast::Expr::QualifiedRecordFieldExpr(_)
+            | ast::Expr::QualifiedRecordUpdateExpr(_) => self.alloc_pat(Pat::Missing, Some(expr)),
         }
     }
 
@@ -1198,6 +1205,13 @@ impl<'a> Ctx<'a> {
                     self.alloc_expr(Expr::Missing, Some(expr))
                 }
             }
+            // TODO(T262108365): lower native records (EEP 79) properly
+            ast::Expr::AnonRecordExpr(_)
+            | ast::Expr::AnonRecordFieldExpr(_)
+            | ast::Expr::AnonRecordUpdateExpr(_)
+            | ast::Expr::QualifiedRecordExpr(_)
+            | ast::Expr::QualifiedRecordFieldExpr(_)
+            | ast::Expr::QualifiedRecordUpdateExpr(_) => self.alloc_expr(Expr::Missing, Some(expr)),
         }
     }
 
@@ -2085,6 +2099,15 @@ impl<'a> Ctx<'a> {
                 let _ = self.lower_optional_type_expr(cond.rhs());
                 self.alloc_type_expr(TypeExpr::Missing, Some(expr))
             }
+            // TODO(T262108365): lower native records (EEP 79) properly
+            ast::Expr::AnonRecordExpr(_)
+            | ast::Expr::AnonRecordFieldExpr(_)
+            | ast::Expr::AnonRecordUpdateExpr(_)
+            | ast::Expr::QualifiedRecordExpr(_)
+            | ast::Expr::QualifiedRecordFieldExpr(_)
+            | ast::Expr::QualifiedRecordUpdateExpr(_) => {
+                self.alloc_type_expr(TypeExpr::Missing, Some(expr))
+            }
         }
     }
 
@@ -2503,6 +2526,13 @@ impl<'a> Ctx<'a> {
                 let _ = self.lower_optional_term(cond.rhs());
                 self.alloc_term(Term::Missing, Some(expr))
             }
+            // TODO(T262108365): lower native records (EEP 79) properly
+            ast::Expr::AnonRecordExpr(_)
+            | ast::Expr::AnonRecordFieldExpr(_)
+            | ast::Expr::AnonRecordUpdateExpr(_)
+            | ast::Expr::QualifiedRecordExpr(_)
+            | ast::Expr::QualifiedRecordFieldExpr(_)
+            | ast::Expr::QualifiedRecordUpdateExpr(_) => self.alloc_term(Term::Missing, Some(expr)),
         }
     }
 

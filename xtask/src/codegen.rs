@@ -730,6 +730,7 @@ fn map_name(name: &str) -> Result<NameType> {
         "{" => Ok(Punctuation("Lbrace".into())),
         "}" => Ok(Punctuation("Rrace".into())),
         "#" => Ok(Punctuation("Pound".into())),
+        "#_" => Ok(Punctuation("PoundUnderscore".into())),
         "=>" => Ok(Punctuation("EqGt".into())),
         ":=" => Ok(Punctuation("ColonEq".into())),
         // try

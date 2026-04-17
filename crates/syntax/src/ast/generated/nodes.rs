@@ -78,6 +78,111 @@ impl std::fmt::Display for AnnVar {
 }
 #[doc = r" Via NodeType::Node 2 struct inner"]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AnonRecordExpr {
+    pub(crate) syntax: SyntaxNode,
+}
+impl AnonRecordExpr {
+    pub fn fields(&self) -> AstChildren<RecordField> {
+        support::children(&self.syntax)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for AnonRecordExpr {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == ANON_RECORD_EXPR
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for AnonRecordExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AnonRecordFieldExpr {
+    pub(crate) syntax: SyntaxNode,
+}
+impl AnonRecordFieldExpr {
+    pub fn expr(&self) -> Option<RecordExprBase> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn field(&self) -> Option<RecordFieldName> {
+        support::child(&self.syntax, 0usize)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for AnonRecordFieldExpr {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == ANON_RECORD_FIELD_EXPR
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for AnonRecordFieldExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AnonRecordUpdateExpr {
+    pub(crate) syntax: SyntaxNode,
+}
+impl AnonRecordUpdateExpr {
+    pub fn expr(&self) -> Option<RecordExprBase> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn fields(&self) -> AstChildren<RecordField> {
+        support::children(&self.syntax)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for AnonRecordUpdateExpr {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == ANON_RECORD_UPDATE_EXPR
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for AnonRecordUpdateExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AnonymousFun {
     pub(crate) syntax: SyntaxNode,
 }
@@ -902,8 +1007,10 @@ impl std::fmt::Display for CatchExpr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CatchPat {
     ExprMax(ExprMax),
+    AnonRecordExpr(AnonRecordExpr),
     BinaryOpExpr(BinaryOpExpr),
     MapExpr(MapExpr),
+    QualifiedRecordExpr(QualifiedRecordExpr),
     RecordExpr(RecordExpr),
     RecordIndexExpr(RecordIndexExpr),
     UnaryOpExpr(UnaryOpExpr),
@@ -912,11 +1019,38 @@ impl AstNode for CatchPat {
     #[allow(clippy::match_like_matches_macro)]
     fn can_cast(kind: SyntaxKind) -> bool {
         match kind {
-            ANONYMOUS_FUN | ATOM | BINARY | BINARY_COMPREHENSION | BLOCK_EXPR | CASE_EXPR
-            | CHAR | CONCATABLES | EXTERNAL_FUN | FLOAT | FUN_TYPE | IF_EXPR | INTEGER
-            | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
-            | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
-            | TUPLE | VAR | BINARY_OP_EXPR | MAP_EXPR | RECORD_EXPR | RECORD_INDEX_EXPR
+            ANONYMOUS_FUN
+            | ATOM
+            | BINARY
+            | BINARY_COMPREHENSION
+            | BLOCK_EXPR
+            | CASE_EXPR
+            | CHAR
+            | CONCATABLES
+            | EXTERNAL_FUN
+            | FLOAT
+            | FUN_TYPE
+            | IF_EXPR
+            | INTEGER
+            | INTERNAL_FUN
+            | LIST
+            | LIST_COMPREHENSION
+            | MACRO_CALL_EXPR
+            | MACRO_STRING
+            | MAP_COMPREHENSION
+            | MAYBE_EXPR
+            | PAREN_EXPR
+            | RECEIVE_EXPR
+            | STRING
+            | TRY_EXPR
+            | TUPLE
+            | VAR
+            | ANON_RECORD_EXPR
+            | BINARY_OP_EXPR
+            | MAP_EXPR
+            | QUALIFIED_RECORD_EXPR
+            | RECORD_EXPR
+            | RECORD_INDEX_EXPR
             | UNARY_OP_EXPR => true,
             _ => false,
         }
@@ -929,8 +1063,12 @@ impl AstNode for CatchPat {
             | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
             | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
             | TUPLE | VAR => Some(CatchPat::ExprMax(ExprMax::cast(syntax).unwrap())),
+            ANON_RECORD_EXPR => Some(CatchPat::AnonRecordExpr(AnonRecordExpr { syntax })),
             BINARY_OP_EXPR => Some(CatchPat::BinaryOpExpr(BinaryOpExpr { syntax })),
             MAP_EXPR => Some(CatchPat::MapExpr(MapExpr { syntax })),
+            QUALIFIED_RECORD_EXPR => Some(CatchPat::QualifiedRecordExpr(QualifiedRecordExpr {
+                syntax,
+            })),
             RECORD_EXPR => Some(CatchPat::RecordExpr(RecordExpr { syntax })),
             RECORD_INDEX_EXPR => Some(CatchPat::RecordIndexExpr(RecordIndexExpr { syntax })),
             UNARY_OP_EXPR => Some(CatchPat::UnaryOpExpr(UnaryOpExpr { syntax })),
@@ -940,8 +1078,10 @@ impl AstNode for CatchPat {
     fn syntax(&self) -> &SyntaxNode {
         match self {
             CatchPat::ExprMax(it) => it.syntax(),
+            CatchPat::AnonRecordExpr(it) => it.syntax(),
             CatchPat::BinaryOpExpr(it) => it.syntax(),
             CatchPat::MapExpr(it) => it.syntax(),
+            CatchPat::QualifiedRecordExpr(it) => it.syntax(),
             CatchPat::RecordExpr(it) => it.syntax(),
             CatchPat::RecordIndexExpr(it) => it.syntax(),
             CatchPat::UnaryOpExpr(it) => it.syntax(),
@@ -954,6 +1094,11 @@ impl From<ExprMax> for CatchPat {
         CatchPat::ExprMax(node)
     }
 }
+impl From<AnonRecordExpr> for CatchPat {
+    fn from(node: AnonRecordExpr) -> CatchPat {
+        CatchPat::AnonRecordExpr(node)
+    }
+}
 impl From<BinaryOpExpr> for CatchPat {
     fn from(node: BinaryOpExpr) -> CatchPat {
         CatchPat::BinaryOpExpr(node)
@@ -962,6 +1107,11 @@ impl From<BinaryOpExpr> for CatchPat {
 impl From<MapExpr> for CatchPat {
     fn from(node: MapExpr) -> CatchPat {
         CatchPat::MapExpr(node)
+    }
+}
+impl From<QualifiedRecordExpr> for CatchPat {
+    fn from(node: QualifiedRecordExpr) -> CatchPat {
+        CatchPat::QualifiedRecordExpr(node)
     }
 }
 impl From<RecordExpr> for CatchPat {
@@ -1769,6 +1919,9 @@ impl std::fmt::Display for ExportTypeAttribute {
 pub enum Expr {
     ExprMax(ExprMax),
     AnnType(AnnType),
+    AnonRecordExpr(AnonRecordExpr),
+    AnonRecordFieldExpr(AnonRecordFieldExpr),
+    AnonRecordUpdateExpr(AnonRecordUpdateExpr),
     BinaryOpExpr(BinaryOpExpr),
     Call(Call),
     CatchExpr(CatchExpr),
@@ -1778,6 +1931,9 @@ pub enum Expr {
     MapExprUpdate(MapExprUpdate),
     MatchExpr(MatchExpr),
     Pipe(Pipe),
+    QualifiedRecordExpr(QualifiedRecordExpr),
+    QualifiedRecordFieldExpr(QualifiedRecordFieldExpr),
+    QualifiedRecordUpdateExpr(QualifiedRecordUpdateExpr),
     RangeType(RangeType),
     RecordExpr(RecordExpr),
     RecordFieldExpr(RecordFieldExpr),
@@ -1790,13 +1946,54 @@ impl AstNode for Expr {
     #[allow(clippy::match_like_matches_macro)]
     fn can_cast(kind: SyntaxKind) -> bool {
         match kind {
-            ANONYMOUS_FUN | ATOM | BINARY | BINARY_COMPREHENSION | BLOCK_EXPR | CASE_EXPR
-            | CHAR | CONCATABLES | EXTERNAL_FUN | FLOAT | FUN_TYPE | IF_EXPR | INTEGER
-            | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
-            | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
-            | TUPLE | VAR | ANN_TYPE | BINARY_OP_EXPR | CALL | CATCH_EXPR | COND_MATCH_EXPR
-            | DOTDOTDOT | MAP_EXPR | MAP_EXPR_UPDATE | MATCH_EXPR | PIPE | RANGE_TYPE
-            | RECORD_EXPR | RECORD_FIELD_EXPR | RECORD_INDEX_EXPR | RECORD_UPDATE_EXPR | REMOTE
+            ANONYMOUS_FUN
+            | ATOM
+            | BINARY
+            | BINARY_COMPREHENSION
+            | BLOCK_EXPR
+            | CASE_EXPR
+            | CHAR
+            | CONCATABLES
+            | EXTERNAL_FUN
+            | FLOAT
+            | FUN_TYPE
+            | IF_EXPR
+            | INTEGER
+            | INTERNAL_FUN
+            | LIST
+            | LIST_COMPREHENSION
+            | MACRO_CALL_EXPR
+            | MACRO_STRING
+            | MAP_COMPREHENSION
+            | MAYBE_EXPR
+            | PAREN_EXPR
+            | RECEIVE_EXPR
+            | STRING
+            | TRY_EXPR
+            | TUPLE
+            | VAR
+            | ANN_TYPE
+            | ANON_RECORD_EXPR
+            | ANON_RECORD_FIELD_EXPR
+            | ANON_RECORD_UPDATE_EXPR
+            | BINARY_OP_EXPR
+            | CALL
+            | CATCH_EXPR
+            | COND_MATCH_EXPR
+            | DOTDOTDOT
+            | MAP_EXPR
+            | MAP_EXPR_UPDATE
+            | MATCH_EXPR
+            | PIPE
+            | QUALIFIED_RECORD_EXPR
+            | QUALIFIED_RECORD_FIELD_EXPR
+            | QUALIFIED_RECORD_UPDATE_EXPR
+            | RANGE_TYPE
+            | RECORD_EXPR
+            | RECORD_FIELD_EXPR
+            | RECORD_INDEX_EXPR
+            | RECORD_UPDATE_EXPR
+            | REMOTE
             | UNARY_OP_EXPR => true,
             _ => false,
         }
@@ -1810,6 +2007,13 @@ impl AstNode for Expr {
             | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
             | TUPLE | VAR => Some(Expr::ExprMax(ExprMax::cast(syntax).unwrap())),
             ANN_TYPE => Some(Expr::AnnType(AnnType { syntax })),
+            ANON_RECORD_EXPR => Some(Expr::AnonRecordExpr(AnonRecordExpr { syntax })),
+            ANON_RECORD_FIELD_EXPR => {
+                Some(Expr::AnonRecordFieldExpr(AnonRecordFieldExpr { syntax }))
+            }
+            ANON_RECORD_UPDATE_EXPR => {
+                Some(Expr::AnonRecordUpdateExpr(AnonRecordUpdateExpr { syntax }))
+            }
             BINARY_OP_EXPR => Some(Expr::BinaryOpExpr(BinaryOpExpr { syntax })),
             CALL => Some(Expr::Call(Call { syntax })),
             CATCH_EXPR => Some(Expr::CatchExpr(CatchExpr { syntax })),
@@ -1819,6 +2023,19 @@ impl AstNode for Expr {
             MAP_EXPR_UPDATE => Some(Expr::MapExprUpdate(MapExprUpdate { syntax })),
             MATCH_EXPR => Some(Expr::MatchExpr(MatchExpr { syntax })),
             PIPE => Some(Expr::Pipe(Pipe { syntax })),
+            QUALIFIED_RECORD_EXPR => {
+                Some(Expr::QualifiedRecordExpr(QualifiedRecordExpr { syntax }))
+            }
+            QUALIFIED_RECORD_FIELD_EXPR => {
+                Some(Expr::QualifiedRecordFieldExpr(QualifiedRecordFieldExpr {
+                    syntax,
+                }))
+            }
+            QUALIFIED_RECORD_UPDATE_EXPR => {
+                Some(Expr::QualifiedRecordUpdateExpr(QualifiedRecordUpdateExpr {
+                    syntax,
+                }))
+            }
             RANGE_TYPE => Some(Expr::RangeType(RangeType { syntax })),
             RECORD_EXPR => Some(Expr::RecordExpr(RecordExpr { syntax })),
             RECORD_FIELD_EXPR => Some(Expr::RecordFieldExpr(RecordFieldExpr { syntax })),
@@ -1833,6 +2050,9 @@ impl AstNode for Expr {
         match self {
             Expr::ExprMax(it) => it.syntax(),
             Expr::AnnType(it) => it.syntax(),
+            Expr::AnonRecordExpr(it) => it.syntax(),
+            Expr::AnonRecordFieldExpr(it) => it.syntax(),
+            Expr::AnonRecordUpdateExpr(it) => it.syntax(),
             Expr::BinaryOpExpr(it) => it.syntax(),
             Expr::Call(it) => it.syntax(),
             Expr::CatchExpr(it) => it.syntax(),
@@ -1842,6 +2062,9 @@ impl AstNode for Expr {
             Expr::MapExprUpdate(it) => it.syntax(),
             Expr::MatchExpr(it) => it.syntax(),
             Expr::Pipe(it) => it.syntax(),
+            Expr::QualifiedRecordExpr(it) => it.syntax(),
+            Expr::QualifiedRecordFieldExpr(it) => it.syntax(),
+            Expr::QualifiedRecordUpdateExpr(it) => it.syntax(),
             Expr::RangeType(it) => it.syntax(),
             Expr::RecordExpr(it) => it.syntax(),
             Expr::RecordFieldExpr(it) => it.syntax(),
@@ -1861,6 +2084,21 @@ impl From<ExprMax> for Expr {
 impl From<AnnType> for Expr {
     fn from(node: AnnType) -> Expr {
         Expr::AnnType(node)
+    }
+}
+impl From<AnonRecordExpr> for Expr {
+    fn from(node: AnonRecordExpr) -> Expr {
+        Expr::AnonRecordExpr(node)
+    }
+}
+impl From<AnonRecordFieldExpr> for Expr {
+    fn from(node: AnonRecordFieldExpr) -> Expr {
+        Expr::AnonRecordFieldExpr(node)
+    }
+}
+impl From<AnonRecordUpdateExpr> for Expr {
+    fn from(node: AnonRecordUpdateExpr) -> Expr {
+        Expr::AnonRecordUpdateExpr(node)
     }
 }
 impl From<BinaryOpExpr> for Expr {
@@ -1906,6 +2144,21 @@ impl From<MatchExpr> for Expr {
 impl From<Pipe> for Expr {
     fn from(node: Pipe) -> Expr {
         Expr::Pipe(node)
+    }
+}
+impl From<QualifiedRecordExpr> for Expr {
+    fn from(node: QualifiedRecordExpr) -> Expr {
+        Expr::QualifiedRecordExpr(node)
+    }
+}
+impl From<QualifiedRecordFieldExpr> for Expr {
+    fn from(node: QualifiedRecordFieldExpr) -> Expr {
+        Expr::QualifiedRecordFieldExpr(node)
+    }
+}
+impl From<QualifiedRecordUpdateExpr> for Expr {
+    fn from(node: QualifiedRecordUpdateExpr) -> Expr {
+        Expr::QualifiedRecordUpdateExpr(node)
     }
 }
 impl From<RangeType> for Expr {
@@ -3268,27 +3521,112 @@ impl AstNode for LcExpr {
     #[allow(clippy::match_like_matches_macro)]
     fn can_cast(kind: SyntaxKind) -> bool {
         match kind {
-            ANONYMOUS_FUN | ATOM | BINARY | BINARY_COMPREHENSION | BLOCK_EXPR | CASE_EXPR
-            | CHAR | CONCATABLES | EXTERNAL_FUN | FLOAT | FUN_TYPE | IF_EXPR | INTEGER
-            | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
-            | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
-            | TUPLE | VAR | ANN_TYPE | BINARY_OP_EXPR | CALL | CATCH_EXPR | COND_MATCH_EXPR
-            | DOTDOTDOT | MAP_EXPR | MAP_EXPR_UPDATE | MATCH_EXPR | PIPE | RANGE_TYPE
-            | RECORD_EXPR | RECORD_FIELD_EXPR | RECORD_INDEX_EXPR | RECORD_UPDATE_EXPR | REMOTE
-            | UNARY_OP_EXPR | B_GENERATOR | GENERATOR | MAP_GENERATOR => true,
+            ANONYMOUS_FUN
+            | ATOM
+            | BINARY
+            | BINARY_COMPREHENSION
+            | BLOCK_EXPR
+            | CASE_EXPR
+            | CHAR
+            | CONCATABLES
+            | EXTERNAL_FUN
+            | FLOAT
+            | FUN_TYPE
+            | IF_EXPR
+            | INTEGER
+            | INTERNAL_FUN
+            | LIST
+            | LIST_COMPREHENSION
+            | MACRO_CALL_EXPR
+            | MACRO_STRING
+            | MAP_COMPREHENSION
+            | MAYBE_EXPR
+            | PAREN_EXPR
+            | RECEIVE_EXPR
+            | STRING
+            | TRY_EXPR
+            | TUPLE
+            | VAR
+            | ANN_TYPE
+            | ANON_RECORD_EXPR
+            | ANON_RECORD_FIELD_EXPR
+            | ANON_RECORD_UPDATE_EXPR
+            | BINARY_OP_EXPR
+            | CALL
+            | CATCH_EXPR
+            | COND_MATCH_EXPR
+            | DOTDOTDOT
+            | MAP_EXPR
+            | MAP_EXPR_UPDATE
+            | MATCH_EXPR
+            | PIPE
+            | QUALIFIED_RECORD_EXPR
+            | QUALIFIED_RECORD_FIELD_EXPR
+            | QUALIFIED_RECORD_UPDATE_EXPR
+            | RANGE_TYPE
+            | RECORD_EXPR
+            | RECORD_FIELD_EXPR
+            | RECORD_INDEX_EXPR
+            | RECORD_UPDATE_EXPR
+            | REMOTE
+            | UNARY_OP_EXPR
+            | B_GENERATOR
+            | GENERATOR
+            | MAP_GENERATOR => true,
             _ => false,
         }
     }
     #[allow(clippy::match_like_matches_macro)]
     fn cast(syntax: SyntaxNode) -> Option<Self> {
         match syntax.kind() {
-            ANONYMOUS_FUN | ATOM | BINARY | BINARY_COMPREHENSION | BLOCK_EXPR | CASE_EXPR
-            | CHAR | CONCATABLES | EXTERNAL_FUN | FLOAT | FUN_TYPE | IF_EXPR | INTEGER
-            | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
-            | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
-            | TUPLE | VAR | ANN_TYPE | BINARY_OP_EXPR | CALL | CATCH_EXPR | COND_MATCH_EXPR
-            | DOTDOTDOT | MAP_EXPR | MAP_EXPR_UPDATE | MATCH_EXPR | PIPE | RANGE_TYPE
-            | RECORD_EXPR | RECORD_FIELD_EXPR | RECORD_INDEX_EXPR | RECORD_UPDATE_EXPR | REMOTE
+            ANONYMOUS_FUN
+            | ATOM
+            | BINARY
+            | BINARY_COMPREHENSION
+            | BLOCK_EXPR
+            | CASE_EXPR
+            | CHAR
+            | CONCATABLES
+            | EXTERNAL_FUN
+            | FLOAT
+            | FUN_TYPE
+            | IF_EXPR
+            | INTEGER
+            | INTERNAL_FUN
+            | LIST
+            | LIST_COMPREHENSION
+            | MACRO_CALL_EXPR
+            | MACRO_STRING
+            | MAP_COMPREHENSION
+            | MAYBE_EXPR
+            | PAREN_EXPR
+            | RECEIVE_EXPR
+            | STRING
+            | TRY_EXPR
+            | TUPLE
+            | VAR
+            | ANN_TYPE
+            | ANON_RECORD_EXPR
+            | ANON_RECORD_FIELD_EXPR
+            | ANON_RECORD_UPDATE_EXPR
+            | BINARY_OP_EXPR
+            | CALL
+            | CATCH_EXPR
+            | COND_MATCH_EXPR
+            | DOTDOTDOT
+            | MAP_EXPR
+            | MAP_EXPR_UPDATE
+            | MATCH_EXPR
+            | PIPE
+            | QUALIFIED_RECORD_EXPR
+            | QUALIFIED_RECORD_FIELD_EXPR
+            | QUALIFIED_RECORD_UPDATE_EXPR
+            | RANGE_TYPE
+            | RECORD_EXPR
+            | RECORD_FIELD_EXPR
+            | RECORD_INDEX_EXPR
+            | RECORD_UPDATE_EXPR
+            | REMOTE
             | UNARY_OP_EXPR => Some(LcExpr::Expr(Expr::cast(syntax).unwrap())),
             B_GENERATOR => Some(LcExpr::BGenerator(BGenerator { syntax })),
             GENERATOR => Some(LcExpr::Generator(Generator { syntax })),
@@ -3578,6 +3916,9 @@ impl AstNode for MacroDefReplacement {
             | TUPLE
             | VAR
             | ANN_TYPE
+            | ANON_RECORD_EXPR
+            | ANON_RECORD_FIELD_EXPR
+            | ANON_RECORD_UPDATE_EXPR
             | BINARY_OP_EXPR
             | CALL
             | CATCH_EXPR
@@ -3587,6 +3928,9 @@ impl AstNode for MacroDefReplacement {
             | MAP_EXPR_UPDATE
             | MATCH_EXPR
             | PIPE
+            | QUALIFIED_RECORD_EXPR
+            | QUALIFIED_RECORD_FIELD_EXPR
+            | QUALIFIED_RECORD_UPDATE_EXPR
             | RANGE_TYPE
             | RECORD_EXPR
             | RECORD_FIELD_EXPR
@@ -3606,13 +3950,54 @@ impl AstNode for MacroDefReplacement {
     #[allow(clippy::match_like_matches_macro)]
     fn cast(syntax: SyntaxNode) -> Option<Self> {
         match syntax.kind() {
-            ANONYMOUS_FUN | ATOM | BINARY | BINARY_COMPREHENSION | BLOCK_EXPR | CASE_EXPR
-            | CHAR | CONCATABLES | EXTERNAL_FUN | FLOAT | FUN_TYPE | IF_EXPR | INTEGER
-            | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
-            | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
-            | TUPLE | VAR | ANN_TYPE | BINARY_OP_EXPR | CALL | CATCH_EXPR | COND_MATCH_EXPR
-            | DOTDOTDOT | MAP_EXPR | MAP_EXPR_UPDATE | MATCH_EXPR | PIPE | RANGE_TYPE
-            | RECORD_EXPR | RECORD_FIELD_EXPR | RECORD_INDEX_EXPR | RECORD_UPDATE_EXPR | REMOTE
+            ANONYMOUS_FUN
+            | ATOM
+            | BINARY
+            | BINARY_COMPREHENSION
+            | BLOCK_EXPR
+            | CASE_EXPR
+            | CHAR
+            | CONCATABLES
+            | EXTERNAL_FUN
+            | FLOAT
+            | FUN_TYPE
+            | IF_EXPR
+            | INTEGER
+            | INTERNAL_FUN
+            | LIST
+            | LIST_COMPREHENSION
+            | MACRO_CALL_EXPR
+            | MACRO_STRING
+            | MAP_COMPREHENSION
+            | MAYBE_EXPR
+            | PAREN_EXPR
+            | RECEIVE_EXPR
+            | STRING
+            | TRY_EXPR
+            | TUPLE
+            | VAR
+            | ANN_TYPE
+            | ANON_RECORD_EXPR
+            | ANON_RECORD_FIELD_EXPR
+            | ANON_RECORD_UPDATE_EXPR
+            | BINARY_OP_EXPR
+            | CALL
+            | CATCH_EXPR
+            | COND_MATCH_EXPR
+            | DOTDOTDOT
+            | MAP_EXPR
+            | MAP_EXPR_UPDATE
+            | MATCH_EXPR
+            | PIPE
+            | QUALIFIED_RECORD_EXPR
+            | QUALIFIED_RECORD_FIELD_EXPR
+            | QUALIFIED_RECORD_UPDATE_EXPR
+            | RANGE_TYPE
+            | RECORD_EXPR
+            | RECORD_FIELD_EXPR
+            | RECORD_INDEX_EXPR
+            | RECORD_UPDATE_EXPR
+            | REMOTE
             | UNARY_OP_EXPR => Some(MacroDefReplacement::Expr(Expr::cast(syntax).unwrap())),
             REPLACEMENT_CR_CLAUSES => Some(MacroDefReplacement::ReplacementCrClauses(
                 ReplacementCrClauses { syntax },
@@ -4916,6 +5301,156 @@ impl std::fmt::Display for PreprocessorDirective {
 }
 #[doc = r" Via NodeType::Node 2 struct inner"]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QualifiedRecordExpr {
+    pub(crate) syntax: SyntaxNode,
+}
+impl QualifiedRecordExpr {
+    pub fn name(&self) -> Option<QualifiedRecordName> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn fields(&self) -> AstChildren<RecordField> {
+        support::children(&self.syntax)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for QualifiedRecordExpr {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == QUALIFIED_RECORD_EXPR
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for QualifiedRecordExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QualifiedRecordFieldExpr {
+    pub(crate) syntax: SyntaxNode,
+}
+impl QualifiedRecordFieldExpr {
+    pub fn expr(&self) -> Option<RecordExprBase> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn name(&self) -> Option<QualifiedRecordName> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn field(&self) -> Option<RecordFieldName> {
+        support::child(&self.syntax, 0usize)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for QualifiedRecordFieldExpr {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == QUALIFIED_RECORD_FIELD_EXPR
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for QualifiedRecordFieldExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QualifiedRecordName {
+    pub(crate) syntax: SyntaxNode,
+}
+impl QualifiedRecordName {
+    pub fn name(&self) -> Option<Name> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn module(&self) -> Option<Module> {
+        support::child(&self.syntax, 0usize)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for QualifiedRecordName {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == QUALIFIED_RECORD_NAME
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for QualifiedRecordName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QualifiedRecordUpdateExpr {
+    pub(crate) syntax: SyntaxNode,
+}
+impl QualifiedRecordUpdateExpr {
+    pub fn expr(&self) -> Option<RecordExprBase> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn name(&self) -> Option<QualifiedRecordName> {
+        support::child(&self.syntax, 0usize)
+    }
+    pub fn fields(&self) -> AstChildren<RecordField> {
+        support::children(&self.syntax)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct"]
+impl AstNode for QualifiedRecordUpdateExpr {
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == QUALIFIED_RECORD_UPDATE_EXPR
+    }
+    #[doc = r" Via field_casts"]
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        if Self::can_cast(syntax.kind()) {
+            Some(Self { syntax })
+        } else {
+            None
+        }
+    }
+    fn syntax(&self) -> &SyntaxNode {
+        &self.syntax
+    }
+}
+#[doc = r" Via NodeType::Node 2 display"]
+impl std::fmt::Display for QualifiedRecordUpdateExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.syntax(), f)
+    }
+}
+#[doc = r" Via NodeType::Node 2 struct inner"]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RangeType {
     pub(crate) syntax: SyntaxNode,
 }
@@ -5098,6 +5633,12 @@ impl std::fmt::Display for RecordExpr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RecordExprBase {
     ExprMax(ExprMax),
+    AnonRecordExpr(AnonRecordExpr),
+    AnonRecordFieldExpr(AnonRecordFieldExpr),
+    AnonRecordUpdateExpr(AnonRecordUpdateExpr),
+    QualifiedRecordExpr(QualifiedRecordExpr),
+    QualifiedRecordFieldExpr(QualifiedRecordFieldExpr),
+    QualifiedRecordUpdateExpr(QualifiedRecordUpdateExpr),
     RecordExpr(RecordExpr),
     RecordFieldExpr(RecordFieldExpr),
     RecordIndexExpr(RecordIndexExpr),
@@ -5107,11 +5648,41 @@ impl AstNode for RecordExprBase {
     #[allow(clippy::match_like_matches_macro)]
     fn can_cast(kind: SyntaxKind) -> bool {
         match kind {
-            ANONYMOUS_FUN | ATOM | BINARY | BINARY_COMPREHENSION | BLOCK_EXPR | CASE_EXPR
-            | CHAR | CONCATABLES | EXTERNAL_FUN | FLOAT | FUN_TYPE | IF_EXPR | INTEGER
-            | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
-            | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
-            | TUPLE | VAR | RECORD_EXPR | RECORD_FIELD_EXPR | RECORD_INDEX_EXPR
+            ANONYMOUS_FUN
+            | ATOM
+            | BINARY
+            | BINARY_COMPREHENSION
+            | BLOCK_EXPR
+            | CASE_EXPR
+            | CHAR
+            | CONCATABLES
+            | EXTERNAL_FUN
+            | FLOAT
+            | FUN_TYPE
+            | IF_EXPR
+            | INTEGER
+            | INTERNAL_FUN
+            | LIST
+            | LIST_COMPREHENSION
+            | MACRO_CALL_EXPR
+            | MACRO_STRING
+            | MAP_COMPREHENSION
+            | MAYBE_EXPR
+            | PAREN_EXPR
+            | RECEIVE_EXPR
+            | STRING
+            | TRY_EXPR
+            | TUPLE
+            | VAR
+            | ANON_RECORD_EXPR
+            | ANON_RECORD_FIELD_EXPR
+            | ANON_RECORD_UPDATE_EXPR
+            | QUALIFIED_RECORD_EXPR
+            | QUALIFIED_RECORD_FIELD_EXPR
+            | QUALIFIED_RECORD_UPDATE_EXPR
+            | RECORD_EXPR
+            | RECORD_FIELD_EXPR
+            | RECORD_INDEX_EXPR
             | RECORD_UPDATE_EXPR => true,
             _ => false,
         }
@@ -5124,6 +5695,28 @@ impl AstNode for RecordExprBase {
             | INTERNAL_FUN | LIST | LIST_COMPREHENSION | MACRO_CALL_EXPR | MACRO_STRING
             | MAP_COMPREHENSION | MAYBE_EXPR | PAREN_EXPR | RECEIVE_EXPR | STRING | TRY_EXPR
             | TUPLE | VAR => Some(RecordExprBase::ExprMax(ExprMax::cast(syntax).unwrap())),
+            ANON_RECORD_EXPR => Some(RecordExprBase::AnonRecordExpr(AnonRecordExpr { syntax })),
+            ANON_RECORD_FIELD_EXPR => {
+                Some(RecordExprBase::AnonRecordFieldExpr(AnonRecordFieldExpr {
+                    syntax,
+                }))
+            }
+            ANON_RECORD_UPDATE_EXPR => {
+                Some(RecordExprBase::AnonRecordUpdateExpr(AnonRecordUpdateExpr {
+                    syntax,
+                }))
+            }
+            QUALIFIED_RECORD_EXPR => {
+                Some(RecordExprBase::QualifiedRecordExpr(QualifiedRecordExpr {
+                    syntax,
+                }))
+            }
+            QUALIFIED_RECORD_FIELD_EXPR => Some(RecordExprBase::QualifiedRecordFieldExpr(
+                QualifiedRecordFieldExpr { syntax },
+            )),
+            QUALIFIED_RECORD_UPDATE_EXPR => Some(RecordExprBase::QualifiedRecordUpdateExpr(
+                QualifiedRecordUpdateExpr { syntax },
+            )),
             RECORD_EXPR => Some(RecordExprBase::RecordExpr(RecordExpr { syntax })),
             RECORD_FIELD_EXPR => Some(RecordExprBase::RecordFieldExpr(RecordFieldExpr { syntax })),
             RECORD_INDEX_EXPR => Some(RecordExprBase::RecordIndexExpr(RecordIndexExpr { syntax })),
@@ -5136,6 +5729,12 @@ impl AstNode for RecordExprBase {
     fn syntax(&self) -> &SyntaxNode {
         match self {
             RecordExprBase::ExprMax(it) => it.syntax(),
+            RecordExprBase::AnonRecordExpr(it) => it.syntax(),
+            RecordExprBase::AnonRecordFieldExpr(it) => it.syntax(),
+            RecordExprBase::AnonRecordUpdateExpr(it) => it.syntax(),
+            RecordExprBase::QualifiedRecordExpr(it) => it.syntax(),
+            RecordExprBase::QualifiedRecordFieldExpr(it) => it.syntax(),
+            RecordExprBase::QualifiedRecordUpdateExpr(it) => it.syntax(),
             RecordExprBase::RecordExpr(it) => it.syntax(),
             RecordExprBase::RecordFieldExpr(it) => it.syntax(),
             RecordExprBase::RecordIndexExpr(it) => it.syntax(),
@@ -5147,6 +5746,36 @@ impl AstNode for RecordExprBase {
 impl From<ExprMax> for RecordExprBase {
     fn from(node: ExprMax) -> RecordExprBase {
         RecordExprBase::ExprMax(node)
+    }
+}
+impl From<AnonRecordExpr> for RecordExprBase {
+    fn from(node: AnonRecordExpr) -> RecordExprBase {
+        RecordExprBase::AnonRecordExpr(node)
+    }
+}
+impl From<AnonRecordFieldExpr> for RecordExprBase {
+    fn from(node: AnonRecordFieldExpr) -> RecordExprBase {
+        RecordExprBase::AnonRecordFieldExpr(node)
+    }
+}
+impl From<AnonRecordUpdateExpr> for RecordExprBase {
+    fn from(node: AnonRecordUpdateExpr) -> RecordExprBase {
+        RecordExprBase::AnonRecordUpdateExpr(node)
+    }
+}
+impl From<QualifiedRecordExpr> for RecordExprBase {
+    fn from(node: QualifiedRecordExpr) -> RecordExprBase {
+        RecordExprBase::QualifiedRecordExpr(node)
+    }
+}
+impl From<QualifiedRecordFieldExpr> for RecordExprBase {
+    fn from(node: QualifiedRecordFieldExpr) -> RecordExprBase {
+        RecordExprBase::QualifiedRecordFieldExpr(node)
+    }
+}
+impl From<QualifiedRecordUpdateExpr> for RecordExprBase {
+    fn from(node: QualifiedRecordUpdateExpr) -> RecordExprBase {
+        RecordExprBase::QualifiedRecordUpdateExpr(node)
     }
 }
 impl From<RecordExpr> for RecordExprBase {
