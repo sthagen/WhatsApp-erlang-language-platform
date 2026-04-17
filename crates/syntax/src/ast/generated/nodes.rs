@@ -5400,7 +5400,7 @@ pub struct Remote {
     pub(crate) syntax: SyntaxNode,
 }
 impl Remote {
-    pub fn fun(&self) -> Option<ExprMax> {
+    pub fn fun(&self) -> Option<Expr> {
         support::child(&self.syntax, 0usize)
     }
     pub fn module(&self) -> Option<RemoteModule> {
@@ -5436,7 +5436,7 @@ pub struct RemoteModule {
     pub(crate) syntax: SyntaxNode,
 }
 impl RemoteModule {
-    pub fn module(&self) -> Option<ExprMax> {
+    pub fn module(&self) -> Option<Expr> {
         support::child(&self.syntax, 0usize)
     }
 }

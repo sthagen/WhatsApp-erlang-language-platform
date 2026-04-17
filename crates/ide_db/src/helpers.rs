@@ -43,15 +43,24 @@ pub fn pick_best_token(
     tokens.max_by_key(move |t| f(t.kind()))
 }
 
-/// Given a syntax node, check it it is immediately enclosed in a call,
-/// which can represent a function call or a type.
-/// For a remote call, the node can be the module or the function name.
-/// In the former case, there is an extra level of nesting, so we need
-/// to check up to 3 steps up
+/// Given a syntax node, find the enclosing call.
+/// Walks up to 3 ancestors to find a Call (covers function name,
+/// module name, and argument atoms). For remote calls where
+/// Remote wraps Call, also extracts Call from an ancestor Remote.
 pub fn get_call(syntax: &SyntaxNode) -> Option<ast::Call> {
     ast::Call::cast(syntax.parent()?)
         .or_else(|| ast::Call::cast(syntax.parent()?.parent()?))
         .or_else(|| ast::Call::cast(syntax.parent()?.parent()?.parent()?))
+        .or_else(|| {
+            // Remote wraps Call: walk up to find Remote, extract Call from it.
+            syntax.ancestors().find_map(|ancestor| {
+                let remote = ast::Remote::cast(ancestor)?;
+                match remote.fun()? {
+                    ast::Expr::Call(call) => Some(call),
+                    _ => None,
+                }
+            })
+        })
 }
 
 pub fn get_external_fun(syntax: &SyntaxNode) -> Option<ast::ExternalFun> {

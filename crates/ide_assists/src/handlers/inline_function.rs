@@ -184,7 +184,7 @@ fn inline_function_as_case(
     let replacement_range = if clauses[0].is_empty() {
         call_replacement_range(call)
     } else {
-        call.syntax().text_range()
+        call_expr_range(call)
     };
     Some((
         replacement_range,
@@ -192,21 +192,49 @@ fn inline_function_as_case(
     ))
 }
 
+/// Return the text range that covers the full call expression.
+/// A remote call `mod:fun(args)` is parsed as
+/// `Remote { mod, Call { fun, args } }`, so the Call is nested inside
+/// a Remote. We need the outer Remote node to get the full text range.
+fn call_expr_range(call: &ast::Call) -> TextRange {
+    call.syntax()
+        .parent()
+        .filter(|p| ast::Remote::can_cast(p.kind()))
+        .map_or_else(|| call.syntax().text_range(), |remote| remote.text_range())
+}
+
+/// Return the indent level for the full call expression, including a
+/// parent Remote node if present.
+fn call_expr_indent(call: &ast::Call) -> IndentLevel {
+    call.syntax()
+        .parent()
+        .filter(|p| ast::Remote::can_cast(p.kind()))
+        .map_or_else(
+            || IndentLevel::from_node(call.syntax()),
+            |remote| IndentLevel::from_node(&remote),
+        )
+}
+
 /// When a call is replaced by something starting on a new line, extend
 /// the range to exclude any trailing whitespace at the call site.
 fn call_replacement_range(call: &ast::Call) -> TextRange {
     fn get_start(call: &ast::Call) -> Option<TextRange> {
-        let call_range = call.syntax().text_range();
-        let mut token = call.syntax().first_token()?.prev_token()?;
-        let mut start_pos = call_range.start();
+        let range = call_expr_range(call);
+        let node = call
+            .syntax()
+            .parent()
+            .filter(|p| ast::Remote::can_cast(p.kind()))
+            .unwrap_or_else(|| call.syntax().clone());
+        let mut token = node.first_token()?.prev_token()?;
+        let mut start_pos = range.start();
         while token.kind() == SyntaxKind::WHITESPACE {
             start_pos = token.text_range().start();
             token = token.prev_token()?;
         }
-        Some(TextRange::new(start_pos, call.syntax().text_range().end()))
+        Some(TextRange::new(start_pos, range.end()))
     }
 
-    get_start(call).unwrap_or_else(|| call.syntax().text_range())
+    get_start(call).unwrap_or_else(|| call_expr_range(call))
 }
 
 /// Inline a function having a single clause.
@@ -258,12 +286,12 @@ fn inline_single_function_clause_with_begin(
     }
     final_text.push_str("\nend");
 
-    let old_indent = IndentLevel::from_node(call.syntax());
+    let old_indent = call_expr_indent(call);
     let delta_indent = old_indent.0 as i8 + DEFAULT_INDENT_STEP;
     let replacement_range = if final_text.starts_with('\n') {
         call_replacement_range(call)
     } else {
-        call.syntax().text_range()
+        call_expr_range(call)
     };
     Some((replacement_range, change_indent(delta_indent, final_text)))
 }
@@ -428,12 +456,12 @@ fn inline_simple_function_clause(
     let edit = builder.finish();
     edit.apply(&mut edited_text);
 
-    let old_indent = IndentLevel::from_node(call.syntax());
+    let old_indent = call_expr_indent(call);
     let delta_indent = old_indent.0 as i8 + DEFAULT_INDENT_STEP;
     let replacement_range = if edited_text.starts_with('\n') {
         call_replacement_range(call)
     } else {
-        call.syntax().text_range()
+        call_expr_range(call)
     };
     Some((replacement_range, change_indent(delta_indent, edited_text)))
 }

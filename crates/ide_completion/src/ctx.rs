@@ -199,9 +199,13 @@ impl CtxKind {
     fn is_type(node: &SyntaxNode, offset: TextSize) -> bool {
         if let Some(ancestors) = algo::ancestors_at_offset(node, offset) {
             let mut error_seen = false;
+            let mut type_sig_seen = false;
             for n in ancestors {
                 if n.kind() == SyntaxKind::ERROR {
                     error_seen = true;
+                }
+                if n.kind() == SyntaxKind::TYPE_SIG {
+                    type_sig_seen = true;
                 }
                 match_ast! {
                     match n {
@@ -209,7 +213,11 @@ impl CtxKind {
                             // For an incomplete spec, the name shows
                             // up in an ERROR node, and the following
                             // fun as the spec.
-                            if !error_seen {
+                            // But if we've seen a TYPE_SIG ancestor,
+                            // we're inside the type body of the spec,
+                            // not in the spec name, so errors there
+                            // are fine.
+                            if !error_seen || type_sig_seen {
                                 return true;
                             }
                         },

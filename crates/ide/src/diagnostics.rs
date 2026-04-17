@@ -3828,7 +3828,7 @@ main(X) ->
                         to_exit_code(run1(Root)),
                     catch
                         _:Reason -> to_exit_code(Reason)
-            %%          ^^^^^^^^^^^  error: P1711: Syntax Error
+            %%            ^^^^^^^^^  error: P1711: Syntax Error
                     end,
             %%      ^^^  error: P1711: Syntax Error
 

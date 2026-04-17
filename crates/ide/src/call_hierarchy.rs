@@ -135,16 +135,37 @@ pub(crate) fn outgoing_calls(db: &RootDatabase, position: FilePosition) -> Optio
                         if let Some(label) = target.label(arity, &sema, body) {
                             nav.name = label
                         }
-                        if let Some(expr) = &function_body.get_body_map(clause_id).any(ctx.item_id)
-                            && let Some(node) = expr.to_node(&source_file)
-                            && let Some(call) = algo::find_node_at_offset::<ast::Call>(
-                                node.syntax(),
-                                node.syntax().text_range().start(),
-                            )
-                            && let Some(expr) = call.expr()
+                        if let Some(source) =
+                            &function_body.get_body_map(clause_id).any(ctx.item_id)
+                            && let Some(node) = source.to_node(&source_file)
                         {
-                            let range = expr.syntax().text_range();
-                            calls.add(nav, range);
+                            // Get the range of the function reference (M:F or F)
+                            let range =
+                                if let Some(remote) = ast::Remote::cast(node.syntax().clone()) {
+                                    // Remote call: Remote { M, Call { F, Args } }
+                                    // Range from Remote start to function name end = "M:F"
+                                    if let Some(ast::Expr::Call(call)) = remote.fun() {
+                                        call.expr().map(|fun_expr| {
+                                            TextRange::new(
+                                                remote.syntax().text_range().start(),
+                                                fun_expr.syntax().text_range().end(),
+                                            )
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                } else if let Some(call) = algo::find_node_at_offset::<ast::Call>(
+                                    node.syntax(),
+                                    node.syntax().text_range().start(),
+                                ) {
+                                    // Local call: Call { F, Args }
+                                    call.expr().map(|e| e.syntax().text_range())
+                                } else {
+                                    None
+                                };
+                            if let Some(range) = range {
+                                calls.add(nav, range);
+                            }
                         }
                     }
                 }

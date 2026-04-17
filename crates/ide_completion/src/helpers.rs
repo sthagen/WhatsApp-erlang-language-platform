@@ -81,10 +81,17 @@ pub(crate) fn name_slash_arity_completion(
 
 pub(crate) fn split_remote(remote: &ast::Remote) -> Option<(ast::Atom, SmolStr)> {
     let module_atom = match remote.module()?.module()? {
-        ExprMax::Atom(atom) => atom,
+        ast::Expr::ExprMax(ExprMax::Atom(atom)) => atom,
         _ => return None,
     };
-    let name: SmolStr = remote.fun().and_then(|f| f.name()).unwrap_or_default();
+    let name: SmolStr = remote
+        .fun()
+        .and_then(|f| match f {
+            ast::Expr::ExprMax(ExprMax::Atom(a)) => a.text().map(SmolStr::from),
+            ast::Expr::ExprMax(ExprMax::Var(v)) => Some(SmolStr::from(v.text().as_ref())),
+            _ => None,
+        })
+        .unwrap_or_default();
     Some((module_atom, name))
 }
 

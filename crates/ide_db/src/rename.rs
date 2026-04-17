@@ -20,6 +20,7 @@ use elp_base_db::FileId;
 use elp_base_db::FileRange;
 use elp_base_db::ModuleName;
 use elp_syntax::AstNode;
+use elp_syntax::SyntaxNode;
 use elp_syntax::ast;
 use elp_syntax::ast::in_erlang_module;
 use hir::InFile;
@@ -497,51 +498,105 @@ fn rename_module_in_refs(refs: &[NameLike], new_name: &str) -> Option<TextEdit> 
     Some(builder.finish())
 }
 
+/// Extract a (Remote, Call) pair.
+/// Grammar: Remote { M, Call { F, Args } } → Remote wraps Call.
+fn get_remote_call(syntax: &SyntaxNode) -> Option<(ast::Remote, ast::Call)> {
+    if let Some(call) = get_call(syntax) {
+        // Remote wraps Call — call's parent is Remote
+        let remote = call.syntax().parent().and_then(ast::Remote::cast)?;
+        return Some((remote, call));
+    }
+    // Walk up ancestors to find Remote containing a Call
+    for ancestor in syntax.ancestors() {
+        if let Some(remote) = ast::Remote::cast(ancestor)
+            && let Some(ast::Expr::Call(call)) = remote.fun()
+        {
+            return Some((remote, call));
+        }
+    }
+    None
+}
+
 fn rename_call_module_in_ref(
     usage: &NameLike,
     builder: &mut TextEditBuilder,
     new_name: &str,
 ) -> Option<()> {
-    let call = get_call(usage.syntax())?;
     // We can only rename an atom usage
     let usage_atom = match usage {
         NameLike::Name(ast::Name::Atom(atom)) => atom,
         _ => return Some(()),
     };
 
-    // First check if this is the module part of a remote call (e.g., module:function())
-    if let Some(ast::Expr::Remote(remote)) = call.expr()
-        && let Some(module) = remote.module()
-        && let Some(ast::ExprMax::Atom(mod_atom)) = module.module()
+    // Try to find the enclosing remote call
+    let (remote, call) = match get_remote_call(usage.syntax()) {
+        Some(pair) => pair,
+        None => {
+            // Try local call for module-as-argument patterns
+            if let Some(call) = get_call(usage.syntax()) {
+                return rename_module_arg_in_call(usage_atom, &call, None, builder, new_name);
+            }
+            return Some(());
+        }
+    };
+
+    // Check if this is the module part of a remote call (e.g., module:function())
+    if let Some(module) = remote.module()
+        && let Some(ast::Expr::ExprMax(ast::ExprMax::Atom(mod_atom))) = module.module()
         && mod_atom.syntax() == usage_atom.syntax()
     {
         builder.replace(usage_atom.syntax().text_range(), new_name.to_string());
         return Some(());
     }
 
-    // Check if this is a known function call that takes a module as an argument
-    // Extract function name and optional module name based on call type
-    let (module_name, function_name) = match call.expr()? {
-        ast::Expr::Remote(remote) => {
-            let module = remote.module()?;
-            let mod_atom = match module.module()? {
-                ast::ExprMax::Atom(atom) => atom,
-                _ => return Some(()),
-            };
-            let fun_atom = match remote.fun()? {
-                ast::ExprMax::Atom(atom) => atom,
-                _ => return Some(()),
-            };
-            (Some(mod_atom.text()?), fun_atom.text()?)
-        }
-        ast::Expr::ExprMax(ast::ExprMax::Atom(fun_atom)) => (None, fun_atom.text()?),
+    // Extract function name and optional module name for pattern matching
+    let module_name = remote
+        .module()
+        .and_then(|m| m.module())
+        .and_then(|e| match e {
+            ast::Expr::ExprMax(ast::ExprMax::Atom(atom)) => atom.text(),
+            _ => None,
+        });
+    let function_name = match call.expr()? {
+        ast::Expr::ExprMax(ast::ExprMax::Atom(fun_atom)) => fun_atom.text()?,
         _ => return Some(()),
+    };
+
+    rename_module_arg_in_call(
+        usage_atom,
+        &call,
+        Some((&module_name, &function_name)),
+        builder,
+        new_name,
+    )
+}
+
+fn rename_module_arg_in_call(
+    usage_atom: &ast::Atom,
+    call: &ast::Call,
+    remote_info: Option<(&Option<String>, &String)>,
+    builder: &mut TextEditBuilder,
+    new_name: &str,
+) -> Option<()> {
+    let function_name_owned;
+    let (module_name, function_name): (Option<&str>, &str) = match remote_info {
+        Some((mod_name, fun_name)) => (mod_name.as_deref(), fun_name.as_str()),
+        None => {
+            // Local call: extract function name from call.expr()
+            match call.expr()? {
+                ast::Expr::ExprMax(ast::ExprMax::Atom(fun_atom)) => {
+                    function_name_owned = fun_atom.text()?;
+                    (None, function_name_owned.as_str())
+                }
+                _ => return Some(()),
+            }
+        }
     };
 
     let args = call.args()?;
     let args_vec: Vec<_> = args.args().collect();
     let arity = args_vec.len();
-    let pattern_key = (module_name.as_deref(), function_name.as_str(), arity);
+    let pattern_key = (module_name, function_name, arity);
 
     // Use combined patterns that merge dynamic call patterns and module argument patterns
     let combined_patterns = hir::sema::to_def::get_module_arg_patterns();
@@ -751,11 +806,8 @@ pub fn is_safe_remote_function(
     // Problem occurs if the usage is not qualified with a module name
     let all_remote = refs.iter().all(|name_like| {
         if let Some(call) = get_call(name_like.syntax()) {
-            if let Some(ast::Expr::Remote(_)) = call.expr() {
-                true
-            } else {
-                false
-            }
+            // Remote wraps Call — check that Call's parent is Remote
+            call.syntax().parent().and_then(ast::Remote::cast).is_some()
         } else {
             false
         }

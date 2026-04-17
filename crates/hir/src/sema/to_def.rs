@@ -14,6 +14,7 @@ use elp_syntax::AstNode;
 use elp_syntax::ast;
 use elp_syntax::match_ast;
 
+use crate::AnyExprId;
 use crate::AnyExprRef;
 use crate::Body;
 use crate::CallTarget;
@@ -137,8 +138,11 @@ impl ToDef for ast::Remote {
     type Def = CallDef;
 
     fn to_def(sema: &Semantic<'_>, ast: InFile<&Self>) -> Option<Self::Def> {
-        let call = ast::Call::cast(ast.value.syntax().parent()?)?;
-        ToDef::to_def(sema, ast.with_value(&call))
+        // Remote wraps Call: resolve via body map using Remote as expr
+        let (body, body_map) = sema.find_body_and_map(ast.file_id, ast.value.syntax())?;
+        let expr = ast.map(|remote| ast::Expr::from(remote.clone()));
+        let any_expr_id = body_map.any_id(expr.as_ref())?;
+        resolve_call_from_body(sema, &body, any_expr_id, ast.file_id)
     }
 }
 
@@ -149,29 +153,40 @@ impl ToDef for ast::Call {
         let (body, body_map) = sema.find_body_and_map(ast.file_id, ast.value.syntax())?;
         let file_id = ast.file_id;
         let expr = ast.map(|call| ast::Expr::from(call.clone()));
-        let any_expr_id = body_map.any_id(expr.as_ref())?;
-        let def = match body.get_any(any_expr_id) {
-            AnyExprRef::Expr(Expr::Call { target, args }) => {
-                let arity = args.len().try_into().ok()?;
-                resolve_call_target(sema, target, Some(arity), file_id, &body)
-                    .map(CallDef::Function)
-                    .or_else(|| {
-                        resolve_call_target(sema, target, None, file_id, &body)
-                            .map(CallDef::FuzzyFunction)
-                    })
-            }
-            AnyExprRef::TypeExpr(TypeExpr::Call { target, args }) => {
-                let arity = args.len().try_into().ok()?;
-                resolve_type_target(sema, target, Some(arity), file_id, &body)
-                    .map(CallDef::Type)
-                    .or_else(|| {
-                        resolve_type_target(sema, target, None, file_id, &body)
-                            .map(CallDef::FuzzyType)
-                    })
-            }
-            _ => None,
-        }?;
-        Some(def)
+        let any_expr_id = body_map.any_id(expr.as_ref()).or_else(|| {
+            let remote = ast::Remote::cast(ast.value.syntax().parent()?)?;
+            let remote_expr = ast::Expr::from(remote);
+            body_map.any_id(InFile::new(file_id, &remote_expr))
+        })?;
+        resolve_call_from_body(sema, &body, any_expr_id, file_id)
+    }
+}
+
+fn resolve_call_from_body(
+    sema: &Semantic<'_>,
+    body: &Body,
+    any_expr_id: AnyExprId,
+    file_id: FileId,
+) -> Option<CallDef> {
+    match body.get_any(any_expr_id) {
+        AnyExprRef::Expr(Expr::Call { target, args }) => {
+            let arity = args.len().try_into().ok()?;
+            resolve_call_target(sema, target, Some(arity), file_id, body)
+                .map(CallDef::Function)
+                .or_else(|| {
+                    resolve_call_target(sema, target, None, file_id, body)
+                        .map(CallDef::FuzzyFunction)
+                })
+        }
+        AnyExprRef::TypeExpr(TypeExpr::Call { target, args }) => {
+            let arity = args.len().try_into().ok()?;
+            resolve_type_target(sema, target, Some(arity), file_id, body)
+                .map(CallDef::Type)
+                .or_else(|| {
+                    resolve_type_target(sema, target, None, file_id, body).map(CallDef::FuzzyType)
+                })
+        }
+        _ => None,
     }
 }
 

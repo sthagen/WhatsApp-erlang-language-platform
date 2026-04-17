@@ -351,10 +351,16 @@ fn test_function_args() {
     let config = TEST_CONFIG;
     let diagnostics = vec![];
     let ctx = AssistContext::new(sema, &config, frange, &diagnostics, None);
-    let call: ast::Call = ctx.find_node_at_offset().unwrap();
+    // Remote wraps Call: find Remote, extract Call from it.
+    let remote: ast::Remote = ctx.find_node_at_offset().unwrap();
+    let _call = match remote.fun().unwrap() {
+        ast::Expr::Call(call) => call,
+        other => panic!("Expected Call inside Remote, got {:?}", other),
+    };
+    // Body map keys on Remote, so look up via the Remote node.
     let call_expr = ctx
         .sema
-        .to_expr(InFile::new(ctx.file_id(), &ast::Expr::Call(call)))
+        .to_expr(InFile::new(ctx.file_id(), &ast::Expr::Remote(remote)))
         .unwrap();
     if let Expr::Call { target: _, args } = &call_expr[call_expr.value] {
         expect![[r#"

@@ -1137,6 +1137,20 @@ impl GleanIndexer {
                 ast::Expr::ExprMax(expr_max) => Some(expr_max.syntax().text_range()),
                 expr => Some(expr.syntax().text_range()),
             },
+            elp_syntax::ast::Expr::Remote(remote) => match remote.fun()? {
+                // Return range of mod:fun, excluding args
+                ast::Expr::Call(call) => {
+                    let start = remote.syntax().text_range().start();
+                    let end = call.expr()?.syntax().text_range().end();
+                    Some(TextRange::new(start, end))
+                }
+                // Bare remote: M:F without call
+                fun => {
+                    let start = remote.syntax().text_range().start();
+                    let end = fun.syntax().text_range().end();
+                    Some(TextRange::new(start, end))
+                }
+            },
             elp_syntax::ast::Expr::RecordExpr(expr) => Some(expr.name()?.syntax().text_range()),
             elp_syntax::ast::Expr::RecordFieldExpr(expr) => {
                 Some(expr.name()?.syntax().text_range())

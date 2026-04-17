@@ -681,16 +681,26 @@ impl<'a> Ctx<'a> {
                     });
                 self.alloc_pat(Pat::Missing, Some(expr))
             }
-            ast::Expr::Remote(remote) => {
-                let _ = self.lower_optional_pat(
-                    remote
-                        .module()
-                        .and_then(|module| module.module())
-                        .map(Into::into),
-                );
-                let _ = self.lower_optional_pat(remote.fun().map(Into::into));
-                self.alloc_pat(Pat::Missing, Some(expr))
-            }
+            ast::Expr::Remote(remote) => match remote.fun() {
+                Some(ast::Expr::Call(call)) => {
+                    let _ =
+                        self.lower_optional_pat(remote.module().and_then(|module| module.module()));
+                    let _ = self.lower_optional_pat(call.expr());
+                    call.args()
+                        .iter()
+                        .flat_map(|args| args.args())
+                        .for_each(|expr| {
+                            let _ = self.lower_pat(&expr);
+                        });
+                    self.alloc_pat(Pat::Missing, Some(expr))
+                }
+                _ => {
+                    let _ =
+                        self.lower_optional_pat(remote.module().and_then(|module| module.module()));
+                    let _ = self.lower_optional_pat(remote.fun());
+                    self.alloc_pat(Pat::Missing, Some(expr))
+                }
+            },
             ast::Expr::UnaryOpExpr(unary_op) => {
                 let operand = self.lower_optional_pat(unary_op.operand());
                 if let Some((op, _)) = unary_op.op() {
@@ -1114,16 +1124,49 @@ impl<'a> Ctx<'a> {
                     self.alloc_expr(Expr::Missing, Some(expr))
                 }
             }
-            ast::Expr::Remote(remote) => {
-                let _ = self.lower_optional_expr(
-                    remote
-                        .module()
-                        .and_then(|module| module.module())
-                        .map(Into::into),
-                );
-                let _ = self.lower_optional_expr(remote.fun().map(Into::into));
-                self.alloc_expr(Expr::Missing, Some(expr))
-            }
+            ast::Expr::Remote(remote) => match remote.fun() {
+                Some(ast::Expr::Call(call)) => {
+                    let module = self
+                        .lower_optional_expr(remote.module().and_then(|module| module.module()));
+                    let name_target = self.lower_call_target(call.expr(), call.arity_value());
+                    let target = match name_target {
+                        CallTarget::Local { name } => CallTarget::Remote {
+                            module,
+                            name,
+                            parens: false,
+                        },
+                        CallTarget::Remote { name, parens, .. } => {
+                            // Nested remote (unlikely but handle gracefully)
+                            CallTarget::Remote {
+                                module,
+                                name,
+                                parens,
+                            }
+                        }
+                    };
+                    let args = call
+                        .args()
+                        .iter()
+                        .flat_map(|args| args.args())
+                        .map(|expr| self.lower_expr(&expr))
+                        .collect();
+                    let expr_id = self.alloc_expr(Expr::Call { target, args }, Some(expr));
+                    // Also record the inner Call node in the forward source map
+                    // so that body_map.any_id(ast::Expr::Call) resolves too.
+                    let call_ast = ast::Expr::from(call);
+                    let call_ptr = AstPtr::new(&call_ast);
+                    let call_source = InFileAstPtr::new(self.curr_file_id(), call_ptr);
+                    self.source_map.expr_map.insert(call_source, expr_id);
+                    expr_id
+                }
+                _ => {
+                    // Bare remote reference: M:F (without call args)
+                    let _ = self
+                        .lower_optional_expr(remote.module().and_then(|module| module.module()));
+                    let _ = self.lower_optional_expr(remote.fun());
+                    self.alloc_expr(Expr::Missing, Some(expr))
+                }
+            },
             ast::Expr::UnaryOpExpr(unary_op) => {
                 let operand = self.lower_optional_expr(unary_op.operand());
                 if let Some((op, _)) = unary_op.op() {
@@ -1183,13 +1226,9 @@ impl<'a> Ctx<'a> {
                 }
             }
             Some(ast::Expr::Remote(remote)) => CallTarget::Remote {
-                module: self.lower_optional_expr(
-                    remote
-                        .module()
-                        .and_then(|module| module.module())
-                        .map(ast::Expr::ExprMax),
-                ),
-                name: self.lower_optional_expr(remote.fun().map(ast::Expr::ExprMax)),
+                module: self
+                    .lower_optional_expr(remote.module().and_then(|module| module.module())),
+                name: self.lower_optional_expr(remote.fun()),
                 parens: false,
             },
             Some(ast::Expr::ExprMax(ast::ExprMax::MacroCallExpr(call))) => self
@@ -1966,16 +2005,49 @@ impl<'a> Ctx<'a> {
                 });
                 self.alloc_type_expr(TypeExpr::Missing, Some(expr))
             }
-            ast::Expr::Remote(remote) => {
-                let _ = self.lower_optional_type_expr(
-                    remote
-                        .module()
-                        .and_then(|module| module.module())
-                        .map(Into::into),
-                );
-                let _ = self.lower_optional_type_expr(remote.fun().map(Into::into));
-                self.alloc_type_expr(TypeExpr::Missing, Some(expr))
-            }
+            ast::Expr::Remote(remote) => match remote.fun() {
+                Some(ast::Expr::Call(call)) => {
+                    let module = self.lower_optional_type_expr(
+                        remote.module().and_then(|module| module.module()),
+                    );
+                    let name_target = self.lower_type_call_target(call.expr(), call.arity_value());
+                    let target = match name_target {
+                        CallTarget::Local { name } => CallTarget::Remote {
+                            module,
+                            name,
+                            parens: false,
+                        },
+                        CallTarget::Remote { name, parens, .. } => CallTarget::Remote {
+                            module,
+                            name,
+                            parens,
+                        },
+                    };
+                    let args = call
+                        .args()
+                        .iter()
+                        .flat_map(|args| args.args())
+                        .map(|expr| self.lower_type_expr(&expr))
+                        .collect();
+                    let type_expr_id =
+                        self.alloc_type_expr(TypeExpr::Call { target, args }, Some(expr));
+                    // Also record the inner Call node in the forward source map
+                    let call_ast = ast::Expr::from(call);
+                    let call_ptr = AstPtr::new(&call_ast);
+                    let call_source = InFileAstPtr::new(self.curr_file_id(), call_ptr);
+                    self.source_map
+                        .type_expr_map
+                        .insert(call_source, type_expr_id);
+                    type_expr_id
+                }
+                _ => {
+                    let _ = self.lower_optional_type_expr(
+                        remote.module().and_then(|module| module.module()),
+                    );
+                    let _ = self.lower_optional_type_expr(remote.fun());
+                    self.alloc_type_expr(TypeExpr::Missing, Some(expr))
+                }
+            },
             ast::Expr::UnaryOpExpr(unary_op) => {
                 let operand = self.lower_optional_type_expr(unary_op.operand());
                 if let Some((op, _)) = unary_op.op() {
@@ -2008,13 +2080,9 @@ impl<'a> Ctx<'a> {
                 self.lower_type_call_target(paren.expr(), arity)
             }
             Some(ast::Expr::Remote(remote)) => CallTarget::Remote {
-                module: self.lower_optional_type_expr(
-                    remote
-                        .module()
-                        .and_then(|module| module.module())
-                        .map(ast::Expr::ExprMax),
-                ),
-                name: self.lower_optional_type_expr(remote.fun().map(ast::Expr::ExprMax)),
+                module: self
+                    .lower_optional_type_expr(remote.module().and_then(|module| module.module())),
+                name: self.lower_optional_type_expr(remote.fun()),
                 parens: false,
             },
             Some(ast::Expr::ExprMax(ast::ExprMax::MacroCallExpr(call))) => self
@@ -2390,13 +2458,9 @@ impl<'a> Ctx<'a> {
                 self.alloc_term(Term::Missing, Some(expr))
             }
             ast::Expr::Remote(remote) => {
-                let _ = self.lower_optional_term(
-                    remote
-                        .module()
-                        .and_then(|module| module.module())
-                        .map(Into::into),
-                );
-                let _ = self.lower_optional_term(remote.fun().map(Into::into));
+                let _ =
+                    self.lower_optional_term(remote.module().and_then(|module| module.module()));
+                let _ = self.lower_optional_term(remote.fun());
                 self.alloc_term(Term::Missing, Some(expr))
             }
             ast::Expr::UnaryOpExpr(unary_op) => {
