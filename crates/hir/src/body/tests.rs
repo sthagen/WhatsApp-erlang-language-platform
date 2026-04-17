@@ -3476,3 +3476,94 @@ bar() -> ok.
 
 // Tree printing ends
 // ---------------------------------------------------------------------
+
+// ---------------------------------------------------------------------
+// Native records (EEP 79)
+
+#[test]
+fn native_record_qualified_create() {
+    check(
+        r#"
+foo() -> #mod:name{a = 1}.
+"#,
+        expect![[r#"
+            foo() ->
+                #mod:name{
+                    a = 1
+                }.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_qualified_update() {
+    check(
+        r#"
+foo(X) -> X#mod:name{a = 1, b = 3}.
+"#,
+        expect![[r#"
+            foo(X) ->
+                X#mod:name{
+                    a = 1,
+                    b = 3
+                }.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_qualified_field_access() {
+    check(
+        r#"
+foo(X) -> X#mod:name.field.
+"#,
+        expect![[r#"
+            foo(X) ->
+                X#mod:name.field.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_anon_create() {
+    check(
+        r#"
+foo() -> #_{a = 1, b = 2}.
+"#,
+        expect![[r#"
+            foo() ->
+                #_{
+                    a = 1,
+                    b = 2
+                }.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_anon_update() {
+    check(
+        r#"
+foo(X) -> X#_{a = 1}.
+"#,
+        expect![[r#"
+            foo(X) ->
+                X#_{
+                    a = 1
+                }.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_anon_field_access() {
+    check(
+        r#"
+foo(X) -> X#_.field.
+"#,
+        expect![[r#"
+            foo(X) ->
+                X#_.field.
+        "#]],
+    );
+}

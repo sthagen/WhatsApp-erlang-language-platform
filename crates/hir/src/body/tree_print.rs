@@ -62,6 +62,7 @@ use crate::db::DefDatabase;
 use crate::db::InternDatabase;
 use crate::expr::Guards;
 use crate::expr::MaybeExpr;
+use crate::expr::NativeRecordName;
 use crate::fold::MacroStrategy;
 use crate::fold::ParenStrategy;
 use crate::fold::default_fold_body;
@@ -649,6 +650,42 @@ impl<'a> Printer<'a> {
                 self.print_herald("Expr::RecordField", &mut |this| {
                     this.print_labelled("expr", true, &mut |this| this.print_expr(expr));
                     writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
+                    writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
+                });
+            }
+            Expr::NativeRecord { name, fields } => {
+                self.print_herald("Expr::NativeRecord", &mut |this| {
+                    this.print_native_record_name(name);
+                    this.print_labelled("fields", false, &mut |this| {
+                        fields.iter().for_each(|(name, expr_id)| {
+                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            this.indent();
+                            this.print_expr(expr_id);
+                            writeln!(this, ",").ok();
+                            this.dedent();
+                        });
+                    });
+                });
+            }
+            Expr::NativeRecordUpdate { expr, name, fields } => {
+                self.print_herald("Expr::NativeRecordUpdate", &mut |this| {
+                    this.print_labelled("expr", true, &mut |this| this.print_expr(expr));
+                    this.print_native_record_name(name);
+                    this.print_labelled("fields", false, &mut |this| {
+                        fields.iter().for_each(|(name, expr_id)| {
+                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            this.indent();
+                            this.print_expr(expr_id);
+                            writeln!(this, ",").ok();
+                            this.dedent();
+                        });
+                    });
+                });
+            }
+            Expr::NativeRecordField { expr, name, field } => {
+                self.print_herald("Expr::NativeRecordField", &mut |this| {
+                    this.print_labelled("expr", true, &mut |this| this.print_expr(expr));
+                    this.print_native_record_name(name);
                     writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
                 });
             }
@@ -1415,6 +1452,23 @@ impl<'a> Printer<'a> {
         for term_id in terms {
             self.print_term(term_id);
             writeln!(self, ",").ok();
+        }
+    }
+
+    fn print_native_record_name(&mut self, name: &NativeRecordName) {
+        match name {
+            NativeRecordName::Anon => {
+                writeln!(self, "name: #_").ok();
+            }
+            NativeRecordName::Qualified { module, name } => {
+                writeln!(
+                    self,
+                    "name: #{}:{}",
+                    self.db.lookup_atom(*module),
+                    self.db.lookup_atom(*name)
+                )
+                .ok();
+            }
         }
     }
 
@@ -3721,6 +3775,159 @@ mod tests {
             expect![[r#"
                 -ifndef('BAR').
                 -endif.
+            "#]],
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // Native records (EEP 79)
+
+    #[test]
+    fn expr_native_record_qualified_create() {
+        check(
+            r#"
+            foo() -> #mod:name{a = 1, b = 2}.
+            "#,
+            expect![[r#"
+                function: foo/0
+                Clause {
+                    pats
+                    guards
+                    exprs
+                        Expr<7>:Expr::NativeRecord {
+                            name: #mod:name
+                            fields
+                                Atom('a'):
+                                    Expr<3>:Literal(Integer(1)),
+                                Atom('b'):
+                                    Expr<5>:Literal(Integer(2)),
+                        },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn expr_native_record_qualified_update() {
+        check(
+            r#"
+            foo(X) -> X#mod:name{a = 1}.
+            "#,
+            expect![[r#"
+                function: foo/1
+                Clause {
+                    pats
+                        Pat<0>:Pat::Var(X),
+                    guards
+                    exprs
+                        Expr<6>:Expr::NativeRecordUpdate {
+                            expr
+                                Expr<1>:Expr::Var(X)
+                            name: #mod:name
+                            fields
+                                Atom('a'):
+                                    Expr<4>:Literal(Integer(1)),
+                        },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn expr_native_record_qualified_field_access() {
+        check(
+            r#"
+            foo(X) -> X#mod:name.field.
+            "#,
+            expect![[r#"
+                function: foo/1
+                Clause {
+                    pats
+                        Pat<0>:Pat::Var(X),
+                    guards
+                    exprs
+                        Expr<5>:Expr::NativeRecordField {
+                            expr
+                                Expr<1>:Expr::Var(X)
+                            name: #mod:name
+                            field: Atom('field')
+                        },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn expr_native_record_anon_create() {
+        check(
+            r#"
+            foo() -> #_{a = 1, b = 2}.
+            "#,
+            expect![[r#"
+                function: foo/0
+                Clause {
+                    pats
+                    guards
+                    exprs
+                        Expr<5>:Expr::NativeRecord {
+                            name: #_
+                            fields
+                                Atom('a'):
+                                    Expr<1>:Literal(Integer(1)),
+                                Atom('b'):
+                                    Expr<3>:Literal(Integer(2)),
+                        },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn expr_native_record_anon_update() {
+        check(
+            r#"
+            foo(X) -> X#_{a = 1}.
+            "#,
+            expect![[r#"
+                function: foo/1
+                Clause {
+                    pats
+                        Pat<0>:Pat::Var(X),
+                    guards
+                    exprs
+                        Expr<4>:Expr::NativeRecordUpdate {
+                            expr
+                                Expr<1>:Expr::Var(X)
+                            name: #_
+                            fields
+                                Atom('a'):
+                                    Expr<2>:Literal(Integer(1)),
+                        },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn expr_native_record_anon_field_access() {
+        check(
+            r#"
+            foo(X) -> X#_.field.
+            "#,
+            expect![[r#"
+                function: foo/1
+                Clause {
+                    pats
+                        Pat<0>:Pat::Var(X),
+                    guards
+                    exprs
+                        Expr<3>:Expr::NativeRecordField {
+                            expr
+                                Expr<1>:Expr::Var(X)
+                            name: #_
+                            field: Atom('field')
+                        },
+                }.
             "#]],
         );
     }

@@ -1259,6 +1259,31 @@ impl PatternIterator {
                     (*field).into(),
                     (*expr).into(),
                 ]),
+                Expr::NativeRecord { name: _, fields } => PatternIterator::as_pattern_list(
+                    fields
+                        .iter()
+                        .flat_map(|(name, val)| vec![(*name).into(), (*val).into()])
+                        .collect(),
+                ),
+                Expr::NativeRecordUpdate {
+                    expr,
+                    name: _,
+                    fields,
+                } => PatternIterator::as_pattern_list(
+                    vec![(*expr).into()]
+                        .into_iter()
+                        .chain(
+                            fields
+                                .iter()
+                                .flat_map(|(name, val)| vec![(*name).into(), (*val).into()]),
+                        )
+                        .collect(),
+                ),
+                Expr::NativeRecordField {
+                    expr,
+                    name: _,
+                    field,
+                } => PatternIterator::as_pattern_list(vec![(*field).into(), (*expr).into()]),
                 Expr::Map { fields } => {
                     let children: FxHashMap<SubId, Vec<SubId>> = fields
                         .iter()

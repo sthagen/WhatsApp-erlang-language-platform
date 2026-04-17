@@ -47,6 +47,7 @@ use crate::Var;
 use crate::db::InternDatabase;
 use crate::expr::Guards;
 use crate::expr::MaybeExpr;
+use crate::expr::NativeRecordName;
 use crate::expr::StringVariant;
 use crate::quote;
 
@@ -493,6 +494,26 @@ impl<'a> Printer<'a> {
                     self.db.lookup_atom(*field)
                 )
             }
+            Expr::NativeRecord { name, fields } => {
+                self.print_native_record_name(name)?;
+                self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
+                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    this.print_expr(&this.body[*val])
+                })
+            }
+            Expr::NativeRecordUpdate { expr, name, fields } => {
+                self.print_expr(&self.body[*expr])?;
+                self.print_native_record_name(name)?;
+                self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
+                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    this.print_expr(&this.body[*val])
+                })
+            }
+            Expr::NativeRecordField { expr, name, field } => {
+                self.print_expr(&self.body[*expr])?;
+                self.print_native_record_name(name)?;
+                write!(self, ".{}", self.db.lookup_atom(*field))
+            }
             Expr::Binary { segs } => self.print_seq(segs, None, "<<", ">>", ",", |this, seg| {
                 this.print_bin_segment(seg, |this, expr| this.print_expr(&this.body[expr]))
             }),
@@ -894,6 +915,20 @@ impl<'a> Printer<'a> {
             }
             Literal::Integer(int) => write!(self, "{}", int.value), // TODO: other bases
             Literal::Float(float) => write!(self, "{}", f64::from_bits(*float)),
+        }
+    }
+
+    fn print_native_record_name(&mut self, name: &NativeRecordName) -> fmt::Result {
+        match name {
+            NativeRecordName::Anon => write!(self, "#_"),
+            NativeRecordName::Qualified { module, name } => {
+                write!(
+                    self,
+                    "#{}:{}",
+                    self.db.lookup_atom(*module),
+                    self.db.lookup_atom(*name)
+                )
+            }
         }
     }
 

@@ -169,6 +169,14 @@ fn has_no_effect(def_fb: &InFunctionClauseBody<&FunctionDef>, expr_id: &ExprId) 
         }
         Expr::RecordIndex { .. } => true,
 
+        Expr::NativeRecord { fields, .. } => fields
+            .iter()
+            .all(|(_key, value)| has_no_effect(def_fb, value)),
+        Expr::NativeRecordUpdate { .. } | Expr::NativeRecordField { .. } => {
+            // Side-effect: may throw (e.g. expr not a record)
+            false
+        }
+
         Expr::UnaryOp { .. } | Expr::BinaryOp { .. } => {
             // Side-effect: may throw
             false

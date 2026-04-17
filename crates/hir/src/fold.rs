@@ -755,6 +755,24 @@ impl<'a, T> FoldCtx<'a, T> {
                 name: _,
                 field: _,
             } => self.do_fold_expr(*expr, acc),
+            crate::Expr::NativeRecord { name: _, fields } => fields
+                .iter()
+                .fold(acc, |acc, (_, field)| self.do_fold_expr(*field, acc)),
+            crate::Expr::NativeRecordUpdate {
+                expr,
+                name: _,
+                fields,
+            } => {
+                let r = self.do_fold_expr(*expr, acc);
+                fields
+                    .iter()
+                    .fold(r, |acc, (_, field)| self.do_fold_expr(*field, acc))
+            }
+            crate::Expr::NativeRecordField {
+                expr,
+                name: _,
+                field: _,
+            } => self.do_fold_expr(*expr, acc),
             crate::Expr::Map { fields } => fields.iter().fold(acc, |acc, (k, v)| {
                 let r = self.do_fold_expr(*k, acc);
                 self.do_fold_expr(*v, r)

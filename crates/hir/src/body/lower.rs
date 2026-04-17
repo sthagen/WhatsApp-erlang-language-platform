@@ -82,6 +82,7 @@ use crate::db::DefDatabase;
 use crate::expr::Guards;
 use crate::expr::MacroCallName;
 use crate::expr::MaybeExpr;
+use crate::expr::NativeRecordName;
 use crate::expr::StringVariant;
 use crate::form_list::ConditionEnvId;
 use crate::known;
@@ -1069,15 +1070,7 @@ impl<'a> Ctx<'a> {
             }
             ast::Expr::RecordExpr(record) => {
                 let name = record.name().and_then(|n| self.resolve_name(n.name()?));
-                let fields = record
-                    .fields()
-                    .flat_map(|field| {
-                        let value =
-                            self.lower_optional_expr(field.expr().and_then(|expr| expr.expr()));
-                        let name = self.resolve_name(field.name()?)?;
-                        Some((name, value))
-                    })
-                    .collect();
+                let fields = self.lower_record_fields(record.fields());
                 if let Some(name) = name {
                     self.alloc_expr(Expr::Record { name, fields }, Some(expr))
                 } else {
@@ -1113,15 +1106,7 @@ impl<'a> Ctx<'a> {
             ast::Expr::RecordUpdateExpr(update) => {
                 let base = self.lower_optional_expr(update.expr().map(Into::into));
                 let name = update.name().and_then(|n| self.resolve_name(n.name()?));
-                let fields = update
-                    .fields()
-                    .flat_map(|field| {
-                        let value =
-                            self.lower_optional_expr(field.expr().and_then(|expr| expr.expr()));
-                        let name = self.resolve_name(field.name()?)?;
-                        Some((name, value))
-                    })
-                    .collect();
+                let fields = self.lower_record_fields(update.fields());
                 if let Some(name) = name {
                     self.alloc_expr(
                         Expr::RecordUpdate {
@@ -1205,13 +1190,97 @@ impl<'a> Ctx<'a> {
                     self.alloc_expr(Expr::Missing, Some(expr))
                 }
             }
-            // TODO(T262108365): lower native records (EEP 79) properly
-            ast::Expr::AnonRecordExpr(_)
-            | ast::Expr::AnonRecordFieldExpr(_)
-            | ast::Expr::AnonRecordUpdateExpr(_)
-            | ast::Expr::QualifiedRecordExpr(_)
-            | ast::Expr::QualifiedRecordFieldExpr(_)
-            | ast::Expr::QualifiedRecordUpdateExpr(_) => self.alloc_expr(Expr::Missing, Some(expr)),
+            ast::Expr::AnonRecordExpr(record) => {
+                let fields = self.lower_record_fields(record.fields());
+                self.alloc_expr(
+                    Expr::NativeRecord {
+                        name: NativeRecordName::Anon,
+                        fields,
+                    },
+                    Some(expr),
+                )
+            }
+            ast::Expr::AnonRecordFieldExpr(field_expr) => {
+                let base = self.lower_optional_expr(field_expr.expr().map(Into::into));
+                let field = field_expr
+                    .field()
+                    .and_then(|n| self.resolve_name(n.name()?));
+                if let Some(field) = field {
+                    self.alloc_expr(
+                        Expr::NativeRecordField {
+                            expr: base,
+                            name: NativeRecordName::Anon,
+                            field,
+                        },
+                        Some(expr),
+                    )
+                } else {
+                    self.alloc_expr(Expr::Missing, Some(expr))
+                }
+            }
+            ast::Expr::AnonRecordUpdateExpr(update) => {
+                let base = self.lower_optional_expr(update.expr().map(Into::into));
+                let fields = self.lower_record_fields(update.fields());
+                self.alloc_expr(
+                    Expr::NativeRecordUpdate {
+                        expr: base,
+                        name: NativeRecordName::Anon,
+                        fields,
+                    },
+                    Some(expr),
+                )
+            }
+            ast::Expr::QualifiedRecordExpr(record) => {
+                let name = record
+                    .name()
+                    .and_then(|n| self.lower_qualified_record_name(&n));
+                if let Some(name) = name {
+                    let fields = self.lower_record_fields(record.fields());
+                    self.alloc_expr(Expr::NativeRecord { name, fields }, Some(expr))
+                } else {
+                    self.alloc_expr(Expr::Missing, Some(expr))
+                }
+            }
+            ast::Expr::QualifiedRecordFieldExpr(field_expr) => {
+                let base = self.lower_optional_expr(field_expr.expr().map(Into::into));
+                let name = field_expr
+                    .name()
+                    .and_then(|n| self.lower_qualified_record_name(&n));
+                let field = field_expr
+                    .field()
+                    .and_then(|n| self.resolve_name(n.name()?));
+                if let (Some(name), Some(field)) = (name, field) {
+                    self.alloc_expr(
+                        Expr::NativeRecordField {
+                            expr: base,
+                            name,
+                            field,
+                        },
+                        Some(expr),
+                    )
+                } else {
+                    self.alloc_expr(Expr::Missing, Some(expr))
+                }
+            }
+            ast::Expr::QualifiedRecordUpdateExpr(update) => {
+                let base = self.lower_optional_expr(update.expr().map(Into::into));
+                let name = update
+                    .name()
+                    .and_then(|n| self.lower_qualified_record_name(&n));
+                if let Some(name) = name {
+                    let fields = self.lower_record_fields(update.fields());
+                    self.alloc_expr(
+                        Expr::NativeRecordUpdate {
+                            expr: base,
+                            name,
+                            fields,
+                        },
+                        Some(expr),
+                    )
+                } else {
+                    self.alloc_expr(Expr::Missing, Some(expr))
+                }
+            }
         }
     }
 
@@ -2973,6 +3042,28 @@ impl<'a> Ctx<'a> {
         } else {
             None
         }
+    }
+
+    fn lower_record_fields(
+        &mut self,
+        fields: impl Iterator<Item = ast::RecordField>,
+    ) -> Vec<(Atom, ExprId)> {
+        fields
+            .flat_map(|field| {
+                let value = self.lower_optional_expr(field.expr().and_then(|expr| expr.expr()));
+                let name = self.resolve_name(field.name()?)?;
+                Some((name, value))
+            })
+            .collect()
+    }
+
+    fn lower_qualified_record_name(
+        &mut self,
+        qname: &ast::QualifiedRecordName,
+    ) -> Option<NativeRecordName> {
+        let module = self.resolve_name(qname.module()?.name()?)?;
+        let name = self.resolve_name(qname.name()?)?;
+        Some(NativeRecordName::Qualified { module, name })
     }
 
     fn resolve_macro<R>(

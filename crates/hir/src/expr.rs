@@ -242,6 +242,15 @@ impl MacroCallName {
 
 pub type ExprId = Idx<Expr>;
 
+/// Name for native records (EEP 79)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum NativeRecordName {
+    /// Anonymous record: `#_`
+    Anon,
+    /// Qualified record: `#module:name`
+    Qualified { module: Atom, name: Atom },
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// A regular Erlang expression
 pub enum Expr {
@@ -289,6 +298,20 @@ pub enum Expr {
     RecordField {
         expr: ExprId,
         name: Atom,
+        field: Atom,
+    },
+    NativeRecord {
+        name: NativeRecordName,
+        fields: Vec<(Atom, ExprId)>,
+    },
+    NativeRecordUpdate {
+        expr: ExprId,
+        name: NativeRecordName,
+        fields: Vec<(Atom, ExprId)>,
+    },
+    NativeRecordField {
+        expr: ExprId,
+        name: NativeRecordName,
         field: Atom,
     },
     Map {
@@ -457,6 +480,9 @@ impl Expr {
             Expr::RecordUpdate { .. } => "Expr::RecordUpdate",
             Expr::RecordIndex { .. } => "Expr::RecordIndex",
             Expr::RecordField { .. } => "Expr::RecordField",
+            Expr::NativeRecord { .. } => "Expr::NativeRecord",
+            Expr::NativeRecordUpdate { .. } => "Expr::NativeRecordUpdate",
+            Expr::NativeRecordField { .. } => "Expr::NativeRecordField",
             Expr::Map { .. } => "Expr::Map",
             Expr::MapUpdate { .. } => "Expr::MapUpdate",
             Expr::Catch { .. } => "Expr::Catch",

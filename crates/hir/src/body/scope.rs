@@ -493,6 +493,28 @@ fn compute_expr_scopes(
         } => {
             compute_expr_scopes(*expr, body, scopes, scope, vt);
         }
+        crate::Expr::NativeRecord { name: _, fields } => {
+            for (_, expr) in fields {
+                compute_expr_scopes(*expr, body, scopes, scope, vt);
+            }
+        }
+        crate::Expr::NativeRecordUpdate {
+            expr,
+            name: _,
+            fields,
+        } => {
+            compute_expr_scopes(*expr, body, scopes, scope, vt);
+            for (_, expr) in fields {
+                compute_expr_scopes(*expr, body, scopes, scope, vt);
+            }
+        }
+        crate::Expr::NativeRecordField {
+            expr,
+            name: _,
+            field: _,
+        } => {
+            compute_expr_scopes(*expr, body, scopes, scope, vt);
+        }
         crate::Expr::Map { fields } => {
             for (lhs, rhs) in fields {
                 compute_expr_scopes(*lhs, body, scopes, scope, vt);
@@ -1197,6 +1219,138 @@ mod tests {
                 (X = 1) orelse (~ + X).
             ",
             &["X"],
+        );
+    }
+
+    #[test]
+    fn test_record_create_exports_field_bindings() {
+        // Bindings in record field values should be exported.
+        do_check(
+            r"
+            -record(rec, {a, b}).
+            f() ->
+              #rec{a = X, b = Y} = #rec{a = 1, b = 2},
+              ~.
+            ",
+            &["X", "Y"],
+        );
+    }
+
+    #[test]
+    fn test_record_update_exports_field_bindings() {
+        // Bindings from both the base expression and field values
+        // should be exported.
+        do_check(
+            r"
+            -record(rec, {a, b}).
+            f() ->
+              R = #rec{a = 1, b = 2},
+              #rec{a = X} = R#rec{a = 3},
+              ~.
+            ",
+            &["R", "X"],
+        );
+    }
+
+    #[test]
+    fn test_record_field_access_exports_base_binding() {
+        // The base expression binding should be exported.
+        do_check(
+            r"
+            -record(rec, {a, b}).
+            f() ->
+              R = #rec{a = 1, b = 2},
+              _ = R#rec.a,
+              ~.
+            ",
+            &["R"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_create_exports_field_bindings() {
+        // Bindings in native record field value expressions should
+        // be exported after the expression.
+        do_check(
+            r"
+            f() ->
+              X = 1,
+              _ = #mod:rec{a = X, b = X + 1},
+              ~.
+            ",
+            &["X"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_update_exports_bindings() {
+        // Bindings from both the base expression and field values
+        // should be exported.  The base expression (R) is evaluated
+        // first, then the field values.
+        do_check(
+            r"
+            f(R) ->
+              _ = R#mod:rec{a = R},
+              ~.
+            ",
+            &["R"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_field_access_exports_base() {
+        // The base expression binding should be exported;
+        // the field name is an atom, not an expression.
+        do_check(
+            r"
+            f(R) ->
+              _ = R#mod:rec.field,
+              ~.
+            ",
+            &["R"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_anon_create_exports_field_bindings() {
+        // Anonymous native record create (#_{...}) should also
+        // export field value bindings.
+        do_check(
+            r"
+            f() ->
+              X = 1,
+              _ = #_{a = X, b = X + 1},
+              ~.
+            ",
+            &["X"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_anon_update_exports_bindings() {
+        // Anonymous native record update should export both base
+        // expression and field value bindings.
+        do_check(
+            r"
+            f(R) ->
+              _ = R#_{a = R},
+              ~.
+            ",
+            &["R"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_anon_field_access_exports_base() {
+        // Anonymous native record field access should export
+        // the base expression binding.
+        do_check(
+            r"
+            f(R) ->
+              _ = R#_.field,
+              ~.
+            ",
+            &["R"],
         );
     }
 
