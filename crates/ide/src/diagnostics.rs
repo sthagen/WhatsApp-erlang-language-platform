@@ -2221,6 +2221,10 @@ fn form_missing_separator_diagnostics(parse: &Parse<ast::SourceFile>) -> Vec<Dia
             ast::Form::ImportAttribute(f) => {
                 check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",", "missing_comma")
             }
+            ast::Form::ImportRecordAttribute(f) => {
+                let names = f.records().into_iter().flat_map(|r| r.names());
+                check_missing_sep(names, SyntaxKind::ANON_COMMA, ",", "missing_comma")
+            }
             ast::Form::RecordDecl(f) => record_decl_check_missing_comma(f),
             ast::Form::TypeAlias(f) => {
                 let args = f
@@ -3379,6 +3383,18 @@ foo() -> XX 3.0.
 -module(main).
 -import(bb, [foo/0 bar/1]).
          %%      ^ warning: W0004: Missing ','
+"#,
+        );
+    }
+
+    #[test]
+    #[should_panic] // T258950369: Remove once ifdef support is completed
+    fn import_record_attribute_missing_comma() {
+        check_diagnostics(
+            r#"
+-module(main).
+-import_record(bb, [foo bar]).
+                %%    ^ warning: W0004: Missing ','
 "#,
         );
     }

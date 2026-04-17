@@ -440,6 +440,7 @@ impl Doc {
                     docdb.to_doc(b)
                 },
                 ast::ImportAttribute(_) => None,
+                ast::ImportRecordAttribute(_) => None,
                 ast::Fa(fa) =>
                     docdb.to_doc(token.with_value(&fa)),
                 ast::TypeName(ty) =>
