@@ -38,7 +38,6 @@ elp_types_db = { path = "./crates/types_db" }
 hir = { path = "./crates/hir" }
 
 # External crates
-trie-rs = "0.4.2"
 always-assert = "0.2.0"
 anyhow = "1.0.86"
 bpaf = { version = "=0.7.10", features = ["derive", "autocomplete", "batteries"] }
@@ -48,7 +47,6 @@ cov-mark = "2.0.0"
 crossbeam-channel = "0.5.15"
 dirs = "5.0"
 dissimilar = "1.0.11"
-triple_accel = "0.4.0"
 eetf = "0.9.0"
 either = "1.13.0"
 env_filter = "0.1.4"
@@ -57,8 +55,8 @@ fxhash = "0.2.1"
 glob = "0.3.1"
 htmlentity = "1.3.2"
 humantime = "2.1.0"
-include_dir = "0.7.4"
 imara-diff = "0.1.7"
+include_dir = "0.7.4"
 indexmap = "2.3.0"
 indicatif = { version = "0.17.8", features = ["rayon"] }
 itertools = "0.10.5"
@@ -75,8 +73,8 @@ num-derive = "0.4.2"
 num-traits = "0.2.19"
 once_cell = "1.19.0"
 parking_lot = "0.12.3"
-petgraph = "0.8.3"
 paths = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-04-13" }
+petgraph = "0.8.3"
 proc-macro2 = "1.0.86"
 profile = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-04-13" }
 quote = "1.0.36"
@@ -100,14 +98,16 @@ tempfile = "3.27.0"
 test-case = "3.3.1"
 text-size = "1.1.1"
 thiserror = "1.0"
-tracing = "0.1.40"
 threadpool = "1.8.1"
 timeout-readwrite = "0.3.3"
 toml = "0.9.11"
+tracing = "0.1.40"
 tree-sitter = "0.23.2"
 # When developing the grammar, you may want to point to a local version
 # tree-sitter-erlang = { path = "./tree-sitter-erlang" }
 tree-sitter-erlang = "0.15.0"
+trie-rs = "0.4.2"
+triple_accel = "0.4.0"
 url = "2.5.4"
 ustr = { version = "1.1.0", features = ["serde"] }
 vfs = { git = "https://github.com/rust-lang/rust-analyzer", rev = "2026-04-13" }
