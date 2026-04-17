@@ -644,15 +644,7 @@ impl<'a> Ctx<'a> {
             }
             ast::Expr::RecordExpr(record) => {
                 let name = record.name().and_then(|n| self.resolve_name(n.name()?));
-                let fields = record
-                    .fields()
-                    .flat_map(|field| {
-                        let value =
-                            self.lower_optional_pat(field.expr().and_then(|expr| expr.expr()));
-                        let name = self.resolve_name(field.name()?)?;
-                        Some((name, value))
-                    })
-                    .collect();
+                let fields = self.lower_record_fields_pat(record.fields());
                 if let Some(name) = name {
                     self.alloc_pat(Pat::Record { name, fields }, Some(expr))
                 } else {
@@ -715,13 +707,55 @@ impl<'a> Ctx<'a> {
                 self.lower_optional_pat(cond.rhs());
                 self.alloc_pat(Pat::Missing, Some(expr))
             }
-            // TODO(T262108365): lower native records (EEP 79) properly
-            ast::Expr::AnonRecordExpr(_)
-            | ast::Expr::AnonRecordFieldExpr(_)
-            | ast::Expr::AnonRecordUpdateExpr(_)
-            | ast::Expr::QualifiedRecordExpr(_)
-            | ast::Expr::QualifiedRecordFieldExpr(_)
-            | ast::Expr::QualifiedRecordUpdateExpr(_) => self.alloc_pat(Pat::Missing, Some(expr)),
+            ast::Expr::AnonRecordExpr(record) => {
+                let fields = self.lower_record_fields_pat(record.fields());
+                self.alloc_pat(
+                    Pat::NativeRecord {
+                        name: NativeRecordName::Anon,
+                        fields,
+                    },
+                    Some(expr),
+                )
+            }
+            ast::Expr::AnonRecordFieldExpr(field_expr) => {
+                let _ = self.lower_optional_pat(field_expr.expr().map(Into::into));
+                self.alloc_pat(Pat::Missing, Some(expr))
+            }
+            ast::Expr::AnonRecordUpdateExpr(update) => {
+                let _ = self.lower_optional_pat(update.expr().map(Into::into));
+                update
+                    .fields()
+                    .flat_map(|field| field.expr()?.expr())
+                    .for_each(|expr| {
+                        let _ = self.lower_pat(&expr);
+                    });
+                self.alloc_pat(Pat::Missing, Some(expr))
+            }
+            ast::Expr::QualifiedRecordExpr(record) => {
+                let name = record
+                    .name()
+                    .and_then(|n| self.lower_qualified_record_name(&n));
+                let fields = self.lower_record_fields_pat(record.fields());
+                if let Some(name) = name {
+                    self.alloc_pat(Pat::NativeRecord { name, fields }, Some(expr))
+                } else {
+                    self.alloc_pat(Pat::Missing, Some(expr))
+                }
+            }
+            ast::Expr::QualifiedRecordFieldExpr(field_expr) => {
+                let _ = self.lower_optional_pat(field_expr.expr().map(Into::into));
+                self.alloc_pat(Pat::Missing, Some(expr))
+            }
+            ast::Expr::QualifiedRecordUpdateExpr(update) => {
+                let _ = self.lower_optional_pat(update.expr().map(Into::into));
+                update
+                    .fields()
+                    .flat_map(|field| field.expr()?.expr())
+                    .for_each(|expr| {
+                        let _ = self.lower_pat(&expr);
+                    });
+                self.alloc_pat(Pat::Missing, Some(expr))
+            }
         }
     }
 
@@ -3051,6 +3085,19 @@ impl<'a> Ctx<'a> {
         fields
             .flat_map(|field| {
                 let value = self.lower_optional_expr(field.expr().and_then(|expr| expr.expr()));
+                let name = self.resolve_name(field.name()?)?;
+                Some((name, value))
+            })
+            .collect()
+    }
+
+    fn lower_record_fields_pat(
+        &mut self,
+        fields: impl Iterator<Item = ast::RecordField>,
+    ) -> Vec<(Atom, PatId)> {
+        fields
+            .flat_map(|field| {
+                let value = self.lower_optional_pat(field.expr().and_then(|expr| expr.expr()));
                 let name = self.resolve_name(field.name()?)?;
                 Some((name, value))
             })

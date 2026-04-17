@@ -332,6 +332,13 @@ impl<'a> Printer<'a> {
                     this.print_pat(&this.body[*val])
                 })
             }
+            Pat::NativeRecord { name, fields } => {
+                self.print_native_record_name(name)?;
+                self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
+                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    this.print_pat(&this.body[*val])
+                })
+            }
             Pat::Binary { segs } => self.print_seq(segs, None, "<<", ">>", ",", |this, seg| {
                 this.print_bin_segment(seg, |this, pat| this.print_pat(&this.body[pat]))
             }),

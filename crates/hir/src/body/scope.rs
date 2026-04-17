@@ -331,6 +331,11 @@ impl ExprScopes {
                 }
             }
             crate::Pat::RecordIndex { name: _, field: _ } => {}
+            crate::Pat::NativeRecord { name: _, fields } => {
+                for (_, pat) in fields {
+                    self.add_bindings(body, scope, *pat, vt, add_bindings);
+                }
+            }
             crate::Pat::Map { fields } => {
                 for (expr, pat) in fields {
                     compute_expr_scopes(*expr, body, self, scope, vt);
@@ -1351,6 +1356,32 @@ mod tests {
               ~.
             ",
             &["R"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_qualified_pat_exports_field_bindings() {
+        // Bindings in native record pattern field values should be
+        // exported after the match.
+        do_check(
+            r"
+            f(#mod:rec{a = X, b = Y}) ->
+              ~.
+            ",
+            &["X", "Y"],
+        );
+    }
+
+    #[test]
+    fn test_native_record_anon_pat_exports_field_bindings() {
+        // Bindings in anonymous native record pattern field values
+        // should be exported after the match.
+        do_check(
+            r"
+            f(#_{a = X, b = Y}) ->
+              ~.
+            ",
+            &["X", "Y"],
         );
     }
 

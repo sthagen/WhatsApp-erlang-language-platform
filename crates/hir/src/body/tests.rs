@@ -3567,3 +3567,33 @@ foo(X) -> X#_.field.
         "#]],
     );
 }
+
+#[test]
+fn native_record_qualified_in_pat() {
+    check(
+        r#"
+foo(#mod:name{a = A}) -> A.
+"#,
+        expect![[r#"
+            foo(#mod:name{
+                a = A
+            }) ->
+                A.
+        "#]],
+    );
+}
+
+#[test]
+fn native_record_anon_in_pat() {
+    check(
+        r#"
+foo(#_{a = A}) -> A.
+"#,
+        expect![[r#"
+            foo(#_{
+                a = A
+            }) ->
+                A.
+        "#]],
+    );
+}

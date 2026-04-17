@@ -236,6 +236,7 @@ fn matches_trivially(
             _ => false,
         },
         Pat::RecordIndex { .. } => false,
+        Pat::NativeRecord { .. } => false,
 
         Pat::Map { fields: pat_fields } => match expr {
             Expr::Map {

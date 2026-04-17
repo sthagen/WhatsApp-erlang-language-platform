@@ -1494,6 +1494,13 @@ impl PatternIterator {
                 Pat::RecordIndex { name, field } => {
                     PatternIterator::as_pattern_list(vec![(*name).into(), (*field).into()])
                 }
+                Pat::NativeRecord { name, fields } => {
+                    let children: FxHashMap<SubId, Vec<SubId>> = fields
+                        .iter()
+                        .map(|(name, val)| ((*name).into(), vec![(*val).into()]))
+                        .collect();
+                    PatternIterator::as_pattern_map(native_record_name_to_subids(name), children)
+                }
                 Pat::Map { fields } => {
                     let children: FxHashMap<SubId, Vec<SubId>> = fields
                         .iter()

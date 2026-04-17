@@ -996,6 +996,9 @@ impl<'a, T> FoldCtx<'a, T> {
                 .iter()
                 .fold(acc, |acc, (_, field)| self.do_fold_pat(*field, acc)),
             crate::Pat::RecordIndex { name: _, field: _ } => acc,
+            crate::Pat::NativeRecord { name: _, fields } => fields
+                .iter()
+                .fold(acc, |acc, (_, field)| self.do_fold_pat(*field, acc)),
             crate::Pat::Map { fields } => fields.iter().fold(acc, |acc, (k, v)| {
                 let r = self.do_fold_expr(*k, acc);
                 self.do_fold_pat(*v, r)
@@ -2971,5 +2974,27 @@ bar() ->
             2
         "#]]
         .assert_debug_eq(&r_expand);
+    }
+
+    #[test]
+    fn traverse_native_record_pat_qualified() {
+        // Fold should traverse into qualified native record pattern fields.
+        // foo appears: module attr (1) + native record pat field value (1) + body (1) = 3
+        let fixture_str = r#"
+               -module(foo).
+               bar(#mod:rec{a = fo~o}) -> foo.
+               "#;
+        count_atom_foo(fixture_str, 3);
+    }
+
+    #[test]
+    fn traverse_native_record_pat_anon() {
+        // Fold should traverse into anonymous native record pattern fields.
+        // foo appears: module attr (1) + native record pat field value (1) + body (1) = 3
+        let fixture_str = r#"
+               -module(foo).
+               bar(#_{a = fo~o}) -> foo.
+               "#;
+        count_atom_foo(fixture_str, 3);
     }
 }

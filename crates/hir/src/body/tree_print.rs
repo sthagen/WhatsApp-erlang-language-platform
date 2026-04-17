@@ -1032,6 +1032,20 @@ impl<'a> Printer<'a> {
                     writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
                 });
             }
+            Pat::NativeRecord { name, fields } => {
+                self.print_herald("Pat::NativeRecord", &mut |this| {
+                    this.print_native_record_name(name);
+                    this.print_labelled("fields", false, &mut |this| {
+                        fields.iter().for_each(|(name, pat_id)| {
+                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            this.indent();
+                            this.print_pat(pat_id);
+                            writeln!(this, ",").ok();
+                            this.dedent();
+                        });
+                    });
+                });
+            }
             Pat::Map { fields } => {
                 self.print_herald("Pat::Map", &mut |this| {
                     fields.iter().for_each(|(name, value)| {
@@ -3927,6 +3941,59 @@ mod tests {
                             name: #_
                             field: Atom('field')
                         },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn pat_native_record_qualified() {
+        check(
+            r#"
+            foo(#mod:name{a = A, b = B}) -> {A, B}.
+            "#,
+            expect![[r#"
+                function: foo/1
+                Clause {
+                    pats
+                        Pat<2>:Pat::NativeRecord {
+                            name: #mod:name
+                            fields
+                                Atom('a'):
+                                    Pat<0>:Pat::Var(A),
+                                Atom('b'):
+                                    Pat<1>:Pat::Var(B),
+                        },
+                    guards
+                    exprs
+                        Expr<7>:Expr::Tuple {
+                            Expr<5>:Expr::Var(A),
+                            Expr<6>:Expr::Var(B),
+                        },
+                }.
+            "#]],
+        );
+    }
+
+    #[test]
+    fn pat_native_record_anon() {
+        check(
+            r#"
+            foo(#_{a = A}) -> A.
+            "#,
+            expect![[r#"
+                function: foo/1
+                Clause {
+                    pats
+                        Pat<1>:Pat::NativeRecord {
+                            name: #_
+                            fields
+                                Atom('a'):
+                                    Pat<0>:Pat::Var(A),
+                        },
+                    guards
+                    exprs
+                        Expr<2>:Expr::Var(A),
                 }.
             "#]],
         );

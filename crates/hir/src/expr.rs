@@ -776,6 +776,10 @@ pub enum Pat {
         name: Atom,
         field: Atom,
     },
+    NativeRecord {
+        name: NativeRecordName,
+        fields: Vec<(Atom, PatId)>,
+    },
     /// map keys in patterns are allowed to be a subset of expressions
     Map {
         fields: Vec<(ExprId, PatId)>,
@@ -820,6 +824,7 @@ impl Pat {
             Pat::BinaryOp { .. } => "Pat::BinaryOp",
             Pat::Record { .. } => "Pat::Record",
             Pat::RecordIndex { .. } => "Pat::RecordIndex",
+            Pat::NativeRecord { .. } => "Pat::NativeRecord",
             Pat::Map { .. } => "Pat::Map",
             Pat::MacroCall { .. } => "Pat::MacroCall",
             Pat::Paren { .. } => "Pat::Paren",

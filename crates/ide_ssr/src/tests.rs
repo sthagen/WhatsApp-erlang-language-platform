@@ -2260,3 +2260,57 @@ fn ssr_native_record_anon_field_access() {
         &[("List#_.field", &[("_@A", &["List"])])],
     );
 }
+
+// Native records in pattern position
+
+#[test]
+fn ssr_native_record_qualified_create_in_pat() {
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A, k2 = _@B}.",
+        "fn(#mod:name{k1 = X, k2 = Y}) -> {X, Y}.",
+        &[(
+            "#mod:name{k1 = X, k2 = Y}",
+            &[("_@A", &["X"]), ("_@B", &["Y"])],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_create_in_pat_wrong_name() {
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A}.",
+        "fn(#mod:other{k1 = X}) -> X.",
+        &[],
+    );
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A}.",
+        "fn(#other:name{k1 = X}) -> X.",
+        &[],
+    );
+}
+
+#[test]
+fn ssr_native_record_qualified_create_in_pat_unordered() {
+    assert_matches(
+        "ssr: #mod:name{k1 = _@A, k2 = _@B}.",
+        "fn(#mod:name{k2 = Y, k1 = X}) -> {X, Y}.",
+        &[(
+            "#mod:name{k2 = Y, k1 = X}",
+            &[("_@A", &["X"]), ("_@B", &["Y"])],
+        )],
+    );
+}
+
+#[test]
+fn ssr_native_record_anon_create_in_pat() {
+    assert_matches(
+        "ssr: #_{k1 = _@A, k2 = _@B}.",
+        "fn(#_{k1 = X, k2 = Y}) -> {X, Y}.",
+        &[("#_{k1 = X, k2 = Y}", &[("_@A", &["X"]), ("_@B", &["Y"])])],
+    );
+}
+
+#[test]
+fn ssr_native_record_anon_in_pat_does_not_match_qualified() {
+    assert_matches("ssr: #_{k1 = _@A}.", "fn(#mod:name{k1 = X}) -> X.", &[]);
+}
