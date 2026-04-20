@@ -95,6 +95,7 @@ fn serialization_test() {
         module: None,
         to: None,
         v2: true,
+        schema2: false,
         pretty: false,
         multi: false,
         print_metrics: false,
