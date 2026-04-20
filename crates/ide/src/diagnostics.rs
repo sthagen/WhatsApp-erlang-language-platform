@@ -717,13 +717,8 @@ pub(crate) trait FunctionCallLinter: Linter {
 
     /// Customize the severity based on each match.
     /// If implemented, it overrides the value of the `severity()`.
-    fn match_severity(
-        &self,
-        _context: &Self::Context,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Severity {
-        self.severity(sema, file_id)
+    fn match_severity(&self, _context: &Self::Context, ctx: &LinterContext) -> Severity {
+        self.severity(ctx.sema, ctx.file_id)
     }
 
     // Specify the list of functions the linter should emit issues for
@@ -747,8 +742,7 @@ pub(crate) trait FunctionCallLinter: Linter {
     fn fixes(
         &self,
         _match_context: &MatchCtx<Self::Context>,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         None
     }
@@ -761,8 +755,7 @@ pub(crate) trait FunctionCallLinter: Linter {
 pub(crate) trait FunctionCallDiagnostics: Linter {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
         config: &FunctionCallLinterConfig,
@@ -772,8 +765,7 @@ pub(crate) trait FunctionCallDiagnostics: Linter {
 impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
         config: &FunctionCallLinterConfig,
@@ -794,39 +786,40 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
             .map(|m| (m, ()))
             .collect();
         // Check if there's a config-level severity override
-        let base_severity = self.severity(sema, file_id);
+        let base_severity = self.severity(ctx.sema, ctx.file_id);
         let has_severity_override = severity != base_severity;
-        let has_cli_severity_override = cli_severity != self.cli_severity(sema, file_id);
-        sema.def_map_local(file_id)
+        let has_cli_severity_override = cli_severity != self.cli_severity(ctx.sema, ctx.file_id);
+        ctx.sema
+            .def_map_local(ctx.file_id)
             .get_functions()
             .for_each(|(_, def)| {
                 find_call_in_function(
                     &mut diagnostics,
-                    sema,
+                    ctx.sema,
                     def,
                     &mfas,
                     &excluded_mfas,
-                    &move |ctx| self.check_match(&ctx),
-                    &move |ctx @ MatchCtx {
+                    &move |check_ctx| self.check_match(&check_ctx),
+                    &move |match_ctx @ MatchCtx {
                                sema,
                                def_fb,
                                extra,
                                ..
                            }| {
-                        let range = ctx.range(&UseRange::NameOnly);
+                        let range = match_ctx.range(&UseRange::NameOnly);
                         if range.file_id == def.file.file_id {
-                            let fixes = self.fixes(&ctx, sema, file_id);
+                            let fixes = self.fixes(&match_ctx, ctx);
                             let description = self.match_description(extra);
                             // Use config override if present, otherwise use match_severity
                             let effective_severity = if has_severity_override {
                                 severity
                             } else {
-                                self.match_severity(extra, sema, file_id)
+                                self.match_severity(extra, ctx)
                             };
                             let effective_cli_severity = if has_cli_severity_override {
                                 cli_severity
                             } else {
-                                self.match_severity(extra, sema, file_id)
+                                self.match_severity(extra, ctx)
                             };
                             let mut diag = Diagnostic::new(self.id(), description, range.range)
                                 .with_fixes(fixes)
@@ -2068,13 +2061,9 @@ fn diagnostics_from_linters(
                     } else {
                         FunctionCallLinterConfig::default()
                     };
-                    let diagnostics = function_linter.diagnostics(
-                        sema,
-                        file_id,
-                        severity,
-                        cli_severity,
-                        &linter_config,
-                    );
+                    let ctx = LinterContext { sema, file_id };
+                    let diagnostics =
+                        function_linter.diagnostics(&ctx, severity, cli_severity, &linter_config);
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::SsrPatterns(ssr_linter) => {

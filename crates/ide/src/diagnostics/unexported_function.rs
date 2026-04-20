@@ -27,6 +27,7 @@ use crate::codemod_helpers::CheckCallCtx;
 use crate::codemod_helpers::MatchCtx;
 use crate::diagnostics::FunctionCallLinter;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 // @fb-only: use crate::diagnostics::meta_only;
 use crate::fix;
 use crate::lazy_function_matches;
@@ -93,14 +94,13 @@ impl FunctionCallLinter for UnexportedFunctionLinter {
     fn fixes(
         &self,
         match_context: &MatchCtx<Self::Context>,
-        sema: &Semantic,
-        _file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         let (_label, target_def) = match_context.extra.as_ref()?;
         let target_file_id = target_def.file.file_id;
         let mut builder = SourceChangeBuilder::new(target_file_id);
         helpers::ExportBuilder::new(
-            sema,
+            ctx.sema,
             target_file_id,
             ExportForm::Functions,
             std::slice::from_ref(&target_def.name),

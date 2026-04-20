@@ -22,6 +22,7 @@ use crate::codemod_helpers::statement_range;
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::FunctionCallLinter;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 // @fb-only: use crate::diagnostics::meta_only;
 use crate::lazy_function_matches;
@@ -66,17 +67,16 @@ impl FunctionCallLinter for NoDebuggingFunctionLinter {
     fn fixes(
         &self,
         match_context: &MatchCtx<Self::Context>,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let source_file = sema.parse(file_id);
+        let source_file = ctx.sema.parse(ctx.file_id);
         if let Some(hir::fold::ParentId::HirIdx(hir_idx)) = &match_context.extra {
             let expr_id = hir_idx.as_expr_id()?;
             let body_map = match_context.def_fb.get_body_map();
             let in_file_ast_ptr = body_map.expr(expr_id)?;
             let expr_ast = in_file_ast_ptr.to_node(&source_file)?;
             let range = statement_range(expr_ast.syntax());
-            Some(vec![remove_fix(file_id, range)])
+            Some(vec![remove_fix(ctx.file_id, range)])
         } else {
             None
         }
