@@ -973,6 +973,19 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
 pub(crate) struct LinterContext<'a> {
     pub sema: &'a Semantic<'a>,
     pub file_id: FileId,
+    #[allow(dead_code)]
+    db: &'a RootDatabase,
+}
+
+impl<'a> LinterContext<'a> {
+    pub(crate) fn new(sema: &'a Semantic<'a>, file_id: FileId, db: &'a RootDatabase) -> Self {
+        Self { sema, file_id, db }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn ct_info(&self) -> Arc<CommonTestInfo> {
+        ct_info(self.db, self.file_id)
+    }
 }
 
 pub(crate) struct GenericLinterMatchContext<Context> {
@@ -1719,7 +1732,8 @@ pub fn native_diagnostics(
             config,
             &diagnostics_descriptors(),
         );
-        diagnostics_from_linters(&mut res, &sema, file_id, config, trigger, linters());
+        let linter_ctx = LinterContext::new(&sema, file_id, db);
+        diagnostics_from_linters(&mut res, &linter_ctx, config, trigger, linters());
 
         let parse_diagnostics = parse.errors().iter().take(128).map(|err| {
             let (code, message) = match err {
@@ -1966,12 +1980,13 @@ pub(crate) fn linters() -> Vec<DiagnosticLinter> {
 
 fn diagnostics_from_linters(
     res: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
+    ctx: &LinterContext,
     config: &DiagnosticsConfig,
     trigger: &DiagnosticsTrigger,
     linters: Vec<DiagnosticLinter>,
 ) {
+    let sema = ctx.sema;
+    let file_id = ctx.file_id;
     let generated_status = sema.db.generated_status(file_id);
     let is_test = sema
         .db
@@ -2057,9 +2072,8 @@ fn diagnostics_from_linters(
                     } else {
                         FunctionCallLinterConfig::default()
                     };
-                    let ctx = LinterContext { sema, file_id };
                     let diagnostics =
-                        function_linter.diagnostics(&ctx, severity, cli_severity, &linter_config);
+                        function_linter.diagnostics(ctx, severity, cli_severity, &linter_config);
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::SsrPatterns(ssr_linter) => {
@@ -2070,14 +2084,12 @@ fn diagnostics_from_linters(
                     } else {
                         SsrPatternsLinterConfig::default()
                     };
-                    let ctx = LinterContext { sema, file_id };
                     let diagnostics =
-                        ssr_linter.diagnostics(&ctx, severity, cli_severity, &linter_config);
+                        ssr_linter.diagnostics(ctx, severity, cli_severity, &linter_config);
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::Generic(generic_linter) => {
-                    let ctx = LinterContext { sema, file_id };
-                    let diagnostics = generic_linter.diagnostics(&ctx, severity, cli_severity);
+                    let diagnostics = generic_linter.diagnostics(ctx, severity, cli_severity);
                     res.extend(filter_for_manual_section(diagnostics));
                 }
             }
