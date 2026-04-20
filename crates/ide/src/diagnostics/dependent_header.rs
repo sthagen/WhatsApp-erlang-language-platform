@@ -31,6 +31,7 @@ use super::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct DependentHeaderLinter;
 
@@ -60,11 +61,9 @@ pub(crate) struct Context {
 impl GenericLinter for DependentHeaderLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let def_map = sema.def_map(file_id);
         let source_file = sema.parse(file_id);
         let form_list = sema.form_list(file_id);

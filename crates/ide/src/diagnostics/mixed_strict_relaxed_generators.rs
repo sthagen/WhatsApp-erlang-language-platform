@@ -14,11 +14,9 @@
 // This can lead to subtle, hard-to-predict behavior.
 // See https://github.com/erlang/otp/issues/9435
 
-use elp_ide_db::elp_base_db::FileId;
 use hir::AnyExpr;
 use hir::ComprehensionExpr;
 use hir::Expr;
-use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
@@ -27,6 +25,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct MixedStrictRelaxedGeneratorsLinter;
 
@@ -78,31 +77,32 @@ impl GenericLinter for MixedStrictRelaxedGeneratorsLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
         let mut res = Vec::new();
 
-        sema.def_map(file_id)
+        ctx.sema
+            .def_map(ctx.file_id)
             .get_function_clauses()
             .for_each(|(_, def)| {
-                if def.file.file_id == file_id {
-                    let in_clause = def.in_clause(sema, def);
+                if def.file.file_id == ctx.file_id {
+                    let in_clause = def.in_clause(ctx.sema, def);
                     in_clause.fold_clause(
                         Strategy {
                             macros: MacroStrategy::Expand,
                             parens: ParenStrategy::InvisibleParens,
                         },
                         (),
-                        &mut |acc, ctx| {
-                            if let AnyExpr::Expr(Expr::Comprehension { exprs, .. }) = ctx.item {
+                        &mut |acc, fold_ctx| {
+                            if let AnyExpr::Expr(Expr::Comprehension { exprs, .. }) = fold_ctx.item
+                            {
                                 // Check each expression in the comprehension for Zip variants
                                 for comp_expr in exprs {
                                     if let ComprehensionExpr::Zip(zip_exprs) = comp_expr
                                         && zip_has_mixed_strictness(zip_exprs.as_slice())
-                                        && let hir::AnyExprId::Expr(expr_id) = ctx.item_id
+                                        && let hir::AnyExprId::Expr(expr_id) = fold_ctx.item_id
                                         && let Some(range) = in_clause.range_for_expr(expr_id)
-                                        && ctx.in_macro.is_none()
+                                        && fold_ctx.in_macro.is_none()
                                     {
                                         res.push(GenericLinterMatchContext { range, context: () });
                                     }

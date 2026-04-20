@@ -22,6 +22,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 
 pub(crate) struct MissingModuleLinter;
@@ -50,10 +51,9 @@ impl GenericLinter for MissingModuleLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        let parse = sema.db.parse(file_id);
+        let parse = ctx.sema.db.parse(ctx.file_id);
         let mut res = Vec::new();
 
         for form in parse.tree().forms() {
@@ -70,7 +70,10 @@ impl GenericLinter for MissingModuleLinter {
                 other_form => {
                     let range = other_form.syntax().text_range();
                     res.push(GenericLinterMatchContext {
-                        range: FileRange { file_id, range },
+                        range: FileRange {
+                            file_id: ctx.file_id,
+                            range,
+                        },
                         context: (),
                     });
                     break;

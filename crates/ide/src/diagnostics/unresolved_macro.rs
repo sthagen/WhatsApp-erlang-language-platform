@@ -14,19 +14,18 @@
 
 use std::borrow::Cow;
 
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_syntax::AstNode;
 use elp_syntax::TextRange;
 use elp_syntax::TextSize;
 use hir::BodyDiagnostic;
-use hir::Semantic;
 
 use super::collect_body_diagnostics;
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct UnresolvedMacroLinter;
 
@@ -55,9 +54,10 @@ impl GenericLinter for UnresolvedMacroLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let body_diagnostics = collect_body_diagnostics(sema, file_id);
         let matches: Vec<_> = body_diagnostics
             .into_iter()

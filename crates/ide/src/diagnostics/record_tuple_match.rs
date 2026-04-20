@@ -29,6 +29,7 @@ use hir::fold::ParenStrategy;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct RecordTupleMatchLinter;
 
@@ -55,11 +56,9 @@ pub(crate) struct Context {
 impl GenericLinter for RecordTupleMatchLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         sema.for_each_function(file_id, |def| {
             let def_fb = def.in_function_body(sema, def);

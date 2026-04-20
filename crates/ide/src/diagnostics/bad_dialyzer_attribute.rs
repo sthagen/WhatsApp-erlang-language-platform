@@ -32,6 +32,7 @@ use super::DiagnosticCode;
 use super::GenericLinter;
 use super::GenericLinterMatchContext;
 use super::Linter;
+use super::LinterContext;
 use super::Severity;
 use crate::Assist;
 use crate::TextRange;
@@ -142,20 +143,19 @@ impl GenericLinter for BadDialyzerAttributeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        let form_list = sema.db.file_form_list(file_id);
-        let def_map = sema.def_map(file_id);
+        let form_list = ctx.sema.db.file_form_list(ctx.file_id);
+        let def_map = ctx.sema.def_map(ctx.file_id);
         let mut res = Vec::new();
 
         for (_id, attr) in form_list.attributes() {
             if attr.name != known::dialyzer {
                 continue;
             }
-            let wild_attr = attr.form_id.get_ast(sema.db, file_id);
+            let wild_attr = attr.form_id.get_ast(ctx.sema.db, ctx.file_id);
             if let Some(value) = wild_attr.value() {
-                validate_dialyzer_value(&value, file_id, &def_map, &mut res);
+                validate_dialyzer_value(&value, ctx.file_id, &def_map, &mut res);
             }
         }
 
@@ -187,9 +187,9 @@ impl GenericLinter for BadDialyzerAttributeLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         if let ContextKind::BadOption {
             suggested: Some(suggestion),
             ..

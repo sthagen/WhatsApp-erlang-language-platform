@@ -15,17 +15,16 @@
 
 use std::borrow::Cow;
 
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileKind;
 use elp_ide_db::elp_base_db::FileRange;
 use hir::PPCondition;
-use hir::Semantic;
 
 use super::compute_pp_condition_range;
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct InvalidPPConditionLinter;
 
@@ -54,24 +53,24 @@ impl GenericLinter for InvalidPPConditionLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
         // Only collect diagnostics from the main file if it's not a header file.
         // Header files get their diagnostics reported via W0062 in the including files.
-        let file_kind = sema.db.file_kind(file_id);
+        let file_kind = ctx.sema.db.file_kind(ctx.file_id);
         if file_kind == FileKind::Header {
             return Some(Vec::new());
         }
 
-        let form_list = sema.form_list(file_id);
+        let form_list = ctx.sema.form_list(ctx.file_id);
         let mut matches = Vec::new();
 
         // Get all condition diagnostics from the preprocessor analysis
-        let env = sema.db.project_macro_environment(file_id);
-        let (_, diagnostics_map) = sema
+        let env = ctx.sema.db.project_macro_environment(ctx.file_id);
+        let (_, diagnostics_map) = ctx
+            .sema
             .db
-            .file_preprocessor_analysis_with_diagnostics(file_id, env);
+            .file_preprocessor_analysis_with_diagnostics(ctx.file_id, env);
 
         for (cond_id, condition) in form_list.pp_conditions() {
             // Only -if and -elif conditions can generate diagnostics
@@ -82,9 +81,12 @@ impl GenericLinter for InvalidPPConditionLinter {
                 // Get diagnostics from the map
                 if let Some(cond_diagnostics) = diagnostics_map.get(&cond_id) {
                     for cond_diag in cond_diagnostics {
-                        let range = compute_pp_condition_range(sema.db, file_id, cond_id);
+                        let range = compute_pp_condition_range(ctx.sema.db, ctx.file_id, cond_id);
                         matches.push(GenericLinterMatchContext {
-                            range: FileRange { file_id, range },
+                            range: FileRange {
+                                file_id: ctx.file_id,
+                                range,
+                            },
                             context: InvalidPPConditionContext {
                                 message: cond_diag.message.clone(),
                             },

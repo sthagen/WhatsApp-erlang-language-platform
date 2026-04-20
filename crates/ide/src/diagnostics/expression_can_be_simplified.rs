@@ -15,7 +15,6 @@
 
 use std::borrow::Cow;
 
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_ide_db::source_change::SourceChangeBuilder;
 use elp_ide_db::text_edit::TextRange;
@@ -42,6 +41,7 @@ use crate::diagnostics::Category;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) struct ExpressionCanBeSimplifiedLinter;
@@ -66,9 +66,10 @@ impl GenericLinter for ExpressionCanBeSimplifiedLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         sema.def_map_local(file_id)
             .get_functions()
@@ -124,9 +125,9 @@ impl GenericLinter for ExpressionCanBeSimplifiedLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut changes = SourceChangeBuilder::new(file_id);
         changes.replace(range, &context.replacement_str);
         let replacement = changes.finish();

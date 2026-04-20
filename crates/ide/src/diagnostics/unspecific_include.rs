@@ -28,6 +28,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -70,9 +71,10 @@ impl GenericLinter for UnspecificIncludeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let form_list = sema.form_list(file_id);
         let source_file = sema.parse(file_id);
         let mut res = Vec::new();
@@ -154,9 +156,9 @@ impl GenericLinter for UnspecificIncludeLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut builder = TextEdit::builder();
         let filename = &context.replacement;
         if let Some(attr_range) = context.make_include_lib {

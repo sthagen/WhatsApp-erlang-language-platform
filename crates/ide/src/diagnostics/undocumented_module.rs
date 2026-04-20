@@ -21,6 +21,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -54,11 +55,9 @@ pub struct Context;
 impl GenericLinter for UndocumentedModuleLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let def_map = sema.def_map_local(file_id);
         let module_attribute = sema.module_attribute(file_id)?;
@@ -85,9 +84,10 @@ impl GenericLinter for UndocumentedModuleLinter {
         &self,
         _context: &Context,
         range: TextRange,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let insert_offset = helpers::moduledoc_insert_offset(sema, file_id)?;
         let mut builder = SourceChangeBuilder::new(file_id);
         builder.insert(insert_offset, "-moduledoc false.\n");

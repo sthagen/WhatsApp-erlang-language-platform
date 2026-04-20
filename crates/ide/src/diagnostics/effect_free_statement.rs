@@ -16,7 +16,6 @@
 use std::iter;
 
 use elp_ide_assists::Assist;
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_ide_db::source_change::SourceChange;
 use elp_ide_db::text_edit::TextEdit;
@@ -30,7 +29,6 @@ use hir::Expr;
 use hir::ExprId;
 use hir::FunctionDef;
 use hir::InFunctionClauseBody;
-use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
@@ -41,6 +39,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) struct EffectFreeStatementLinter;
@@ -63,11 +62,9 @@ pub(crate) struct Context {
 impl GenericLinter for EffectFreeStatementLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         sema.for_each_function(file_id, |def| {
             let source_file = sema.parse(file_id);
@@ -110,9 +107,9 @@ impl GenericLinter for EffectFreeStatementLinter {
         &self,
         context: &Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let statement_removal = context.statement_removal.as_ref()?;
         Some(vec![fix(
             "remove_statement",

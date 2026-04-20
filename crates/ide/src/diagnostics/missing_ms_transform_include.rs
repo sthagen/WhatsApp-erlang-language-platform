@@ -31,6 +31,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 const MS_TRANSFORM_APP: &str = "stdlib";
@@ -64,9 +65,10 @@ impl GenericLinter for MissingMsTransformIncludeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let include = IncludeFile {
             include_lib: true,
             path: MS_TRANSFORM_INCLUDE.to_string(),
@@ -126,9 +128,9 @@ impl GenericLinter for MissingMsTransformIncludeLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let edit = TextEdit::insert(
             context.insert_offset,
             context.include.as_ref()?.as_attribute(),

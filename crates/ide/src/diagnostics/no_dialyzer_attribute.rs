@@ -9,15 +9,14 @@
  */
 
 // Diagnostic: no-dialyzer-attribute
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
-use hir::Semantic;
 use hir::known;
 
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct NoDialyzerAttributeLinter;
 
@@ -40,9 +39,10 @@ impl GenericLinter for NoDialyzerAttributeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let form_list = sema.db.file_form_list(file_id);
         form_list.attributes().for_each(|(_idx, attr)| {

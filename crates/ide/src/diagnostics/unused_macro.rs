@@ -30,6 +30,7 @@ use crate::diagnostics::DiagnosticTag;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) struct UnusedMacroLinter;
@@ -58,11 +59,9 @@ pub struct Context {
 impl GenericLinter for UnusedMacroLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let def_map = sema.def_map_local(file_id);
         for (name, def) in def_map.get_macros() {
@@ -96,9 +95,9 @@ impl GenericLinter for UnusedMacroLinter {
         &self,
         context: &Context,
         _range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         Some(vec![delete_unused_macro(
             file_id,
             context.delete_range,

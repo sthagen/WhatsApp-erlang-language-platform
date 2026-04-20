@@ -15,13 +15,11 @@
 
 use elp_ide_assists::Assist;
 use elp_ide_assists::helpers::add_parens_edit;
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::source_change::SourceChange;
 use elp_ide_db::text_edit::TextRange;
 use hir::AnyExpr;
 use hir::AnyExprRef;
 use hir::Expr;
-use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
@@ -32,6 +30,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -58,9 +57,10 @@ impl GenericLinter for MacroPrecedenceSupriseLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let fold_strategy = Strategy {
             macros: MacroStrategy::ExpandButIncludeMacroCall,
             parens: ParenStrategy::VisibleParens,
@@ -110,9 +110,9 @@ impl GenericLinter for MacroPrecedenceSupriseLinter {
         &self,
         _context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let edit = add_parens_edit(&range);
         let fix = fix(
             "macro_precedence_add_parens",

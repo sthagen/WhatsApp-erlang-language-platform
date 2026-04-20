@@ -33,6 +33,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) struct DuplicateIncludeLinter;
@@ -78,20 +79,19 @@ impl GenericLinter for DuplicateIncludeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        let db = sema.db;
-        let form_list = db.file_form_list(file_id);
-        let source_file = db.parse(file_id);
-        let source_app_name = db.file_app_name(file_id);
+        let db = ctx.sema.db;
+        let form_list = db.file_form_list(ctx.file_id);
+        let source_file = db.parse(ctx.file_id);
+        let source_app_name = db.file_app_name(ctx.file_id);
 
         // Pass 1: group includes by resolved file ID
         let mut groups: FxHashMap<FileId, Vec<IncludeInfo>> = FxHashMap::default();
         for (include_idx, attr) in form_list.includes() {
-            let in_file = InFile::new(file_id, include_idx);
+            let in_file = InFile::new(ctx.file_id, include_idx);
             if let Some(include_file_id) =
-                db.resolve_include(db.app_data_id_by_file(file_id), in_file)
+                db.resolve_include(db.app_data_id_by_file(ctx.file_id), in_file)
             {
                 let (is_include_lib, path) = match attr {
                     IncludeAttribute::Include { path, .. } => (false, path.clone()),
@@ -141,7 +141,7 @@ impl GenericLinter for DuplicateIncludeLinter {
 
                 res.push(GenericLinterMatchContext {
                     range: FileRange {
-                        file_id,
+                        file_id: ctx.file_id,
                         range: attribute_range,
                     },
                     context: Context {
@@ -162,9 +162,9 @@ impl GenericLinter for DuplicateIncludeLinter {
         &self,
         context: &Self::Context,
         _range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut edit_builder = TextEdit::builder();
         edit_builder.delete(context.extended_range);
         let edit = edit_builder.finish();

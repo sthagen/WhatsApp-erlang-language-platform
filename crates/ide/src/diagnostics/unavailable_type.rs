@@ -38,6 +38,7 @@ use super::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct UnavailableTypeLinter;
 
@@ -66,9 +67,10 @@ impl GenericLinter for UnavailableTypeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         // Early return if we don't have app data - can't determine type availability
         let referencing_app_data = sema.db.file_app_data(file_id)?;
 

@@ -32,6 +32,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -65,9 +66,10 @@ impl GenericLinter for NonstandardIntegerFormattingLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         sema.for_each_function(file_id, |def| {
             let def_fb = def.in_function_body(sema, def);
@@ -124,9 +126,9 @@ impl GenericLinter for NonstandardIntegerFormattingLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut builder = SourceChangeBuilder::new(file_id);
         builder.replace(range, &context.formatted_integer);
         let fix_msg: &str = if context.formatted_integer.len() < 16 {

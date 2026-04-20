@@ -50,6 +50,7 @@ use hir::fold::ParentId;
 use super::GenericLinter;
 use super::GenericLinterMatchContext;
 use super::Linter;
+use super::LinterContext;
 use crate::Assist;
 use crate::fix;
 
@@ -79,9 +80,10 @@ impl GenericLinter for BooleanPrecedenceLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         sema.for_each_function(file_id, |def| {
             check_function(&mut res, sema, def);
@@ -102,9 +104,9 @@ impl GenericLinter for BooleanPrecedenceLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut fixes = Vec::new();
 
         // Add "replace with preferred operator" fix

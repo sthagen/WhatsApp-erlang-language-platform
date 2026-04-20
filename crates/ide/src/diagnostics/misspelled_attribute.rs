@@ -19,6 +19,7 @@ use super::DiagnosticCode;
 use super::GenericLinter;
 use super::GenericLinterMatchContext;
 use super::Linter;
+use super::LinterContext;
 use crate::Assist;
 use crate::TextRange;
 use crate::TextSize;
@@ -65,9 +66,10 @@ impl GenericLinter for MisspelledAttributeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let form_list = sema.db.file_form_list(file_id);
         let parsed_file = sema.db.parse(file_id);
         let mut res = Vec::new();
@@ -113,9 +115,9 @@ impl GenericLinter for MisspelledAttributeLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let edit = TextEdit::replace(range, context.suggested_rename.clone());
         let msg = format!("Change to '{}'", context.suggested_rename);
         Some(vec![fix(

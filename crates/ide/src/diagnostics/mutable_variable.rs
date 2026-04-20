@@ -39,6 +39,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 
 pub(crate) struct MutableVariableLinter;
@@ -64,11 +65,9 @@ impl Linter for MutableVariableLinter {
 impl GenericLinter for MutableVariableLinter {
     type Context = ();
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<()>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<()>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let bound_vars_by_function = sema.bound_vars_by_function(file_id);
         sema.def_map(file_id)

@@ -15,14 +15,13 @@
 // TODO: combine with head_mismatch?
 
 use elp_ide_db::DiagnosticCode;
-use elp_ide_db::elp_base_db::FileId;
 use elp_syntax::ast::AstNode;
 use elp_syntax::ast::ClauseSeparator;
-use hir::Semantic;
 
 use crate::Diagnostic;
 use crate::diagnostics::GenericDiagnostics;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 
 pub(crate) struct MissingSeparatorLinter;
@@ -48,13 +47,12 @@ impl Linter for MissingSeparatorLinter {
 impl GenericDiagnostics for MissingSeparatorLinter {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
-        let def_map = sema.def_map(file_id);
+        let def_map = ctx.sema.def_map(ctx.file_id);
 
         def_map.get_functions().for_each(|(_, fun_def)| {
             let n = fun_def.function_clauses.len();
@@ -87,7 +85,7 @@ impl GenericDiagnostics for MissingSeparatorLinter {
                                 diagnostics.push(d);
                             }
                             None => {
-                                let ast_fun = fun.form_id.get_ast(sema.db, file_id);
+                                let ast_fun = fun.form_id.get_ast(ctx.sema.db, ctx.file_id);
                                 if let Some(last_tok) = ast_fun.syntax().last_token() {
                                     let range = last_tok.text_range();
                                     let d = Diagnostic::new(
@@ -125,7 +123,7 @@ impl GenericDiagnostics for MissingSeparatorLinter {
                             }
                             Some((ClauseSeparator::Dot, _range)) => {}
                             None => {
-                                let ast_fun = fun.form_id.get_ast(sema.db, file_id);
+                                let ast_fun = fun.form_id.get_ast(ctx.sema.db, ctx.file_id);
                                 if let Some(last_tok) = ast_fun.syntax().last_token() {
                                     let range = last_tok.text_range();
                                     let d = Diagnostic::new(

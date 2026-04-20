@@ -8,12 +8,10 @@
  * above-listed licenses.
  */
 
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_syntax::AstNode;
 use elp_syntax::ast;
 use elp_syntax::match_ast;
-use hir::Semantic;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -21,6 +19,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct NoNoWarnSuppressionsLinter;
 
@@ -39,9 +38,10 @@ impl GenericLinter for NoNoWarnSuppressionsLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         lazy_static! {
             static ref NOWARN_REGEX: Regex = Regex::new(r"^nowarn_").expect("valid regex");
         }

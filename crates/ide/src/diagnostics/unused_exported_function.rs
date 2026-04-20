@@ -35,6 +35,7 @@ use crate::diagnostics::DiagnosticTag;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) struct UnusedExportedFunctionLinter;
@@ -77,11 +78,9 @@ pub struct Context {
 impl GenericLinter for UnusedExportedFunctionLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let def_map = sema.def_map_local(file_id);
 
@@ -161,9 +160,10 @@ impl GenericLinter for UnusedExportedFunctionLinter {
         &self,
         context: &Context,
         _range: TextRange,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let def_map = sema.def_map(file_id);
         let name_arity =
             NameArity::new(hir::Name::from_erlang_service(&context.name), context.arity);

@@ -27,6 +27,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -57,9 +58,10 @@ impl GenericLinter for ModuleMismatchLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let root_id = sema.db.file_source_root(file_id);
         let root = sema.db.source_root(root_id);
         let path = root.path_for_file(&file_id)?;
@@ -93,9 +95,9 @@ impl GenericLinter for ModuleMismatchLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut builder = TextEdit::builder();
         builder.replace(range, context.filename.clone());
         let edit = builder.finish();

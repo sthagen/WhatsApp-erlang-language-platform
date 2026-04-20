@@ -17,7 +17,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use elp_ide_assists::Assist;
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_ide_db::source_change::SourceChange;
 use elp_ide_db::text_edit::TextEdit;
@@ -39,6 +38,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) struct UnusedFunctionArgsLinter;
@@ -66,11 +66,9 @@ pub(crate) struct Context {
 impl GenericLinter for UnusedFunctionArgsLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         sema.def_map(file_id)
             .get_function_clauses()
@@ -91,9 +89,9 @@ impl GenericLinter for UnusedFunctionArgsLinter {
         &self,
         context: &Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut edit_builder = TextEdit::builder();
         edit_builder.replace(range, context.new_name.clone());
         let edit = edit_builder.finish();

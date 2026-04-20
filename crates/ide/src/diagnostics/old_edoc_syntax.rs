@@ -32,6 +32,7 @@ use super::DiagnosticCode;
 use super::GenericLinter;
 use super::GenericLinterMatchContext;
 use super::Linter;
+use super::LinterContext;
 
 pub(crate) struct OldEdocSyntaxLinter;
 
@@ -54,11 +55,9 @@ pub struct Context {
 impl GenericLinter for OldEdocSyntaxLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         if let Some(comments) = sema.file_edoc_comments(file_id) {
             for (header_ptr, header) in comments.iter() {
@@ -124,9 +123,10 @@ impl GenericLinter for OldEdocSyntaxLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let comments = sema.file_edoc_comments(file_id)?;
         let header_ptr = context.header_ptr.as_ref()?;
         let header = comments.get(header_ptr)?;

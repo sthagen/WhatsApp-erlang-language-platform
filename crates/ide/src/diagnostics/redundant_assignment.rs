@@ -41,6 +41,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -73,11 +74,9 @@ pub(crate) struct Context {
 impl GenericLinter for RedundantAssignmentLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         if sema.db.generated_status(file_id).is_generated() {
             return Some(vec![]);
         }
@@ -90,8 +89,7 @@ impl GenericLinter for RedundantAssignmentLinter {
         &self,
         context: &Context,
         range: TextRange,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         Some(vec![fix(
             "remove_redundant_assignment",

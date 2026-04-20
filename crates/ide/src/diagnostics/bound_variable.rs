@@ -13,10 +13,8 @@
 // Return a warning if the LHS of a match already contains a bound variable.
 //
 
-use elp_ide_db::elp_base_db::FileId;
 use hir::AnyExpr;
 use hir::Expr;
-use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
@@ -25,6 +23,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct BoundVariableLinter;
 
@@ -43,9 +42,10 @@ impl GenericLinter for BoundVariableLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let bound_vars_by_function = sema.bound_vars_by_function(file_id);
         let mut res = Vec::new();
         sema.def_map(file_id)

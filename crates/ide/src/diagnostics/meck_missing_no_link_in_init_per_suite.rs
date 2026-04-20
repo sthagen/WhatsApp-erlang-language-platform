@@ -32,6 +32,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 pub(crate) static LINTER: MeckMissingNoLinkLinter = MeckMissingNoLinkLinter;
@@ -69,9 +70,10 @@ impl GenericLinter for MeckMissingNoLinkLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut results = Vec::new();
         sema.def_map_local(file_id)
             .get_functions()
@@ -100,9 +102,9 @@ impl GenericLinter for MeckMissingNoLinkLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         Some(vec![make_fix(context, range, file_id)])
     }
 }

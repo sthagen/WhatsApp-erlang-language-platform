@@ -31,6 +31,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::diagnostics::SsrPatternsLinter;
 
@@ -88,10 +89,9 @@ impl GenericLinter for EqwalizerFixmeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        find_eqwalizer_comments(sema, file_id, Kind::Fixme)
+        find_eqwalizer_comments(ctx.sema, ctx.file_id, Kind::Fixme)
     }
 }
 
@@ -127,10 +127,9 @@ impl GenericLinter for EqwalizerIgnoreLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        find_eqwalizer_comments(sema, file_id, Kind::Ignore)
+        find_eqwalizer_comments(ctx.sema, ctx.file_id, Kind::Ignore)
     }
 }
 

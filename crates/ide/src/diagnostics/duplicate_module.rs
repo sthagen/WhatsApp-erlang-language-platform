@@ -12,16 +12,15 @@
 //
 // Return a warning if more than one module has the same name
 
-use elp_ide_db::elp_base_db::FileId;
 use elp_ide_db::elp_base_db::FileRange;
 use elp_ide_db::elp_base_db::ModuleName;
 use elp_syntax::AstNode;
-use hir::Semantic;
 
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 
 pub(crate) struct DuplicateModuleLinter;
 
@@ -44,21 +43,23 @@ impl GenericLinter for DuplicateModuleLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
         let mut res = Vec::new();
         // We cannot ask for the module name from the module_index, as
         // this file_id may be discarded as a duplicate
-        let module_name_ast = sema.module_attribute_name(file_id)?;
+        let module_name_ast = ctx.sema.module_attribute_name(ctx.file_id)?;
         let module_name = ModuleName::new(module_name_ast.text()?.as_str());
 
-        let app_data = sema.db.file_app_data(file_id)?;
-        let module_index = sema.db.module_index(app_data.project_id);
+        let app_data = ctx.sema.db.file_app_data(ctx.file_id)?;
+        let module_index = ctx.sema.db.module_index(app_data.project_id);
         if let Some(_dups) = module_index.duplicates(&module_name) {
             let range = module_name_ast.syntax().text_range();
             res.push(GenericLinterMatchContext {
-                range: FileRange { file_id, range },
+                range: FileRange {
+                    file_id: ctx.file_id,
+                    range,
+                },
                 context: (),
             });
         }

@@ -27,6 +27,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 
 pub(crate) struct UndocumentedFunctionLinter;
@@ -61,11 +62,9 @@ pub struct Context {
 impl GenericLinter for UndocumentedFunctionLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let callbacks = sema.resolve_callbacks(file_id);
         if !contains_moduledoc_hidden_attribute(sema, file_id) {

@@ -40,6 +40,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::fix;
 
 lazy_static! {
@@ -86,22 +87,21 @@ impl GenericLinter for UnusedIncludeLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        let db = sema.db;
-        let form_list = db.file_form_list(file_id);
+        let db = ctx.sema.db;
+        let form_list = db.file_form_list(ctx.file_id);
         let mut cache = Default::default();
-        let source_file = db.parse(file_id);
+        let source_file = db.parse(ctx.file_id);
         let mut res = Vec::new();
 
         for (include_idx, attr) in form_list.includes() {
             if !EXCLUDES.contains(attr.path()) {
-                let in_file = InFile::new(file_id, include_idx);
+                let in_file = InFile::new(ctx.file_id, include_idx);
                 if let Some(include_file_id) =
-                    db.resolve_include(db.app_data_id_by_file(file_id), in_file)
+                    db.resolve_include(db.app_data_id_by_file(ctx.file_id), in_file)
                 {
-                    if is_file_used(sema, db, include_file_id, file_id, &mut cache) {
+                    if is_file_used(ctx.sema, db, include_file_id, ctx.file_id, &mut cache) {
                         continue;
                     }
 
@@ -118,7 +118,7 @@ impl GenericLinter for UnusedIncludeLinter {
 
                     res.push(GenericLinterMatchContext {
                         range: FileRange {
-                            file_id,
+                            file_id: ctx.file_id,
                             range: attribute_range,
                         },
                         context: Context {
@@ -140,9 +140,9 @@ impl GenericLinter for UnusedIncludeLinter {
         &self,
         context: &Self::Context,
         _range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let mut edit_builder = TextEdit::builder();
         edit_builder.delete(context.extended_range);
         let edit = edit_builder.finish();

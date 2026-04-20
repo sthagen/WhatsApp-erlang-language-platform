@@ -42,6 +42,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -100,32 +101,32 @@ impl GenericLinter for RedundantFunWrapperLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
         let mut res = Vec::new();
 
-        sema.def_map(file_id)
+        ctx.sema
+            .def_map(ctx.file_id)
             .get_function_clauses()
-            .filter(|(_, def)| def.file.file_id == file_id)
+            .filter(|(_, def)| def.file.file_id == ctx.file_id)
             .for_each(|(_, def)| {
-                let in_clause = def.in_clause(sema, def);
+                let in_clause = def.in_clause(ctx.sema, def);
                 in_clause.fold_clause(
                     Strategy {
                         macros: MacroStrategy::Expand,
                         parens: ParenStrategy::InvisibleParens,
                     },
                     (),
-                    &mut |acc, ctx| {
-                        if let AnyExpr::Expr(Expr::Closure { clauses, name }) = ctx.item
+                    &mut |acc, fold_ctx| {
+                        if let AnyExpr::Expr(Expr::Closure { clauses, name }) = fold_ctx.item
                             && name.is_none() // Skip named funs like `fun Name(X) -> ...`
-                            && ctx.in_macro.is_none() // Skip closures inside macros
-                            && let hir::AnyExprId::Expr(expr_id) = ctx.item_id
+                            && fold_ctx.in_macro.is_none() // Skip closures inside macros
+                            && let hir::AnyExprId::Expr(expr_id) = fold_ctx.item_id
                             && let Some(range) = in_clause.range_for_expr(expr_id)
                             && let Some(kind) = check_redundant_wrapper(
-                                sema,
+                                ctx.sema,
                                 &in_clause,
-                                file_id,
+                                ctx.file_id,
                                 &in_clause.body(),
                                 &clauses,
                             )
@@ -166,9 +167,9 @@ impl GenericLinter for RedundantFunWrapperLinter {
         &self,
         context: &Self::Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let replacement = context.replacement()?;
         let mut builder = SourceChangeBuilder::new(file_id);
         builder.replace(range, replacement.clone());

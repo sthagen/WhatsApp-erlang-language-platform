@@ -981,6 +981,11 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
     }
 }
 
+pub(crate) struct LinterContext<'a> {
+    pub sema: &'a Semantic<'a>,
+    pub file_id: FileId,
+}
+
 pub(crate) struct GenericLinterMatchContext<Context> {
     pub range: FileRange,
     pub context: Context,
@@ -994,8 +999,7 @@ pub(crate) trait GenericLinter: Linter {
     /// Return a list of matches for the linter
     fn matches(
         &self,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
         None
     }
@@ -1027,8 +1031,7 @@ pub(crate) trait GenericLinter: Linter {
         &self,
         _context: &Self::Context,
         _range: TextRange,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
         None
     }
@@ -1037,8 +1040,7 @@ pub(crate) trait GenericLinter: Linter {
     fn related(
         &self,
         _context: &Self::Context,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<RelatedInformation>> {
         None
     }
@@ -1057,8 +1059,7 @@ pub(crate) trait GenericLinter: Linter {
 pub(crate) trait GenericDiagnostics: Linter {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
     ) -> Vec<Diagnostic>;
@@ -1067,22 +1068,21 @@ pub(crate) trait GenericDiagnostics: Linter {
 impl<T: GenericLinter> GenericDiagnostics for T {
     fn diagnostics(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
     ) -> Vec<Diagnostic> {
         let mut res = Vec::new();
-        if let Some(matches) = self.matches(sema, file_id) {
+        if let Some(matches) = self.matches(ctx) {
             for matched in matches {
-                if !self.filter_match(&matched, file_id) {
+                if !self.filter_match(&matched, ctx.file_id) {
                     continue;
                 }
                 let range = matched.range.range;
                 let message = self.match_description(&matched.context);
-                let fixes = self.fixes(&matched.context, range, sema, file_id);
+                let fixes = self.fixes(&matched.context, range, ctx);
                 let tag = self.tag(&matched.context);
-                let related = self.related(&matched.context, sema, file_id);
+                let related = self.related(&matched.context, ctx);
                 let mut d = Diagnostic::new(self.id(), message, range)
                     .with_fixes(fixes)
                     .with_tag(tag)
@@ -1092,8 +1092,8 @@ impl<T: GenericLinter> GenericDiagnostics for T {
                     .with_cli_severity(cli_severity);
                 if self.can_be_suppressed() {
                     d = d
-                        .with_ignore_fix(sema, file_id)
-                        .with_fixme_fix(sema, file_id);
+                        .with_ignore_fix(ctx.sema, ctx.file_id)
+                        .with_fixme_fix(ctx.sema, ctx.file_id);
                 }
                 res.push(d);
             }
@@ -2095,8 +2095,8 @@ fn diagnostics_from_linters(
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::Generic(generic_linter) => {
-                    let diagnostics =
-                        generic_linter.diagnostics(sema, file_id, severity, cli_severity);
+                    let ctx = LinterContext { sema, file_id };
+                    let diagnostics = generic_linter.diagnostics(&ctx, severity, cli_severity);
                     res.extend(filter_for_manual_section(diagnostics));
                 }
             }

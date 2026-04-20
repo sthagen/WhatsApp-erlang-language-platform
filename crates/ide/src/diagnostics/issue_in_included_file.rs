@@ -20,7 +20,6 @@ use elp_ide_db::elp_base_db::FileRange;
 use elp_syntax::TextRange;
 use hir::InFile;
 use hir::PPCondition;
-use hir::Semantic;
 
 use super::compute_pp_condition_range;
 use super::find_include_directive_for_file;
@@ -28,6 +27,7 @@ use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::RelatedInformation;
 
 pub(crate) struct IssueInIncludedFileLinter;
@@ -59,26 +59,26 @@ impl GenericLinter for IssueInIncludedFileLinter {
 
     fn matches(
         &self,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
-        let form_list = sema.form_list(file_id);
+        let form_list = ctx.sema.form_list(ctx.file_id);
         let mut matches = Vec::new();
 
         // Scan included files for PP condition issues
         for (include_id, _include) in form_list.includes() {
-            if let Some(included_file_id) = sema.db.resolve_include(
-                sema.db.app_data_id_by_file(file_id),
-                InFile::new(file_id, include_id),
+            if let Some(included_file_id) = ctx.sema.db.resolve_include(
+                ctx.sema.db.app_data_id_by_file(ctx.file_id),
+                InFile::new(ctx.file_id, include_id),
             ) {
                 // Get all condition diagnostics from the preprocessor analysis for the included file
-                let env = sema.db.project_macro_environment(included_file_id);
-                let (_, diagnostics_map) = sema
+                let env = ctx.sema.db.project_macro_environment(included_file_id);
+                let (_, diagnostics_map) = ctx
+                    .sema
                     .db
                     .file_preprocessor_analysis_with_diagnostics(included_file_id, env);
 
                 // Check the included file for PP condition diagnostics
-                let included_form_list = sema.form_list(included_file_id);
+                let included_form_list = ctx.sema.form_list(included_file_id);
 
                 for (cond_id, condition) in included_form_list.pp_conditions() {
                     // Only -if and -elif conditions can generate diagnostics
@@ -92,20 +92,20 @@ impl GenericLinter for IssueInIncludedFileLinter {
                                 // Find the include directive range in the parent file
                                 if let Some((_include_id, include_range)) =
                                     find_include_directive_for_file(
-                                        sema.db,
-                                        file_id,
+                                        ctx.sema.db,
+                                        ctx.file_id,
                                         included_file_id,
                                     )
                                 {
                                     let condition_range = compute_pp_condition_range(
-                                        sema.db,
+                                        ctx.sema.db,
                                         included_file_id,
                                         cond_id,
                                     );
 
                                     matches.push(GenericLinterMatchContext {
                                         range: FileRange {
-                                            file_id,
+                                            file_id: ctx.file_id,
                                             range: include_range,
                                         },
                                         context: IssueInIncludedFileContext {
@@ -132,8 +132,7 @@ impl GenericLinter for IssueInIncludedFileLinter {
     fn related(
         &self,
         context: &Self::Context,
-        _sema: &Semantic,
-        _file_id: FileId,
+        _ctx: &LinterContext,
     ) -> Option<Vec<RelatedInformation>> {
         Some(vec![RelatedInformation {
             file_id: context.included_file_id,

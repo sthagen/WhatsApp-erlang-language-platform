@@ -29,6 +29,7 @@ use super::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::RelatedInformation;
 use crate::diagnostics::Severity;
 use crate::fix;
@@ -74,11 +75,9 @@ impl Linter for HeadMismatchLinter {
 impl GenericLinter for HeadMismatchLinter {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut match_contexts = head_mismatch_semantic(sema, file_id);
         head_mismatch_anonymous_funs(sema, file_id, &mut match_contexts);
         Some(match_contexts)
@@ -92,9 +91,9 @@ impl GenericLinter for HeadMismatchLinter {
         &self,
         context: &Context,
         range: TextRange,
-        _sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
+        let file_id = ctx.file_id;
         let edit = context.fix_edit.as_ref()?;
         Some(vec![fix(
             "fix_head_mismatch",
@@ -104,12 +103,8 @@ impl GenericLinter for HeadMismatchLinter {
         )])
     }
 
-    fn related(
-        &self,
-        context: &Context,
-        _sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<RelatedInformation>> {
+    fn related(&self, context: &Context, ctx: &LinterContext) -> Option<Vec<RelatedInformation>> {
+        let file_id = ctx.file_id;
         Some(vec![RelatedInformation {
             file_id,
             range: context.related_range,

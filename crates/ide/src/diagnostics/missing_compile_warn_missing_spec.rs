@@ -42,6 +42,7 @@ use super::DIAGNOSTIC_WHOLE_FILE_RANGE;
 use crate::diagnostics::GenericLinter;
 use crate::diagnostics::GenericLinterMatchContext;
 use crate::diagnostics::Linter;
+use crate::diagnostics::LinterContext;
 use crate::diagnostics::Severity;
 use crate::fix;
 
@@ -81,11 +82,9 @@ pub struct Context {
 impl GenericLinter for MissingCompileWarnMissingSpec {
     type Context = Context;
 
-    fn matches(
-        &self,
-        sema: &Semantic,
-        file_id: FileId,
-    ) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+    fn matches(&self, ctx: &LinterContext) -> Option<Vec<GenericLinterMatchContext<Context>>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut res = Vec::new();
         let form_list = sema.form_list(file_id);
         if form_list.compile_attributes().next().is_none() {
@@ -162,9 +161,10 @@ impl GenericLinter for MissingCompileWarnMissingSpec {
         &self,
         context: &Self::Context,
         range: TextRange,
-        sema: &Semantic,
-        file_id: FileId,
+        ctx: &LinterContext,
     ) -> Option<Vec<elp_ide_assists::Assist>> {
+        let sema = ctx.sema;
+        let file_id = ctx.file_id;
         let mut builder = SourceChangeBuilder::new(file_id);
         if context.found == Found::No {
             add_compile_option(sema, file_id, "warn_missing_spec_all", None, &mut builder);
