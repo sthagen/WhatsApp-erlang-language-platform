@@ -109,51 +109,19 @@ error: invalid_ref_in_type_cast (See https://fb.me/eqwalizer_errors#invalid_ref_
     │                                          ^^^^^^^^^^^^^^^ type cast references type with invalid definition: invalid/0
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/type_asserts.erl:126:9
-    │
-126 │         Acc#{K => V#{ka => va}};
-    │         ^^^^^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         ..#{..}.
+    ┌─ check/src/type_asserts.erl:123:5
+    │    
+123 │ ╭ ╭     case Key of
+124 │ │ │       a ->
+125 │ │ │         V = maps:get(K, Acc, #{}),
+126 │ │ │         Acc#{K => V#{ka => va}};
+    · │ │
+132 │ │ │         Acc#{K => V#{kc => vc}}
+133 │ │ │     end
+    │ ╰─│───────^ case ....
 Expression has type:   #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kb := 'vb', kc := 'vc'} | #{ka := 'va', kc := 'vc'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}}
 Context expected type: #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kc := 'vc'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb'}} | #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}} | #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kc := 'vc'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}}
-    │         
-
-Because in the expression's type:
-  #{ dynamic() =>
-    Here the type is:     #{kb := ...}
-    Context expects type: #{...}
-    The expected map has no corresponding key for: kb.
-  , ... }
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/type_asserts.erl:129:9
-    │
-129 │         Acc#{K => V#{kb => vb}};
-    │         ^^^^^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         ..#{..}.
-Expression has type:   #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kb := 'vb', kc := 'vc'} | #{ka := 'va', kc := 'vc'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}}
-Context expected type: #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kc := 'vc'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb'}} | #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}} | #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kc := 'vc'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}}
-    │         
-
-Because in the expression's type:
-  #{ dynamic() =>
-    Here the type is:     #{kb := ...}
-    Context expects type: #{...}
-    The expected map has no corresponding key for: kb.
-  , ... }
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/type_asserts.erl:132:9
-    │
-132 │         Acc#{K => V#{kc => vc}}
-    │         ^^^^^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         ..#{..}.
-Expression has type:   #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kb := 'vb', kc := 'vc'} | #{ka := 'va', kc := 'vc'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}}
-Context expected type: #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kc := 'vc'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb'}} | #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kb := 'vb'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}} | #{dynamic() => #{kc := 'vc'} | #{ka := 'va'} | #{ka := 'va', kc := 'vc'} | #{kb := 'vb', kc := 'vc'} | #{kb := 'vb'}}
-    │         
+    │   ╰───────' 
 
 Because in the expression's type:
   #{ dynamic() =>
@@ -196,4 +164,4 @@ error: refined_record_in_type_cast (See https://fb.me/eqwalizer_errors#refined_r
 173 │   ?unchecked_cast(1, #rec{bad_field :: atom()}).
     │                      ^^^^^^^^^^^^^^^^^^^^^^^^^ refined records are not allowed in type casts, found: rec
 
-19 ERRORS
+17 ERRORS
