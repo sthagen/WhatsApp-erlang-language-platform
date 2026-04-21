@@ -44,9 +44,6 @@ use hir::known;
 use lazy_static::lazy_static;
 
 use crate::Runnable;
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::DiagnosticCode;
-use crate::diagnostics::Severity;
 use crate::navigation_target::ToNav;
 use crate::runnables::RunnableKind;
 
@@ -63,29 +60,6 @@ impl GroupName {
         match self {
             GroupName::NoGroup => "".to_string(),
             GroupName::Name(name) => name.to_string(),
-        }
-    }
-}
-
-pub fn unreachable_test(
-    res: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    file_id: FileId,
-    testcases: &Option<FxHashSet<NameArity>>,
-) {
-    let exported_test_ranges = exported_test_ranges(sema, file_id);
-    if let Some(runnable_names) = testcases {
-        for (name, range) in exported_test_ranges {
-            if !runnable_names.contains(&name) {
-                let d = Diagnostic::new(
-                    DiagnosticCode::UnreachableTest,
-                    format!("Unreachable test ({name})"),
-                    range,
-                )
-                .with_severity(Severity::Error)
-                .with_ignore_fix(sema, file_id);
-                res.push(d);
-            }
         }
     }
 }
@@ -107,7 +81,10 @@ pub fn runnable_names(
     })
 }
 
-fn exported_test_ranges(sema: &Semantic, file_id: FileId) -> FxHashMap<NameArity, TextRange> {
+pub(crate) fn exported_test_ranges(
+    sema: &Semantic,
+    file_id: FileId,
+) -> FxHashMap<NameArity, TextRange> {
     let mut res = FxHashMap::default();
     let def_map = sema.db.def_map_local(file_id);
     let functions = def_map.get_functions();
@@ -296,195 +273,4 @@ fn def_to_runnable(sema: &Semantic, def: &FunctionDef, group: GroupName) -> Opti
 
 pub fn is_suite(module_name: &ModuleName) -> bool {
     module_name.ends_with(SUFFIX)
-}
-
-#[cfg(test)]
-mod tests {
-
-    use crate::tests::check_ct_diagnostics;
-    use crate::tests::check_ct_fix;
-
-    #[test]
-    fn test_unreachable_test() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/unreachable1_SUITE.erl
-   -module(unreachable1_SUITE).~
-   -export([all/0]).
-   -export([a/1, b/1]).
-   all() -> [a].
-   a(_Config) ->
-     ok.
-   b(_Config) ->
-%% ^ 💡 error: W0008: Unreachable test (b/1)
-     ok.
-            "#,
-        );
-    }
-
-    #[test]
-    fn test_unreachable_test_init_end() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/unreachable_init_SUITE.erl
-   -module(unreachable_init_SUITE).~
-   -export([all/0]).
-   -export([init_per_suite/1, end_per_suite/1]).
-   -export([a/1, b/1]).
-   all() -> [a].
-   init_per_suite(Config) -> Config.
-   end_per_suite(_Config) -> ok.
-   a(_Config) ->
-     ok.
-   b(_Config) ->
-%% ^ 💡 error: W0008: Unreachable test (b/1)
-     ok.
-            "#,
-        );
-    }
-
-    #[test]
-    fn test_unreachable_test_dynamic_all() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/unreachable_dynamic_SUITE.erl
-   -module(unreachable_dynamic_SUITE).~
-   -export([all/0]).
-   -export([init_per_suite/1, end_per_suite/1]).
-   -export([a/1, b/1]).
-   all() -> do_all().
-   do_all() -> [a].
-   init_per_suite(Config) -> Config.
-   end_per_suite(_Config) -> ok.
-   a(_Config) ->
-     ok.
-   b(_Config) ->
-%% ^ 💡 error: W0008: Unreachable test (b/1)
-     ok.
-            "#,
-        );
-    }
-
-    #[test]
-    fn test_unreachable_test_ignore() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/unreachable_ignore_SUITE.erl
-   -module(unreachable_ignore_SUITE).~
-   -export([all/0]).
-   -export([a/1, b/1, c/1]).
-   all() -> [a].
-   a(_Config) ->
-     ok.
-   % elp:ignore W0008
-   b(_Config) ->
-     ok.
-   c(_Config) ->
-%% ^ 💡 error: W0008: Unreachable test (c/1)
-     ok.
-            "#,
-        );
-    }
-    #[test]
-    fn test_unreachable_test_ignore_by_label() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/unreachable_ignore_label_SUITE.erl
-   -module(unreachable_ignore_label_SUITE).~
-   -export([all/0]).
-   -export([a/1, b/1, c/1]).
-   all() -> [a].
-   a(_Config) ->
-     ok.
-   % elp:ignore unreachable_test
-   b(_Config) ->
-     ok.
-   c(_Config) ->
-%% ^ 💡 error: W0008: Unreachable test (c/1)
-     ok.
-            "#,
-        );
-    }
-
-    #[test]
-    fn test_unreachable_test_fix() {
-        check_ct_diagnostics(
-            r#"
- //- common_test
- //- /my_app/test/unreachable_fix1_SUITE.erl
-    -module(unreachable_fix1_SUITE).~
-    -export([all/0]).
-    -export([a/1, b/1, c/1]).
-    all() -> [a].
-    a(_Config) ->
-      ok.
-    b(_Config) ->
- %% ^ 💡 error: W0008: Unreachable test (b/1)
-      ok.
-    c(_Config) ->
- %% ^ 💡 error: W0008: Unreachable test (c/1)
-      ok.
-     "#,
-        );
-        check_ct_fix(
-            r#"
-//- common_test
-//- /my_app/test/unreachable_fix_SUITE.erl
--module(unreachable_fix_SUITE).
--export([all/0]).
--export([a/1, b/1, c/1]).
-all() -> [a].
-a(_Config) ->
-  ok.
-b(_Config) ->
-  ok.
-c~(_Config) ->
-  ok.
-     "#,
-            r#"
--module(unreachable_fix_SUITE).
--export([all/0]).
--export([a/1, b/1, c/1]).
-all() -> [a].
-a(_Config) ->
-  ok.
-b(_Config) ->
-  ok.
-% elp:ignore W0008 (unreachable_test)
-c(_Config) ->
-  ok.
-     "#,
-        );
-    }
-
-    #[test]
-    fn test_unreachable_test_with_callback() {
-        check_ct_diagnostics(
-            r#"
-//- common_test
-//- /my_app/test/unreachable_SUITE.erl
-   -module(unreachable_SUITE).~
-   -export([all/0]).
-   -export([a/1, b/1, my_callback/1]).
-   -behaviour(my_behaviour).
-   my_callback(X) -> X.
-   all() -> [a].
-   a(_Config) ->
-     ok.
-   b(_Config) ->
-%% ^ 💡 error: W0008: Unreachable test (b/1)
-     ok.
-//- /my_app/src/my_behaviour.erl
--module(my_behaviour).
--export([foo/1]).
-foo(X) -> X.
--callback my_callback(integer()) -> integer().
-            "#,
-        );
-    }
 }

@@ -166,6 +166,7 @@ mod unexported_function;
 mod unnecessary_fold_to_build_map;
 mod unnecessary_map_from_list_around_comprehension;
 mod unnecessary_map_to_list_in_comprehension;
+mod unreachable_test;
 mod unresolved_include;
 mod unresolved_macro;
 mod unspecific_include;
@@ -1945,6 +1946,7 @@ const GENERIC_LINTERS: &[&dyn GenericDiagnostics] = &[
     &module_mismatch::LINTER,
     &meck_missing_no_link_in_init_per_suite::LINTER,
     &cannot_evaluate_ct_callbacks::LINTER,
+    &unreachable_test::LINTER,
 ];
 
 /// Unified registry for all types of linters
@@ -2723,8 +2725,7 @@ pub fn ct_diagnostics(
     let sema = Semantic::new(db);
 
     if let CommonTestInfo::Result { all, groups } = &*ct_info(db, file_id) {
-        let testcases = common_test::runnable_names(&sema, file_id, all, groups).ok();
-        common_test::unreachable_test(&mut res, &sema, file_id, &testcases);
+        // @fb-only: let testcases = common_test::runnable_names(&sema, file_id, all, groups).ok();
         // @fb-only: meta_only::ct_diagnostics(&mut res, &sema, file_id, testcases);
     };
     let metadata = db.elp_metadata(file_id);
