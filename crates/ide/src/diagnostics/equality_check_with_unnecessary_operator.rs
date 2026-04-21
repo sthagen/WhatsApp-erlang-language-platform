@@ -51,7 +51,6 @@ use hir::Literal;
 use hir::Pat;
 use hir::Semantic;
 use hir::Strategy;
-use hir::db::InternDatabase;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 use lazy_static::lazy_static;
@@ -215,20 +214,20 @@ impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
         {
             return None;
         }
-        let lhs = &matched.get_placeholder_match(ctx.sema, LHS_VAR)?;
-        let rhs = &matched.get_placeholder_match(ctx.sema, RHS_VAR)?;
-        let wildcard = &matched.get_placeholder_match(ctx.sema, UNDERSCORE_VAR);
+        let lhs = &matched.get_placeholder_match(LHS_VAR)?;
+        let rhs = &matched.get_placeholder_match(RHS_VAR)?;
+        let wildcard = &matched.get_placeholder_match(UNDERSCORE_VAR);
         let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         let underscore_expected = *context == PatternContext::Wildcard;
-        if !check_underscore(ctx.sema, body, wildcard, underscore_expected) {
+        if !check_underscore(body, wildcard, underscore_expected) {
             return Some(false);
         }
-        if is_length_zero_comparison(ctx.sema, body, lhs, rhs) {
+        if is_length_zero_comparison(body, lhs, rhs) {
             return None;
         }
-        let lhs_as_pattern_priority = pattern_priority(ctx.sema, body, lhs);
-        let rhs_as_pattern_priority = pattern_priority(ctx.sema, body, rhs);
+        let lhs_as_pattern_priority = pattern_priority(body, lhs);
+        let rhs_as_pattern_priority = pattern_priority(body, rhs);
         match (lhs_as_pattern_priority, rhs_as_pattern_priority) {
             (Some(_), _) | (_, Some(_)) => Some(true),
             (None, None) => Some(false),
@@ -241,17 +240,17 @@ impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
         matched: &Match,
         ctx: &LinterContext,
     ) -> Option<Vec<Assist>> {
-        let lhs = &matched.get_placeholder_match(ctx.sema, LHS_VAR)?;
-        let rhs = &matched.get_placeholder_match(ctx.sema, RHS_VAR)?;
-        let wildcard = &matched.get_placeholder_match(ctx.sema, UNDERSCORE_VAR);
+        let lhs = &matched.get_placeholder_match(LHS_VAR)?;
+        let rhs = &matched.get_placeholder_match(RHS_VAR)?;
+        let wildcard = &matched.get_placeholder_match(UNDERSCORE_VAR);
         let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         let underscore_expected = *context == PatternContext::Wildcard;
-        if !check_underscore(ctx.sema, body, wildcard, underscore_expected) {
+        if !check_underscore(body, wildcard, underscore_expected) {
             return None;
         }
-        let lhs_as_pattern_priority = pattern_priority(ctx.sema, body, lhs);
-        let rhs_as_pattern_priority = pattern_priority(ctx.sema, body, rhs);
+        let lhs_as_pattern_priority = pattern_priority(body, lhs);
+        let rhs_as_pattern_priority = pattern_priority(body, rhs);
         let (discriminee, pattern) = match (lhs_as_pattern_priority, rhs_as_pattern_priority) {
             (Some(left), Some(right)) => match left.cmp(&right) {
                 Ordering::Less => (lhs, rhs),
@@ -269,9 +268,9 @@ impl SsrPatternsLinter for EqualityCheckWithUnnecessaryOperatorLinter {
         vec![Category::SimplificationRule]
     }
 
-    fn range(&self, ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
-        let discriminee_lhs_range = matched.placeholder_range(ctx.sema, LHS_VAR)?;
-        let discriminee_rhs_range = matched.placeholder_range(ctx.sema, RHS_VAR)?;
+    fn range(&self, _ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
+        let discriminee_lhs_range = matched.placeholder_range(LHS_VAR)?;
+        let discriminee_rhs_range = matched.placeholder_range(RHS_VAR)?;
         Some(discriminee_lhs_range.cover(discriminee_rhs_range))
     }
 }
@@ -281,33 +280,32 @@ pub(crate) static LINTER: EqualityCheckWithUnnecessaryOperatorLinter =
 
 // If the wildcard metavar was bound at all, make sure it is equivalent to an underscore
 fn check_underscore(
-    sema: &Semantic,
     body: &Body,
     wildcard: &Option<PlaceholderMatch>,
     underscore_expected: bool,
 ) -> bool {
     if underscore_expected {
-        is_underscore(sema, body, wildcard)
+        is_underscore(body, wildcard)
     } else {
         true
     }
 }
 
-fn is_underscore(sema: &Semantic, body: &Body, wildcard: &Option<PlaceholderMatch>) -> bool {
+fn is_underscore(body: &Body, wildcard: &Option<PlaceholderMatch>) -> bool {
     match wildcard {
         Some(m) => match m.code_id {
             SubId::AnyExprId(expr_id) => match expr_id {
                 AnyExprId::Expr(expr_id) => match body.exprs[expr_id] {
-                    Expr::Var(var) => is_wildcard(sema, var),
+                    Expr::Var(var) => is_wildcard(var),
                     _ => false,
                 },
                 AnyExprId::Pat(pat_id) => match body.pats[pat_id] {
-                    Pat::Var(var) => is_wildcard(sema, var),
+                    Pat::Var(var) => is_wildcard(var),
                     _ => false,
                 },
                 _ => false,
             },
-            SubId::Var(var) => is_wildcard(sema, var),
+            SubId::Var(var) => is_wildcard(var),
             _ => false,
         },
         None => false,
@@ -365,17 +363,13 @@ impl Ord for PatternPriority {
 }
 
 // Returns None if the match is not a valid pattern
-fn pattern_priority(
-    sema: &Semantic,
-    body: &Body,
-    matched: &PlaceholderMatch,
-) -> Option<PatternPriority> {
+fn pattern_priority(body: &Body, matched: &PlaceholderMatch) -> Option<PatternPriority> {
     let pp = match matched.code_id {
         SubId::AnyExprId(AnyExprId::Expr(expr_id)) => {
-            pattern_priority_expr(sema, body, body.exprs[expr_id].clone())
+            pattern_priority_expr(body, body.exprs[expr_id].clone())
         }
         SubId::AnyExprId(AnyExprId::Pat(pat_id)) => {
-            pattern_priority_pat(sema, body, body.pats[pat_id].clone())
+            pattern_priority_pat(body, body.pats[pat_id].clone())
         }
         SubId::AnyExprId(AnyExprId::TypeExpr(_)) => None,
         SubId::AnyExprId(AnyExprId::Term(_)) => None,
@@ -399,7 +393,7 @@ fn pattern_priority(
     if pp == bare_var { None } else { pp }
 }
 
-fn pattern_priority_expr(sema: &Semantic, body: &Body, expr: Expr) -> Option<PatternPriority> {
+fn pattern_priority_expr(body: &Body, expr: Expr) -> Option<PatternPriority> {
     match expr {
         Expr::Var(_) => Some(PatternPriority {
             num_vars_used: 1,
@@ -412,32 +406,32 @@ fn pattern_priority_expr(sema: &Semantic, body: &Body, expr: Expr) -> Option<Pat
         Expr::Tuple { exprs } => coalesce_all_nested_children(
             &exprs
                 .iter()
-                .map(|elem| pattern_priority_expr(sema, body, body.exprs[*elem].clone()))
+                .map(|elem| pattern_priority_expr(body, body.exprs[*elem].clone()))
                 .collect::<Vec<_>>(),
         ),
         Expr::List { exprs, tail } => coalesce_all_nested_children(
             &exprs
                 .iter()
                 .chain(tail.iter())
-                .map(|elem| pattern_priority_expr(sema, body, body.exprs[*elem].clone()))
+                .map(|elem| pattern_priority_expr(body, body.exprs[*elem].clone()))
                 .collect::<Vec<_>>(),
         ),
         Expr::UnaryOp { expr, op: _ } => {
-            nest(pattern_priority_expr(sema, body, body.exprs[expr].clone()))
+            nest(pattern_priority_expr(body, body.exprs[expr].clone()))
         }
         Expr::Record { name: _, fields } => coalesce_all_nested_children(
             &fields
                 .iter()
-                .map(|(_, field)| pattern_priority_expr(sema, body, body.exprs[*field].clone()))
+                .map(|(_, field)| pattern_priority_expr(body, body.exprs[*field].clone()))
                 .collect::<Vec<_>>(),
         ),
-        Expr::Paren { expr } => pattern_priority_expr(sema, body, body.exprs[expr].clone()),
+        Expr::Paren { expr } => pattern_priority_expr(body, body.exprs[expr].clone()),
         Expr::Binary { segs } => {
-            if is_seg_formulation_valid_in_pattern(sema, &segs) {
+            if is_seg_formulation_valid_in_pattern(&segs) {
                 coalesce_all_nested_children(
                     &segs
                         .iter()
-                        .map(|seg| pattern_priority_expr(sema, body, body.exprs[seg.elem].clone()))
+                        .map(|seg| pattern_priority_expr(body, body.exprs[seg.elem].clone()))
                         .collect::<Vec<_>>(),
                 )
             } else {
@@ -449,10 +443,9 @@ fn pattern_priority_expr(sema: &Semantic, body: &Body, expr: Expr) -> Option<Pat
     }
 }
 
-fn is_seg_formulation_valid_in_pattern<T: Debug>(sema: &Semantic, segs: &[BinarySeg<T>]) -> bool {
+fn is_seg_formulation_valid_in_pattern<T: Debug>(segs: &[BinarySeg<T>]) -> bool {
     // A binary field without size is only allowed at the end of a binary pattern
     if segs.len() > 1 {
-        let intern_db: &dyn InternDatabase = sema.db.upcast();
         let without_last = segs.iter().take(segs.len() - 1).collect::<Vec<_>>();
         without_last.iter().all(|seg| {
             if seg
@@ -470,14 +463,14 @@ fn is_seg_formulation_valid_in_pattern<T: Debug>(sema: &Semantic, segs: &[Binary
     }
 }
 
-fn pattern_priority_pat(sema: &Semantic, body: &Body, pat: Pat) -> Option<PatternPriority> {
+fn pattern_priority_pat(body: &Body, pat: Pat) -> Option<PatternPriority> {
     match pat {
         Pat::Binary { segs } => {
-            if is_seg_formulation_valid_in_pattern(sema, &segs) {
+            if is_seg_formulation_valid_in_pattern(&segs) {
                 coalesce_all_nested_children(
                     &segs
                         .iter()
-                        .map(|seg| pattern_priority_pat(sema, body, body.pats[seg.elem].clone()))
+                        .map(|seg| pattern_priority_pat(body, body.pats[seg.elem].clone()))
                         .collect::<Vec<_>>(),
                 )
             } else {
@@ -495,24 +488,22 @@ fn pattern_priority_pat(sema: &Semantic, body: &Body, pat: Pat) -> Option<Patter
         Pat::Tuple { pats } => coalesce_all_nested_children(
             &pats
                 .iter()
-                .map(|pat| pattern_priority_pat(sema, body, body.pats[*pat].clone()))
+                .map(|pat| pattern_priority_pat(body, body.pats[*pat].clone()))
                 .collect::<Vec<_>>(),
         ),
         Pat::List { pats, tail } => coalesce_all_nested_children(
             &pats
                 .iter()
                 .chain(tail.iter())
-                .map(|pat| pattern_priority_pat(sema, body, body.pats[*pat].clone()))
+                .map(|pat| pattern_priority_pat(body, body.pats[*pat].clone()))
                 .collect::<Vec<_>>(),
         ),
         Pat::Map { .. } => None, // Map's expression semantics are different to their pattern semantics (e.g. patterns need match only a subset of the map value, so we explicitly reject them here for simplicity)
-        Pat::UnaryOp { pat, op: _ } => {
-            nest(pattern_priority_pat(sema, body, body.pats[pat].clone()))
-        }
+        Pat::UnaryOp { pat, op: _ } => nest(pattern_priority_pat(body, body.pats[pat].clone())),
         Pat::Record { name: _, fields } => coalesce_all_nested_children(
             &fields
                 .iter()
-                .map(|(_, field)| pattern_priority_pat(sema, body, body.pats[*field].clone()))
+                .map(|(_, field)| pattern_priority_pat(body, body.pats[*field].clone()))
                 .collect::<Vec<_>>(),
         ),
         _ => None,
@@ -522,17 +513,12 @@ fn pattern_priority_pat(sema: &Semantic, body: &Body, pat: Pat) -> Option<Patter
 /// Check if the LHS/RHS of the equality check represent `length(List) =:= 0`
 /// (or `0 =:= length(List)`). If so, we skip this lint so that
 /// `InefficientListEmptyCheckLinter` can take priority with a better fix.
-fn is_length_zero_comparison(
-    sema: &Semantic,
-    body: &Body,
-    lhs: &PlaceholderMatch,
-    rhs: &PlaceholderMatch,
-) -> bool {
-    (is_length_call(sema, body, lhs) && is_integer_zero(body, rhs))
-        || (is_integer_zero(body, lhs) && is_length_call(sema, body, rhs))
+fn is_length_zero_comparison(body: &Body, lhs: &PlaceholderMatch, rhs: &PlaceholderMatch) -> bool {
+    (is_length_call(body, lhs) && is_integer_zero(body, rhs))
+        || (is_integer_zero(body, lhs) && is_length_call(body, rhs))
 }
 
-fn is_length_call(sema: &Semantic, body: &Body, pm: &PlaceholderMatch) -> bool {
+fn is_length_call(body: &Body, pm: &PlaceholderMatch) -> bool {
     let SubId::AnyExprId(AnyExprId::Expr(expr_id)) = pm.code_id else {
         return false;
     };
@@ -542,7 +528,6 @@ fn is_length_call(sema: &Semantic, body: &Body, pm: &PlaceholderMatch) -> bool {
     if args.len() != 1 {
         return false;
     }
-    let intern_db: &dyn InternDatabase = sema.db.upcast();
     match target {
         CallTarget::Local { name } => {
             matches!(body[*name].as_atom(), Some(atom) if atom.as_string() == "length")

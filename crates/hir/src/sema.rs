@@ -1181,7 +1181,7 @@ impl Semantic<'_> {
             .db
             .ssr_body_with_source(ssr_source)
             .expect("SSR body should exist");
-        body.tree_print(self.db.upcast())
+        body.tree_print()
     }
 }
 
@@ -1446,8 +1446,8 @@ impl<'a, T: Clone> InFunctionBody<'a, T> {
         self.in_clause(clause_id).range_for_pat(pat_id)
     }
 
-    pub fn tree_print(&self, db: &dyn DefDatabase, strategy: Strategy) -> String {
-        self.body.tree_print(db.upcast(), strategy)
+    pub fn tree_print(&self, strategy: Strategy) -> String {
+        self.body.tree_print(strategy)
     }
 }
 
@@ -1695,11 +1695,11 @@ impl<'a, T> InFunctionClauseBody<'a, T> {
     }
 
     pub fn tree_print_any_expr(&self, expr: AnyExprId) -> String {
-        self.body().tree_print_any_expr(self.sema.db.upcast(), expr)
+        self.body().tree_print_any_expr(expr)
     }
 
     pub fn tree_print(&self) -> String {
-        self.body.tree_print(self.sema.db.upcast())
+        self.body.tree_print()
     }
 }
 

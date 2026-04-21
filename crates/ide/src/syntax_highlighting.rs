@@ -147,7 +147,6 @@ fn deprecated_func_highlight(
                     match target {
                         CallTarget::Local { name } => {
                             if let Some(range) = find_deprecated_range(
-                                sema,
                                 file_id,
                                 &def_map,
                                 &name,
@@ -168,7 +167,6 @@ fn deprecated_func_highlight(
                             {
                                 let def_map = sema.def_map(file_id);
                                 if let Some(range) = find_deprecated_range(
-                                    sema,
                                     file_id,
                                     &def_map,
                                     &name,
@@ -193,7 +191,6 @@ fn deprecated_func_highlight(
 }
 
 fn find_deprecated_range(
-    sema: &Semantic,
     file_id: FileId,
     def_map: &DefMap,
     name: &ExprId,

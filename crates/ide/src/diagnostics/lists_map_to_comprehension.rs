@@ -107,7 +107,7 @@ impl SsrPatternsLinter for ListsMapToComprehensionLinter {
         }
 
         if *context == PatternKind::FunVar {
-            let fun_placeholder = matched.get_placeholder_match(ctx.sema, FUN_VAR)?;
+            let fun_placeholder = matched.get_placeholder_match(FUN_VAR)?;
             if !is_placeholder_a_var_from_sema_and_match(ctx.sema, matched, &fun_placeholder) {
                 return None;
             }

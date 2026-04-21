@@ -120,7 +120,7 @@ pub(crate) fn extract_function(acc: &mut Assists, ctx: &AssistContext<'_>) -> Op
             let new_indent = IndentLevel::from_node(&insert_after);
             let old_indent = fun.body.indent_level();
 
-            builder.replace(target_range, make_call(ctx, &fun));
+            builder.replace(target_range, make_call(&fun));
             let fn_def = fun.format(ctx, old_indent, new_indent);
             let insert_offset = insert_after.text_range().end();
 
@@ -467,7 +467,7 @@ fn overlaps(range_a: &TextRange, range_b: &TextRange) -> bool {
         .is_some()
 }
 
-fn make_call(ctx: &AssistContext<'_>, fun: &Function) -> String {
+fn make_call(fun: &Function) -> String {
     let args = fun
         .params
         .iter()
@@ -520,7 +520,7 @@ fn ends_with_comma_then_trivia(node: &SyntaxNode, range: TextRange) -> Option<Te
 }
 
 impl Function {
-    fn make_param_list(&self, ctx: &AssistContext<'_>) -> String {
+    fn make_param_list(&self) -> String {
         self.params
             .iter()
             .map(|param| format!("{}", param.var.as_name()))
@@ -535,8 +535,8 @@ impl Function {
         new_indent: IndentLevel,
     ) -> String {
         let mut fn_def = String::new();
-        let params = self.make_param_list(ctx);
-        let ret_ty = self.make_ret_ty(ctx);
+        let params = self.make_param_list();
+        let ret_ty = self.make_ret_ty();
         let (body, ends_with_comment) = self.make_body(old_indent);
         match ctx.config.snippet_cap {
             Some(_) => format_to!(fn_def, "\n\n{}$0{}({}) ->", new_indent, self.name, params),
@@ -559,7 +559,7 @@ impl Function {
         fn_def
     }
 
-    fn make_ret_ty(&self, ctx: &AssistContext<'_>) -> Option<String> {
+    fn make_ret_ty(&self) -> Option<String> {
         match self.outliving_locals.as_slice() {
             [] => None,
             [local] => Some(local.as_string()),

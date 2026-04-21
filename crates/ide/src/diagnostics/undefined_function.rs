@@ -109,7 +109,7 @@ impl FunctionCallLinter for UndefinedFunctionLinter {
                                 if is_automatically_added(sema, resolved_module, name, arity) {
                                     return None;
                                 }
-                                Some(context.target.label(arity, sema, &def_fb.body()))
+                                Some(context.target.label(arity, &def_fb.body()))
                             }
                         }
                     }
@@ -120,7 +120,7 @@ impl FunctionCallLinter for UndefinedFunctionLinter {
                         // we can't determine at compile time whether it's defined.
                         if module.as_atom().is_some() {
                             // Static module name that doesn't exist - report as undefined
-                            Some(context.target.label(arity, sema, &def_fb.body()))
+                            Some(context.target.label(arity, &def_fb.body()))
                         } else {
                             // Dynamic module expression - can't determine at compile time
                             None
@@ -456,10 +456,10 @@ exists() -> ok.
     -export([do/0]).
     -define(COUNT_BACKEND, (count_backend:count_module())).
     -define(COUNT(Name), ?COUNT_BACKEND:count(Name)).
-    
+
     do() ->
         ?COUNT('error.count').
-    
+
     //- /src/stats.erl
     -module(stats).
     -export([count/1]).

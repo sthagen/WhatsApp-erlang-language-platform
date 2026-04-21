@@ -127,7 +127,7 @@ static STEP_VAR: &str = "_@Step";
 
 fn is_indexing_from_literal_one(sema: &Semantic, m: &Match) -> bool {
     || -> Option<bool> {
-        let index_match = m.get_placeholder_match(sema, INDEX_VAR)?;
+        let index_match = m.get_placeholder_match(INDEX_VAR)?;
         let body = &m.matched_node_body.get_body(sema)?;
         match index_match.code_id {
             SubId::AnyExprId(AnyExprId::Expr(expr_id)) => match body[expr_id] {

@@ -268,7 +268,7 @@ impl ToNav for hir::VarDef {
             full_range,
             focus_range: None,
             highlight_ranges,
-            name: self.name(db.upcast()).raw(),
+            name: self.name().raw(),
             kind: SymbolKind::Variable,
         }
     }

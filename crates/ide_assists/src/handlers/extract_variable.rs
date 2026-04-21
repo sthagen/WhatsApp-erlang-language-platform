@@ -80,7 +80,6 @@ pub(crate) fn extract_variable(acc: &mut Assists, ctx: &AssistContext) -> Option
                 .sema
                 .find_vars_in_clause_ast(&InFile::new(ctx.file_id(), &to_extract));
             let var_name = freshen_variable_name(
-                &ctx.sema,
                 ctx.user_input_or(|| suggest_name_for_variable(&to_extract, &ctx.sema)),
                 &vars_in_clause,
             );

@@ -114,7 +114,7 @@ impl SsrPatternsLinter for InlineNestedListComprehensionLinter {
         let inner_var_text = matched.placeholder_text(ctx.sema, INNER_VAR)?;
         let list_text = matched.placeholder_text(ctx.sema, LIST_VAR)?;
         let body_text = matched.placeholder_text(ctx.sema, BODY_VAR)?;
-        let body_range = matched.placeholder_range(ctx.sema, BODY_VAR)?;
+        let body_range = matched.placeholder_range(BODY_VAR)?;
 
         let var_range = find_single_var_occurrence_in_body(ctx.sema, matched)?;
 
@@ -159,10 +159,10 @@ fn get_in_function_clause_body<'a>(
 /// Uses HIR traversal with scope-aware variable resolution to correctly handle
 /// variable shadowing in nested scopes (e.g., lambda parameters).
 fn count_var_occurrences_in_body(sema: &Semantic, matched: &Match) -> Option<usize> {
-    let outer_var_match = matched.get_placeholder_match(sema, OUTER_VAR)?;
+    let outer_var_match = matched.get_placeholder_match(OUTER_VAR)?;
     let outer_var_def = get_var_def_from_match(sema, matched, &outer_var_match)?;
 
-    let body_match = matched.get_placeholder_match(sema, BODY_VAR)?;
+    let body_match = matched.get_placeholder_match(BODY_VAR)?;
     let body = matched.matched_node_body.get_body(sema)?;
     let any_expr_id = body_match.code_id.any_expr_id()?;
     let expr_id = match any_expr_id {
@@ -220,10 +220,10 @@ fn get_var_def_from_match(
 /// Find the source range of the single variable occurrence in the body expression.
 /// Uses HIR traversal with scope-aware variable resolution.
 fn find_single_var_occurrence_in_body(sema: &Semantic, matched: &Match) -> Option<TextRange> {
-    let outer_var_match = matched.get_placeholder_match(sema, OUTER_VAR)?;
+    let outer_var_match = matched.get_placeholder_match(OUTER_VAR)?;
     let outer_var_def = get_var_def_from_match(sema, matched, &outer_var_match)?;
 
-    let body_match = matched.get_placeholder_match(sema, BODY_VAR)?;
+    let body_match = matched.get_placeholder_match(BODY_VAR)?;
     let body = matched.matched_node_body.get_body(sema)?;
     let any_expr_id = body_match.code_id.any_expr_id()?;
     let expr_id = match any_expr_id {

@@ -382,17 +382,17 @@ impl Body {
         }
     }
 
-    pub fn tree_print_any_expr(&self, db: &dyn InternDatabase, expr: AnyExprId) -> String {
+    pub fn tree_print_any_expr(&self, expr: AnyExprId) -> String {
         let fold_body = default_fold_body(self);
         match expr {
-            AnyExprId::Expr(expr_id) => tree_print::print_expr(db, &fold_body, expr_id),
-            AnyExprId::Pat(pat_id) => tree_print::print_pat(db, &fold_body, pat_id),
-            AnyExprId::TypeExpr(type_id) => tree_print::print_type(db, &fold_body, type_id),
-            AnyExprId::Term(term_id) => tree_print::print_term(db, &fold_body, term_id),
+            AnyExprId::Expr(expr_id) => tree_print::print_expr(&fold_body, expr_id),
+            AnyExprId::Pat(pat_id) => tree_print::print_pat(&fold_body, pat_id),
+            AnyExprId::TypeExpr(type_id) => tree_print::print_type(&fold_body, type_id),
+            AnyExprId::Term(term_id) => tree_print::print_term(&fold_body, term_id),
         }
     }
 
-    pub fn get_atom_name(&self, sema: &Semantic, name: &ExprId) -> Option<Name> {
+    pub fn get_atom_name(&self, name: &ExprId) -> Option<Name> {
         match self[*name] {
             Expr::Literal(Literal::Atom(atom)) => Some(atom.as_name()),
             _ => None,
@@ -461,12 +461,7 @@ impl Body {
     /// Given an HIR `AnyExprId` for a `Map` literal possibly
     /// containing maps as key values, look up the series of keys in
     /// the `path`.
-    pub fn lookup_map_path(
-        &self,
-        db: &dyn InternDatabase,
-        map_id: AnyExprId,
-        path: &[String],
-    ) -> Option<AnyExprId> {
+    pub fn lookup_map_path(&self, map_id: AnyExprId, path: &[String]) -> Option<AnyExprId> {
         let key = path.first()?;
         match map_id {
             AnyExprId::Expr(id) => {
@@ -479,7 +474,7 @@ impl Body {
                                 if path.len() == 1 {
                                     Some(AnyExprId::Expr(*val_id))
                                 } else {
-                                    self.lookup_map_path(db, AnyExprId::Expr(*val_id), &path[1..])
+                                    self.lookup_map_path(AnyExprId::Expr(*val_id), &path[1..])
                                 }
                             } else {
                                 None
@@ -500,11 +495,7 @@ impl Body {
                                     if path.len() == 1 {
                                         Some(AnyExprId::Pat(*val_id))
                                     } else {
-                                        self.lookup_map_path(
-                                            db,
-                                            AnyExprId::Pat(*val_id),
-                                            &path[1..],
-                                        )
+                                        self.lookup_map_path(AnyExprId::Pat(*val_id), &path[1..])
                                     }
                                 } else {
                                     None
@@ -526,7 +517,6 @@ impl Body {
                                         Some(AnyExprId::TypeExpr(*val_id))
                                     } else {
                                         self.lookup_map_path(
-                                            db,
                                             AnyExprId::TypeExpr(*val_id),
                                             &path[1..],
                                         )
@@ -550,7 +540,7 @@ impl Body {
                                 if path.len() == 1 {
                                     Some(AnyExprId::Term(*val_id))
                                 } else {
-                                    self.lookup_map_path(db, AnyExprId::Term(*val_id), &path[1..])
+                                    self.lookup_map_path(AnyExprId::Term(*val_id), &path[1..])
                                 }
                             } else {
                                 None
@@ -656,8 +646,8 @@ impl FunctionBody {
         pretty::print_function_clause(db, self, form)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, strategy: Strategy) -> String {
-        tree_print::print_function(db, self, strategy)
+    pub fn tree_print(&self, strategy: Strategy) -> String {
+        tree_print::print_function(self, strategy)
     }
 
     pub fn valid_clause_id(&self, ast_clause_id: AstClauseId) -> Option<ClauseId> {
@@ -736,27 +726,19 @@ impl FunctionClauseBody {
         (body, source_map)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase) -> String {
-        self.tree_print_with_strategy(
-            db,
-            Strategy {
-                macros: MacroStrategy::Expand,
-                parens: ParenStrategy::InvisibleParens,
-            },
-        )
+    pub fn tree_print(&self) -> String {
+        self.tree_print_with_strategy(Strategy {
+            macros: MacroStrategy::Expand,
+            parens: ParenStrategy::InvisibleParens,
+        })
     }
 
-    pub fn tree_print_with_strategy(&self, db: &dyn InternDatabase, strategy: Strategy) -> String {
-        tree_print::print_function_clause_with_strategy(db, self, strategy)
+    pub fn tree_print_with_strategy(&self, strategy: Strategy) -> String {
+        tree_print::print_function_clause_with_strategy(self, strategy)
     }
 
-    pub fn tree_print_with_range(
-        &self,
-        db: &dyn InternDatabase,
-        strategy: Strategy,
-        source_map: &BodySourceMap,
-    ) -> String {
-        tree_print::print_function_clause_with_strategy_and_range(db, self, strategy, source_map)
+    pub fn tree_print_with_range(&self, strategy: Strategy, source_map: &BodySourceMap) -> String {
+        tree_print::print_function_clause_with_strategy_and_range(self, strategy, source_map)
     }
 
     pub fn fold<T>(&self, strategy: Strategy, initial: T, callback: AnyCallBack<'_, T>) -> T {
@@ -830,17 +812,12 @@ impl TypeBody {
         pretty::print_type_alias(db, self, form)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, form: &TypeAlias) -> String {
-        tree_print::print_type_alias(db, self, form)
+    pub fn tree_print(&self, form: &TypeAlias) -> String {
+        tree_print::print_type_alias(self, form)
     }
 
-    pub fn tree_print_with_strategy(
-        &self,
-        db: &dyn InternDatabase,
-        form: &TypeAlias,
-        strategy: Strategy,
-    ) -> String {
-        tree_print::print_type_alias_with_strategy(db, self, form, strategy)
+    pub fn tree_print_with_strategy(&self, form: &TypeAlias, strategy: Strategy) -> String {
+        tree_print::print_type_alias_with_strategy(self, form, strategy)
     }
 }
 
@@ -865,8 +842,8 @@ impl DefineBody {
         (Arc::new(body), Arc::new(source_map))
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, form: &Define) -> String {
-        tree_print::print_define(db, self, form)
+    pub fn tree_print(&self, form: &Define) -> String {
+        tree_print::print_define(self, form)
     }
 }
 
@@ -917,8 +894,8 @@ impl ConditionBody {
         ))
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, condition: &PPCondition) -> String {
-        tree_print::print_condition(db, self, condition)
+    pub fn tree_print(&self, condition: &PPCondition) -> String {
+        tree_print::print_condition(self, condition)
     }
 }
 
@@ -948,8 +925,8 @@ impl SsrBody {
         pretty::print_ssr(db, self)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase) -> String {
-        tree_print::print_ssr(db, self)
+    pub fn tree_print(&self) -> String {
+        tree_print::print_ssr(self)
     }
 }
 
@@ -1014,8 +991,8 @@ impl SpecBody {
         pretty::print_spec(db, self, form)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, form: SpecOrCallback) -> String {
-        tree_print::print_spec(db, self, &form)
+    pub fn tree_print(&self, form: SpecOrCallback) -> String {
+        tree_print::print_spec(self, &form)
     }
 }
 
@@ -1047,8 +1024,8 @@ impl RecordBody {
         pretty::print_record(db, self, form, form_list)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, form: &Record) -> String {
-        tree_print::print_record(db, self, form)
+    pub fn tree_print(&self, form: &Record) -> String {
+        tree_print::print_record(self, form)
     }
 }
 
@@ -1111,8 +1088,8 @@ impl AttributeBody {
         pretty::print_attribute(db, self, &form)
     }
 
-    pub fn tree_print(&self, db: &dyn InternDatabase, form: AnyAttribute) -> String {
-        tree_print::print_attribute(db, self, &form)
+    pub fn tree_print(&self, form: AnyAttribute) -> String {
+        tree_print::print_attribute(self, &form)
     }
 }
 
@@ -1581,7 +1558,7 @@ mod local_tests {
         let path = path.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         if let Some(found) = in_clause
             .body()
-            .lookup_map_path(&db, in_clause.value.into(), &path)
+            .lookup_map_path(in_clause.value.into(), &path)
         {
             let astptr_found = in_clause.get_body_map().any(found).unwrap().value();
             let ast_found = astptr_found.to_node(&file_syntax);

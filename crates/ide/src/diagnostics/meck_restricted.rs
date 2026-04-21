@@ -74,14 +74,14 @@ impl FunctionCallLinter for MeckRestrictedLinter {
         let first_arg = ctx.args.get(0)?;
 
         // Check if first argument is a restricted module atom directly
-        if let Some(name) = get_restricted_module_name(ctx.sema, &first_arg, ctx.in_clause) {
+        if let Some(name) = get_restricted_module_name(&first_arg, ctx.in_clause) {
             return Some(MeckRestrictedContext {
                 module_names: vec![name],
             });
         }
 
         // Check if first argument is a list containing restricted module atoms
-        let names = get_restricted_modules_from_list(ctx.sema, &first_arg, ctx.in_clause);
+        let names = get_restricted_modules_from_list(&first_arg, ctx.in_clause);
         if !names.is_empty() {
             return Some(MeckRestrictedContext {
                 module_names: names,
@@ -93,7 +93,6 @@ impl FunctionCallLinter for MeckRestrictedLinter {
 }
 
 fn get_restricted_module_name(
-    sema: &Semantic,
     expr_id: &hir::ExprId,
     in_clause: &hir::InFunctionClauseBody<&hir::FunctionDef>,
 ) -> Option<String> {
@@ -107,14 +106,13 @@ fn get_restricted_module_name(
 }
 
 fn get_restricted_modules_from_list(
-    sema: &Semantic,
     expr_id: &hir::ExprId,
     in_clause: &hir::InFunctionClauseBody<&hir::FunctionDef>,
 ) -> Vec<String> {
     let mut names = Vec::new();
     if let Expr::List { exprs, .. } = &in_clause[*expr_id] {
         for element in exprs {
-            if let Some(name) = get_restricted_module_name(sema, element, in_clause) {
+            if let Some(name) = get_restricted_module_name(element, in_clause) {
                 names.push(name);
             }
         }

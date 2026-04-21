@@ -87,7 +87,6 @@ use hir::SsrBody;
 use hir::SsrPatternIds;
 use hir::SsrSource;
 use hir::db::DefDatabase;
-use hir::db::InternDatabase;
 use hir::fold::AnyCallBack;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
@@ -227,8 +226,8 @@ pub enum Condition {
 
 impl SsrRule {
     #[allow(unused)] // Used in tests
-    pub(crate) fn tree_print(&self, db: &dyn InternDatabase) -> String {
-        self.parsed_rule.tree_print(db)
+    pub(crate) fn tree_print(&self) -> String {
+        self.parsed_rule.tree_print()
     }
 
     fn parse_ssr_source(db: &dyn DefDatabase, ssr_source: SsrSource) -> Result<SsrRule, SsrError> {
@@ -245,7 +244,7 @@ impl SsrRule {
                 },
                 &ssr_body.body,
             );
-            let conditions = SsrRule::make_conditions(&ssr_body, &body, db.upcast())?;
+            let conditions = SsrRule::make_conditions(&ssr_body, &body)?;
             Ok(SsrRule {
                 parsed_rule: ssr_body.clone(),
                 conditions,
@@ -272,14 +271,13 @@ impl SsrRule {
     fn make_conditions(
         ssr_body: &SsrBody,
         body: &FoldBody,
-        db: &dyn InternDatabase,
     ) -> Result<FxHashMap<SsrPlaceholder, Condition>, SsrError> {
         let mut conditions: FxHashMap<SsrPlaceholder, Condition> = FxHashMap::default();
         let mut error = None;
         if let Some(w) = ssr_body.when.as_ref() {
             w.iter().for_each(|conds| {
                 conds.iter().for_each(|cond| {
-                    extract_condition(body, cond, &mut conditions, &mut error, db);
+                    extract_condition(body, cond, &mut conditions, &mut error);
                 });
             })
         }
@@ -296,12 +294,11 @@ fn extract_condition(
     cond: &ExprId,
     conditions: &mut FxHashMap<SsrPlaceholder, Condition>,
     error: &mut Option<SsrError>,
-    db: &dyn InternDatabase,
 ) {
     match body[*cond] {
         Expr::BinaryOp { lhs, rhs, op } => {
             if let Expr::Var(var) = &body[lhs]
-                && let Some(ssr_placeholder) = SsrPlaceholder::from_var(*var, db)
+                && let Some(ssr_placeholder) = SsrPlaceholder::from_var(*var)
             {
                 // We have a condition on the current placeholder, store it if valid
                 match op {
@@ -429,10 +426,7 @@ impl<'a> MatchFinder<'a> {
     /// Adds a search pattern.
     pub fn add_search_pattern(&mut self, rule: SsrRule) {
         if self.debug_print {
-            println!(
-                "MatchFinder: adding pattern:\n{}",
-                rule.tree_print(self.sema.db.upcast())
-            );
+            println!("MatchFinder: adding pattern:\n{}", rule.tree_print());
         }
         self.rules.push(SsrPattern::new(rule, self.rules.len()));
     }
@@ -499,8 +493,7 @@ impl<'a> MatchFinder<'a> {
                     let body_origin = in_clause_expr.body().origin;
                     let pattern_body = rule.get_body(self.sema).expect("Cannot get pattern_body");
                     let pattern_body = fold_body(self.strategy, &pattern_body);
-                    let placeholder_cache =
-                        matching::PlaceholderCache::build(&pattern_body, self.sema.db.upcast());
+                    let placeholder_cache = matching::PlaceholderCache::build(&pattern_body);
                     let code_body = &body_origin
                         .get_body(self.sema)
                         .expect("Could not get code Body");
@@ -558,11 +551,7 @@ impl Match {
         file_text[self.range.range.start().into()..self.range.range.end().into()].to_string()
     }
 
-    pub fn get_placeholder_matches(
-        &self,
-        sema: &Semantic,
-        placeholder_name: &str,
-    ) -> Option<Vec<PlaceholderMatch>> {
+    pub fn get_placeholder_matches(&self, placeholder_name: &str) -> Option<Vec<PlaceholderMatch>> {
         let var = Var::new(&Name::from_erlang_service(placeholder_name));
         let subids = self.placeholders_by_var.get(&var)?;
         Some(
@@ -572,11 +561,7 @@ impl Match {
                 .collect(),
         )
     }
-    pub fn get_placeholder_match(
-        &self,
-        sema: &Semantic,
-        placeholder_name: &str,
-    ) -> Option<PlaceholderMatch> {
+    pub fn get_placeholder_match(&self, placeholder_name: &str) -> Option<PlaceholderMatch> {
         let var = Var::new(&Name::from_erlang_service(placeholder_name));
         let subids = self.placeholders_by_var.get(&var)?;
         if subids.len() == 1 {
@@ -595,7 +580,7 @@ impl Match {
         sema: &Semantic,
         placeholder_name: &str,
     ) -> Option<Vec<String>> {
-        let placeholder_matches = self.get_placeholder_matches(sema, placeholder_name)?;
+        let placeholder_matches = self.get_placeholder_matches(placeholder_name)?;
         let body = self.matched_node_body.get_body(sema)?;
         Some(
             placeholder_matches
@@ -606,22 +591,18 @@ impl Match {
     }
 
     pub fn placeholder_text(&self, sema: &Semantic, placeholder_name: &str) -> Option<String> {
-        let placeholder_match = self.get_placeholder_match(sema, placeholder_name)?;
+        let placeholder_match = self.get_placeholder_match(placeholder_name)?;
         let body = self.matched_node_body.get_body(sema)?;
         placeholder_match.text(sema, &body)
     }
 
-    pub fn placeholder_ranges(
-        &self,
-        sema: &Semantic,
-        placeholder_name: &str,
-    ) -> Option<Vec<TextRange>> {
-        let placeholder_matches = self.get_placeholder_matches(sema, placeholder_name)?;
+    pub fn placeholder_ranges(&self, placeholder_name: &str) -> Option<Vec<TextRange>> {
+        let placeholder_matches = self.get_placeholder_matches(placeholder_name)?;
         Some(placeholder_matches.iter().map(|pm| pm.range()).collect())
     }
 
-    pub fn placeholder_range(&self, sema: &Semantic, placeholder_name: &str) -> Option<TextRange> {
-        let placeholder_match = self.get_placeholder_match(sema, placeholder_name)?;
+    pub fn placeholder_range(&self, placeholder_name: &str) -> Option<TextRange> {
+        let placeholder_match = self.get_placeholder_match(placeholder_name)?;
         Some(placeholder_match.range())
     }
 
@@ -630,19 +611,19 @@ impl Match {
         sema: &Semantic,
         placeholder_name: &str,
     ) -> Option<StringVariant> {
-        let placeholder_match = self.get_placeholder_match(sema, placeholder_name)?;
+        let placeholder_match = self.get_placeholder_match(placeholder_name)?;
         let body = self.matched_node_body.get_body(sema)?;
         placeholder_match.is_string(&body)
     }
 
     pub fn placeholder_is_atom(&self, sema: &Semantic, placeholder_name: &str) -> Option<Atom> {
-        let placeholder_match = self.get_placeholder_match(sema, placeholder_name)?;
+        let placeholder_match = self.get_placeholder_match(placeholder_name)?;
         let body = self.matched_node_body.get_body(sema)?;
         placeholder_match.is_atom(&body)
     }
 
     pub fn placeholder_is_var(&self, sema: &Semantic, placeholder_name: &str) -> Option<Var> {
-        let placeholder_match = self.get_placeholder_match(sema, placeholder_name)?;
+        let placeholder_match = self.get_placeholder_match(placeholder_name)?;
         let body = self.matched_node_body.get_body(sema)?;
         placeholder_match.is_var(&body)
     }
@@ -653,7 +634,7 @@ impl Match {
             macros: MacroStrategy::DoNotExpand,
             parens: ParenStrategy::InvisibleParens,
         });
-        let placeholder_match = self.get_placeholder_match(sema, placeholder_name)?;
+        let placeholder_match = self.get_placeholder_match(placeholder_name)?;
         placeholder_match.is_macro(&body_with_visible_macros)
     }
 }
@@ -918,6 +899,6 @@ mod test {
                 14..19,
             )
         "#]]
-        .assert_debug_eq(&m.matches[0].placeholder_range(&sema, "_@A"));
+        .assert_debug_eq(&m.matches[0].placeholder_range("_@A"));
     }
 }

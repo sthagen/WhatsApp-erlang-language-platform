@@ -331,7 +331,7 @@ impl SymbolDefinition {
             SymbolDefinition::Callback(it) => it.callback.name.name().raw(),
             SymbolDefinition::Define(it) => it.define.name.name().raw(),
             SymbolDefinition::Header(it) => it.name(db.upcast()),
-            SymbolDefinition::Var(it) => it.name(db.upcast()).raw(),
+            SymbolDefinition::Var(it) => it.name().raw(),
         }
     }
 
@@ -525,10 +525,10 @@ pub fn from_is_record(
         AnyExprRef::Expr(Expr::Call { target, args }) => {
             match target {
                 CallTarget::Local { name } => {
-                    named_is_record(sema, &body, None, name)?;
+                    named_is_record(&body, None, name)?;
                 }
                 CallTarget::Remote { module, name, .. } => {
-                    named_is_record(sema, &body, Some(module), name)?;
+                    named_is_record(&body, Some(module), name)?;
                 }
             };
             // We know we are calling erlang:is_record
@@ -590,18 +590,13 @@ fn from_macro_dynamic_call(
     reference_direct(Some(def))
 }
 
-fn named_is_record(
-    sema: &Semantic,
-    body: &hir::Body,
-    module: Option<&ExprId>,
-    name: &ExprId,
-) -> Option<()> {
+fn named_is_record(body: &hir::Body, module: Option<&ExprId>, name: &ExprId) -> Option<()> {
     if let Some(module) = module
-        && body.get_atom_name(sema, module)? != known::erlang
+        && body.get_atom_name(module)? != known::erlang
     {
         return None;
     }
-    if body.get_atom_name(sema, name)? != known::is_record {
+    if body.get_atom_name(name)? != known::is_record {
         return None;
     }
     Some(())

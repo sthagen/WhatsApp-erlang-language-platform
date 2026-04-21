@@ -86,7 +86,7 @@ pub fn replace_in_spec(
                     &mut |_acc, ctx| {
                         if let AnyExpr::TypeExpr(TypeExpr::Call { target, ref args }) = ctx.item {
                             let arity = args.len();
-                            let type_label = target.label(arity as u32, sema, &spec.body);
+                            let type_label = target.label(arity as u32, &spec.body);
                             let from_label: SmolStr = action_from.label().into();
                             if type_label == Some(from_label)
                                 && let Some(range) = spec.body.range_for_any(sema, ctx.item_id)

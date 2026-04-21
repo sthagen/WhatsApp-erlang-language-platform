@@ -29,7 +29,6 @@ use hir::InFunctionClauseBody;
 use hir::Literal;
 use hir::Semantic;
 use hir::Strategy;
-use hir::db::InternDatabase;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 use hir::fold::ParentId;
@@ -102,12 +101,12 @@ pub(crate) fn statement_range(node: &SyntaxNode) -> TextRange {
     node_range.cover(final_node_range)
 }
 
-pub(crate) fn var_name_starts_with_underscore(db: &dyn InternDatabase, var: &hir::Var) -> bool {
+pub(crate) fn var_name_starts_with_underscore(var: &hir::Var) -> bool {
     var.as_string().starts_with('_')
 }
 
-pub(crate) fn is_wildcard(sema: &Semantic, var: hir::Var) -> bool {
-    var_name_starts_with_underscore(sema.db.upcast(), &var)
+pub(crate) fn is_wildcard(var: hir::Var) -> bool {
+    var_name_starts_with_underscore(&var)
 }
 
 pub(crate) fn is_only_place_where_var_is_defined(
@@ -249,20 +248,14 @@ impl<'a, T> FunctionMatcher<'a, T> {
         body: &Body,
     ) -> Option<(&'a FunctionMatch, &'a T)> {
         self.match_any
+            .or_else(|| self.labels_full.get(&target.label(arity, body)).copied())
             .or_else(|| {
-                self.labels_full
-                    .get(&target.label(arity, sema, body))
-                    .copied()
-            })
-            .or_else(|| {
-                let (types, match_val, t) = self
-                    .labels_full_typed
-                    .get(&target.label(arity, sema, body))?;
+                let (types, match_val, t) =
+                    self.labels_full_typed.get(&target.label(arity, body))?;
                 self.types_match(args?, types, sema, body)
                     .then_some((match_val, t))
             })
-            .or_else(|| self.labels_mf.get(&target.label_short(sema, body)).copied())
-            .or_else(|| self.labels_mf.get(&target.label_short(sema, body)).copied())
+            .or_else(|| self.labels_mf.get(&target.label_short(body)).copied())
             .or_else(|| match target {
                 CallTarget::Local { name: _ } => None,
                 CallTarget::Remote { module, .. } => {

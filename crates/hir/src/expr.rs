@@ -31,7 +31,6 @@ use crate::RecordFieldId;
 use crate::Semantic;
 use crate::TypeAliasDef;
 use crate::Var;
-use crate::db::InternDatabase;
 use crate::known;
 use crate::sema;
 
@@ -587,7 +586,7 @@ impl CallTarget<TypeExprId> {
         sema::to_def::resolve_type_target(sema, self, Some(arity), file_id, body)
     }
 
-    pub fn label(&self, arity: u32, sema: &Semantic, body: &Body) -> Option<SmolStr> {
+    pub fn label(&self, arity: u32, body: &Body) -> Option<SmolStr> {
         match self {
             CallTarget::Local { name } => {
                 let name = body[*name].as_atom()?.as_name();
@@ -633,7 +632,7 @@ impl CallTarget<ExprId> {
         sema::to_def::resolve_call_target(sema, self, Some(arity), file_id, body)
     }
 
-    pub fn label(&self, arity: u32, sema: &Semantic, body: &Body) -> Option<SmolStr> {
+    pub fn label(&self, arity: u32, body: &Body) -> Option<SmolStr> {
         match self {
             CallTarget::Local { name } => {
                 let name = body[*name].as_atom()?.as_name();
@@ -647,7 +646,7 @@ impl CallTarget<ExprId> {
         }
     }
 
-    pub fn label_short(&self, sema: &Semantic, body: &Body) -> Option<SmolStr> {
+    pub fn label_short(&self, body: &Body) -> Option<SmolStr> {
         match self {
             CallTarget::Local { name } => {
                 let name = body[*name].as_atom()?.as_name();

@@ -38,7 +38,7 @@ impl MatchFinder<'_> {
         // Pre-compute placeholder info once for the entire pattern.
         // This avoids Salsa intern lookups in the matching hot path,
         // which was a major source of RwLock contention with many threads.
-        let placeholder_cache = PlaceholderCache::build(&pattern_body, self.sema.db.upcast());
+        let placeholder_cache = PlaceholderCache::build(&pattern_body);
         self.slow_scan_node(rule, &None, matches_out, &pattern_body, &placeholder_cache);
     }
 

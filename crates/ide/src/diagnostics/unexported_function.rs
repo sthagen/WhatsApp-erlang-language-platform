@@ -73,7 +73,7 @@ impl FunctionCallLinter for UnexportedFunctionLinter {
                         .def_map(fun_def.file.file_id)
                         .is_function_exported(&fun_def.name)
                 {
-                    let label = context.target.label(arity, sema, &def_fb.body())?;
+                    let label = context.target.label(arity, &def_fb.body())?;
                     return Some(Some((label, fun_def)));
                 }
             }

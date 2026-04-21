@@ -137,8 +137,8 @@ impl SsrPatternsLinter for SimplifyNegationLinter {
         }
     }
 
-    fn range(&self, ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
-        matched.placeholder_range(ctx.sema, NEGATED_EXPR_VAR)
+    fn range(&self, _ctx: &LinterContext, matched: &Match) -> Option<TextRange> {
+        matched.placeholder_range(NEGATED_EXPR_VAR)
     }
 
     fn fixes(

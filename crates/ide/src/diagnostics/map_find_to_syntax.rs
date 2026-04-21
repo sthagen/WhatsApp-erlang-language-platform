@@ -214,9 +214,9 @@ impl SsrPatternsLinter for MapFindToSyntaxLinter {
         {
             return None;
         }
-        let key = matched.get_placeholder_match(ctx.sema, KEY_VAR)?;
-        let value = matched.get_placeholder_match(ctx.sema, VALUE_VAR)?;
-        let maybe_value2 = matched.get_placeholder_match(ctx.sema, VALUE_VAR2);
+        let key = matched.get_placeholder_match(KEY_VAR)?;
+        let value = matched.get_placeholder_match(VALUE_VAR)?;
+        let maybe_value2 = matched.get_placeholder_match(VALUE_VAR2);
         let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         if !is_match_valid_pat(body, key) || !is_match_valid_pat(body, value) {

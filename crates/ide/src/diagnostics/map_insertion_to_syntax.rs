@@ -81,7 +81,7 @@ impl SsrPatternsLinter for MapPutToSyntaxLinter {
         matched: &Match,
         ctx: &LinterContext,
     ) -> Option<bool> {
-        let map_match = matched.get_placeholder_match(ctx.sema, MAP_VAR)?;
+        let map_match = matched.get_placeholder_match(MAP_VAR)?;
         Some(is_placeholder_a_var_from_sema_and_match(
             ctx.sema, matched, &map_match,
         ))
@@ -158,7 +158,7 @@ impl SsrPatternsLinter for MapUpdateToSyntaxLinter {
         matched: &Match,
         ctx: &LinterContext,
     ) -> Option<bool> {
-        let map_match = matched.get_placeholder_match(ctx.sema, MAP_VAR)?;
+        let map_match = matched.get_placeholder_match(MAP_VAR)?;
         Some(is_placeholder_a_var_from_sema_and_match(
             ctx.sema, matched, &map_match,
         ))

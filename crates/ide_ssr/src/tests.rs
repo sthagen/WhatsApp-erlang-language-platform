@@ -39,7 +39,7 @@ fn parse_error_text(query: &str) -> String {
 fn parse_good_text(query: &str, expect: Expect) {
     let (db, _file_id) = RootDatabase::with_single_file(query);
     let pattern = SsrRule::parse_str(&db, query);
-    let actual = pattern.unwrap().tree_print(&db);
+    let actual = pattern.unwrap().tree_print();
     expect.assert_eq(actual.as_str());
 }
 
@@ -293,7 +293,7 @@ fn assert_match_placeholder(
     match_finder.add_search_pattern(pattern);
     let matches = match_finder.matches();
     let match0 = &matches.matches[0];
-    let placeholder_val = match0.get_placeholder_matches(&sema, placeholder_name);
+    let placeholder_val = match0.get_placeholder_matches(placeholder_name);
     let matched_strings: Vec<String> = matches
         .flattened()
         .matches
@@ -1857,7 +1857,7 @@ fn ssr_comments_in_match() {
     "#]]
     .assert_debug_eq(&match_.comments(&sema));
 
-    let a_match = match_.get_placeholder_match(&sema, "_@A").unwrap();
+    let a_match = match_.get_placeholder_match("_@A").unwrap();
     let (_body, body_map) = match_.matched_node_body.get_body_and_map(&sema).unwrap();
     expect![[r#"
         Some(
@@ -1872,7 +1872,7 @@ fn ssr_comments_in_match() {
     "#]]
     .assert_debug_eq(&a_match.comments(&sema, &body_map));
 
-    let b_match = match_.get_placeholder_match(&sema, "_@B").unwrap();
+    let b_match = match_.get_placeholder_match("_@B").unwrap();
     expect![[r#"
         Some(
             [

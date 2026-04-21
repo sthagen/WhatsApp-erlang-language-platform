@@ -925,7 +925,6 @@ mod tests {
     use crate::InFile;
     use crate::Semantic;
     use crate::db::DefDatabase;
-    use crate::db::InternDatabase;
     use crate::test_db::TestDB;
 
     // Return the first function found in the test fixture

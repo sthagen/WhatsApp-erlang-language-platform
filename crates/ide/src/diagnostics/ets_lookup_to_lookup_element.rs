@@ -123,24 +123,20 @@ impl SsrPatternsLinter for EtsLookupToLookupElementLinter {
         {
             return None;
         }
-        let default_match = matched.get_placeholder_match(ctx.sema, DEFAULT_VAR)?;
+        let default_match = matched.get_placeholder_match(DEFAULT_VAR)?;
         let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         if !is_not_a_computation(body, &default_match) {
             return None;
         }
-        let default_pat_match = matched.get_placeholder_match(ctx.sema, DEFAULT_PAT_VAR);
-        if default_pat_match.is_some() && !is_wildcard_match(ctx.sema, body, &default_pat_match) {
+        let default_pat_match = matched.get_placeholder_match(DEFAULT_PAT_VAR);
+        if default_pat_match.is_some() && !is_wildcard_match(body, &default_pat_match) {
             return None;
         }
         let key_text = matched.placeholder_text(ctx.sema, KEY_VAR)?;
         let result_key_text = matched.placeholder_text(ctx.sema, RESULT_KEY_VAR)?;
         if key_text == result_key_text
-            || is_wildcard_match(
-                ctx.sema,
-                body,
-                &matched.get_placeholder_match(ctx.sema, RESULT_KEY_VAR),
-            )
+            || is_wildcard_match(body, &matched.get_placeholder_match(RESULT_KEY_VAR))
         {
             Some(true)
         } else {
@@ -220,21 +216,21 @@ fn is_not_a_computation_expr(body: &Body, expr: Expr) -> bool {
     }
 }
 
-fn is_wildcard_match(sema: &Semantic, body: &Body, wildcard: &Option<PlaceholderMatch>) -> bool {
+fn is_wildcard_match(body: &Body, wildcard: &Option<PlaceholderMatch>) -> bool {
     match wildcard {
         Some(m) => match m.code_id {
             SubId::AnyExprId(expr_id) => match expr_id {
                 AnyExprId::Expr(expr_id) => match body.exprs[expr_id] {
-                    Expr::Var(var) => is_wildcard(sema, var),
+                    Expr::Var(var) => is_wildcard(var),
                     _ => false,
                 },
                 AnyExprId::Pat(pat_id) => match body.pats[pat_id] {
-                    Pat::Var(var) => is_wildcard(sema, var),
+                    Pat::Var(var) => is_wildcard(var),
                     _ => false,
                 },
                 _ => false,
             },
-            SubId::Var(var) => is_wildcard(sema, var),
+            SubId::Var(var) => is_wildcard(var),
             _ => false,
         },
         None => false,

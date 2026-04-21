@@ -751,7 +751,6 @@ impl GleanIndexer {
     }
 
     fn xref_callback(
-        db: &RootDatabase,
         sema: &Semantic,
         source_file: &InFile<ast::SourceFile>,
         file_id: FileId,
@@ -888,7 +887,7 @@ impl GleanIndexer {
             file_id,
             vec![],
             &mut |mut acc, ctx| {
-                Self::xref_callback(db, &sema, &source_file, file_id, &mut acc, &ctx);
+                Self::xref_callback(&sema, &source_file, file_id, &mut acc, &ctx);
                 acc
             },
             &mut |mut acc, on, form_id| match (on, form_id) {
@@ -1106,7 +1105,7 @@ impl GleanIndexer {
         let source_file = sema.parse(file_id);
         let range = Self::find_range(sema, ctx, &source_file, &expr_source)?;
 
-        // @fb-only: let tagged_urls = meta_only::build_record_tagged_urls(sema, name);
+        // @fb-only: let tagged_urls = meta_only::build_record_tagged_urls(name);
         let tagged_urls: Vec<TaggedUrl> = Vec::new(); // @oss-only
 
         Some(XRef {

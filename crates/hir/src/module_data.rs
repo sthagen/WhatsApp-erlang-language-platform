@@ -51,7 +51,6 @@ use crate::Var;
 use crate::code_complexity;
 use crate::code_complexity::CodeComplexity;
 use crate::db::DefDatabase;
-use crate::db::InternDatabase;
 use crate::def_map::FunctionDefId;
 use crate::edoc::EdocHeader;
 use crate::form_list::DeprecatedDesc;
@@ -711,7 +710,7 @@ impl VarDef {
         self.var.to_node(source_file.syntax())
     }
 
-    pub fn name(&self, db: &dyn InternDatabase) -> Name {
+    pub fn name(&self) -> Name {
         self.hir_var.as_name()
     }
 }

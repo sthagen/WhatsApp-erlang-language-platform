@@ -132,7 +132,7 @@ pub(crate) fn outgoing_calls(db: &RootDatabase, position: FilePosition) -> Optio
                     let body = &function_body.body(clause_id);
                     if let Some(call_def) = target.resolve_call(arity, &sema, file_id, body) {
                         let mut nav = call_def.to_nav(db);
-                        if let Some(label) = target.label(arity, &sema, body) {
+                        if let Some(label) = target.label(arity, body) {
                             nav.name = label
                         }
                         if let Some(source) =

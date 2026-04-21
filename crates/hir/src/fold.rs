@@ -1320,7 +1320,6 @@ mod tests {
     use crate::Semantic;
     use crate::Term;
     use crate::TypeExpr;
-    use crate::db::InternDatabase;
     use crate::expr::AnyExpr;
     use crate::fold::FoldCtx;
     use crate::fold::ParentId;
@@ -1544,7 +1543,7 @@ bar() ->
                 _ => (in_macro, not_in_macro),
             },
         );
-        tree_expect.assert_eq(&function_body.tree_print_with_strategy(&db, strategy));
+        tree_expect.assert_eq(&function_body.tree_print_with_strategy(strategy));
 
         r_expect.assert_debug_eq(&r);
     }
@@ -2012,7 +2011,7 @@ bar() ->
                 _ => (in_macro, not_in_macro),
             },
         );
-        tree_expect.assert_eq(&type_alias_body.tree_print_with_strategy(&db, type_alias, strategy));
+        tree_expect.assert_eq(&type_alias_body.tree_print_with_strategy(type_alias, strategy));
 
         r_expect.assert_debug_eq(&r);
     }

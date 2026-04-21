@@ -312,7 +312,7 @@ fn check_type_call(
 ) -> Option<()> {
     if let AnyExpr::TypeExpr(TypeExpr::Call { target, args }) = &ctx.item {
         let arity = args.len() as u32;
-        let target_label = target.label(arity, sema, body)?;
+        let target_label = target.label(arity, body)?;
         let target_range = target.range(sema, body)?;
         let type_alias_def = target.resolve_call(arity, sema, file_id, body)?;
         let defining_file_id = type_alias_def.file.file_id;

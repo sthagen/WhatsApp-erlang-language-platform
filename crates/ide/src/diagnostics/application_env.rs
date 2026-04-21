@@ -173,11 +173,9 @@ fn process_badmatches(
                 let arg = args.get(*arg_index)?;
                 match &in_clause[arg] {
                     hir::Expr::Map { fields: _ } => {
-                        if let Some(AnyExprId::Expr(rhs)) = in_clause.body().lookup_map_path(
-                            sema.db.upcast(),
-                            AnyExprId::Expr(arg),
-                            keys,
-                        ) {
+                        if let Some(AnyExprId::Expr(rhs)) =
+                            in_clause.body().lookup_map_path(AnyExprId::Expr(arg), keys)
+                        {
                             check_tuple(in_clause, &rhs, sema, def)
                         } else {
                             None

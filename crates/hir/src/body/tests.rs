@@ -110,7 +110,7 @@ fn check_ast(ra_fixture: &str, expect: Expect) {
                 let function_def_id = InFile::new(file_id, FunctionDefId::new(function_id));
                 if let Some(_fun_def) = def_map.get_by_function_id(&function_def_id) {
                     let body = db.function_body(function_def_id);
-                    Some(body.tree_print(&db, strategy))
+                    Some(body.tree_print(strategy))
                 } else {
                     None
                 }
@@ -118,37 +118,37 @@ fn check_ast(ra_fixture: &str, expect: Expect) {
             FormIdx::TypeAlias(type_alias_id) => {
                 let type_alias = &form_list[type_alias_id];
                 let body = db.type_body(InFile::new(file_id, type_alias_id));
-                Some(body.tree_print(&db, type_alias))
+                Some(body.tree_print(type_alias))
             }
             FormIdx::Spec(spec_id) => {
                 let spec = SpecOrCallback::Spec(form_list[spec_id].clone());
                 let body = db.spec_body(InFile::new(file_id, spec_id));
-                Some(body.tree_print(&db, spec))
+                Some(body.tree_print(spec))
             }
             FormIdx::Callback(callback_id) => {
                 let spec = SpecOrCallback::Callback(form_list[callback_id].clone());
                 let body = db.callback_body(InFile::new(file_id, callback_id));
-                Some(body.tree_print(&db, spec))
+                Some(body.tree_print(spec))
             }
             FormIdx::Record(record_id) => {
                 let body = db.record_body(InFile::new(file_id, record_id));
-                Some(body.tree_print(&db, &form_list[record_id]))
+                Some(body.tree_print(&form_list[record_id]))
             }
             FormIdx::Attribute(attribute_id) => {
                 let attribute = AnyAttribute::Attribute(form_list[attribute_id].clone());
                 let body = db.attribute_body(InFile::new(file_id, attribute_id));
-                Some(body.tree_print(&db, attribute))
+                Some(body.tree_print(attribute))
             }
             FormIdx::CompileOption(attribute_id) => {
                 let attribute = AnyAttribute::CompileOption(form_list[attribute_id].clone());
                 let body = db.compile_body(InFile::new(file_id, attribute_id));
-                Some(body.tree_print(&db, attribute))
+                Some(body.tree_print(attribute))
             }
             FormIdx::PPDirective(idx) => match &form_list[idx] {
                 PPDirective::Define(define_id) => {
                     let define = &form_list[*define_id];
                     let body = db.define_body(InFile::new(file_id, *define_id));
-                    Some(body.tree_print(&db, define))
+                    Some(body.tree_print(define))
                 }
                 _ => None,
             },
@@ -2836,7 +2836,7 @@ fn tree_print_function_with_ranges() {
                             write!(
                                 out,
                                 "{}",
-                                clause.tree_print_with_range(&db, strategy, source_map)
+                                clause.tree_print_with_range(strategy, source_map)
                             )
                             .ok();
                         }

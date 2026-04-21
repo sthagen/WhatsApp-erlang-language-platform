@@ -81,7 +81,6 @@ pub(crate) fn suggest_name_for_variable(_expr: &ast::Expr, _sema: &Semantic) -> 
 /// Given a variable name and vars in scope, return either the
 /// original if it does not clash, or one with the smallest numeric suffix to be fresh.
 pub(crate) fn freshen_variable_name(
-    sema: &Semantic,
     var_name: String,
     vars_in_clause: &Option<FxHashSet<Var>>,
 ) -> String {

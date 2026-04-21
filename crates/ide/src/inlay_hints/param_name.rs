@@ -16,7 +16,6 @@ use hir::InFile;
 use hir::ParamName;
 use hir::Semantic;
 use hir::Strategy;
-use hir::db::InternDatabase;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 
@@ -54,7 +53,7 @@ pub(super) fn hints(
                         if let Some(call_def) = target.resolve_call(arity, sema, file_id, body) {
                             let param_names = &call_def.function_clauses[0].param_names;
                             for (param_name, arg) in param_names.iter().zip(args) {
-                                if should_hint(sema.db.upcast(), param_name, &body[arg])
+                                if should_hint(param_name, &body[arg])
                                     && let Some(arg_range) =
                                         function_body.range_for_expr(clause_id, arg)
                                     && (range_limit.is_none()
@@ -86,7 +85,7 @@ pub(super) fn hints(
     Some(())
 }
 
-fn should_hint(db: &dyn InternDatabase, param_name: &ParamName, expr: &Expr) -> bool {
+fn should_hint(param_name: &ParamName, expr: &Expr) -> bool {
     match param_name {
         ParamName::Name(name) => {
             if let Some(var) = expr.as_var() {

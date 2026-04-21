@@ -133,11 +133,11 @@ static LIST_VAR: &str = "_@List";
 fn from_list_match_is_valid(sema: &Semantic, m: &Match) -> Option<bool> {
     let body_arc = m.matched_node_body.get_body(sema)?;
     let body = body_arc.as_ref();
-    let key_matches = m.get_placeholder_matches(sema, KEY_VAR)?;
+    let key_matches = m.get_placeholder_matches(KEY_VAR)?;
     let key = key_matches.first()?;
-    let value_matches = m.get_placeholder_matches(sema, VALUE_VAR)?;
+    let value_matches = m.get_placeholder_matches(VALUE_VAR)?;
     let value = value_matches.first()?;
-    let acc_matches = m.get_placeholder_matches(sema, ACC_VAR)?;
+    let acc_matches = m.get_placeholder_matches(ACC_VAR)?;
     let acc = acc_matches.first()?;
     Some(
         is_placeholder_a_var_from_body(body, key)
@@ -149,10 +149,10 @@ fn from_list_match_is_valid(sema: &Semantic, m: &Match) -> Option<bool> {
 fn from_keys_match_is_valid(sema: &Semantic, m: &Match) -> Option<bool> {
     let body_arc = m.matched_node_body.get_body(sema)?;
     let body = body_arc.as_ref();
-    let key_matches = m.get_placeholder_matches(sema, KEY_VAR)?;
+    let key_matches = m.get_placeholder_matches(KEY_VAR)?;
     let key = key_matches.first()?;
-    let value = &m.get_placeholder_match(sema, VALUE_VAR)?;
-    let acc_matches = m.get_placeholder_matches(sema, ACC_VAR)?;
+    let value = &m.get_placeholder_match(VALUE_VAR)?;
+    let acc_matches = m.get_placeholder_matches(ACC_VAR)?;
     let acc = acc_matches.first()?;
     Some(
         is_placeholder_a_var_from_body(body, key)

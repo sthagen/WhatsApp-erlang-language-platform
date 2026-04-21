@@ -466,13 +466,12 @@ pub fn lower_condition_expr(
         macro_defs,
     );
     let mut diagnostics = Vec::new();
-    let expr = hir_to_condition_expr(db, &body, root_id, &mut diagnostics);
+    let expr = hir_to_condition_expr(&body, root_id, &mut diagnostics);
     ConditionLowerResult { expr, diagnostics }
 }
 
 /// Convert a HIR expression to a ConditionExpr, tracking diagnostics for unsupported constructs.
 fn hir_to_condition_expr(
-    db: &dyn DefDatabase,
     body: &Body,
     expr_id: ExprId,
     diagnostics: &mut Vec<ConditionDiagnostic>,
@@ -496,39 +495,36 @@ fn hir_to_condition_expr(
         Expr::Literal(Literal::String(s)) => ConditionExpr::String(s.as_string()),
 
         Expr::UnaryOp { expr, op } => match op {
-            UnaryOp::Not => ConditionExpr::Not(Box::new(hir_to_condition_expr(
-                db,
-                body,
-                *expr,
-                diagnostics,
-            ))),
+            UnaryOp::Not => {
+                ConditionExpr::Not(Box::new(hir_to_condition_expr(body, *expr, diagnostics)))
+            }
             UnaryOp::Minus | UnaryOp::Plus | UnaryOp::Bnot => ConditionExpr::UnaryArithmetic {
                 op: *op,
-                operand: Box::new(hir_to_condition_expr(db, body, *expr, diagnostics)),
+                operand: Box::new(hir_to_condition_expr(body, *expr, diagnostics)),
             },
         },
 
         Expr::BinaryOp { lhs, rhs, op } => match op {
             BinaryOp::LogicOp(LogicOp::And { lazy: true }) => ConditionExpr::AndAlso(
-                Box::new(hir_to_condition_expr(db, body, *lhs, diagnostics)),
-                Box::new(hir_to_condition_expr(db, body, *rhs, diagnostics)),
+                Box::new(hir_to_condition_expr(body, *lhs, diagnostics)),
+                Box::new(hir_to_condition_expr(body, *rhs, diagnostics)),
             ),
             BinaryOp::LogicOp(LogicOp::Or { lazy: true }) => ConditionExpr::OrElse(
-                Box::new(hir_to_condition_expr(db, body, *lhs, diagnostics)),
-                Box::new(hir_to_condition_expr(db, body, *rhs, diagnostics)),
+                Box::new(hir_to_condition_expr(body, *lhs, diagnostics)),
+                Box::new(hir_to_condition_expr(body, *rhs, diagnostics)),
             ),
             BinaryOp::LogicOp(LogicOp::And { lazy: false }) => {
                 // Non-lazy 'and' - evaluate both sides and combine
                 ConditionExpr::And(
-                    Box::new(hir_to_condition_expr(db, body, *lhs, diagnostics)),
-                    Box::new(hir_to_condition_expr(db, body, *rhs, diagnostics)),
+                    Box::new(hir_to_condition_expr(body, *lhs, diagnostics)),
+                    Box::new(hir_to_condition_expr(body, *rhs, diagnostics)),
                 )
             }
             BinaryOp::LogicOp(LogicOp::Or { lazy: false }) => {
                 // Non-lazy 'or' - evaluate both sides and combine
                 ConditionExpr::Or(
-                    Box::new(hir_to_condition_expr(db, body, *lhs, diagnostics)),
-                    Box::new(hir_to_condition_expr(db, body, *rhs, diagnostics)),
+                    Box::new(hir_to_condition_expr(body, *lhs, diagnostics)),
+                    Box::new(hir_to_condition_expr(body, *rhs, diagnostics)),
                 )
             }
             BinaryOp::LogicOp(LogicOp::Xor) => {
@@ -540,13 +536,13 @@ fn hir_to_condition_expr(
             }
             BinaryOp::CompOp(comp_op) => ConditionExpr::Compare {
                 op: *comp_op,
-                left: Box::new(hir_to_condition_expr(db, body, *lhs, diagnostics)),
-                right: Box::new(hir_to_condition_expr(db, body, *rhs, diagnostics)),
+                left: Box::new(hir_to_condition_expr(body, *lhs, diagnostics)),
+                right: Box::new(hir_to_condition_expr(body, *rhs, diagnostics)),
             },
             BinaryOp::ArithOp(arith_op) => ConditionExpr::Arithmetic {
                 op: *arith_op,
-                left: Box::new(hir_to_condition_expr(db, body, *lhs, diagnostics)),
-                right: Box::new(hir_to_condition_expr(db, body, *rhs, diagnostics)),
+                left: Box::new(hir_to_condition_expr(body, *lhs, diagnostics)),
+                right: Box::new(hir_to_condition_expr(body, *rhs, diagnostics)),
             },
             BinaryOp::ListOp(_) | BinaryOp::Send => {
                 // List operations and send are not supported in conditions
@@ -558,11 +554,11 @@ fn hir_to_condition_expr(
         },
 
         Expr::Call { target, args } => {
-            if is_defined_call(db, target, body) {
-                extract_defined_macro_name(db, args, body, diagnostics)
+            if is_defined_call(target, body) {
+                extract_defined_macro_name(args, body, diagnostics)
             } else {
                 // Unsupported function call
-                let call_name = get_call_name(db, target, body);
+                let call_name = get_call_name(target, body);
                 diagnostics.push(ConditionDiagnostic::new(format!(
                     "function call '{}' is not supported in preprocessor conditions",
                     call_name
@@ -589,11 +585,11 @@ fn hir_to_condition_expr(
                 ConditionExpr::Invalid
             } else {
                 // Follow macro expansion
-                hir_to_condition_expr(db, body, *expansion, diagnostics)
+                hir_to_condition_expr(body, *expansion, diagnostics)
             }
         }
 
-        Expr::Paren { expr } => hir_to_condition_expr(db, body, *expr, diagnostics),
+        Expr::Paren { expr } => hir_to_condition_expr(body, *expr, diagnostics),
 
         // All other expression types are not supported in conditions
         _ => {
@@ -606,7 +602,7 @@ fn hir_to_condition_expr(
 }
 
 /// Get the name of a call for diagnostic messages.
-fn get_call_name(db: &dyn DefDatabase, target: &CallTarget<ExprId>, body: &Body) -> String {
+fn get_call_name(target: &CallTarget<ExprId>, body: &Body) -> String {
     match target {
         CallTarget::Local { name } => {
             if let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*name] {
@@ -636,7 +632,7 @@ fn get_call_name(db: &dyn DefDatabase, target: &CallTarget<ExprId>, body: &Body)
 }
 
 /// Check if a call target is a call to `defined/1`.
-fn is_defined_call(db: &dyn DefDatabase, target: &CallTarget<ExprId>, body: &Body) -> bool {
+fn is_defined_call(target: &CallTarget<ExprId>, body: &Body) -> bool {
     match target {
         CallTarget::Local { name } => {
             // Access the raw expression
@@ -657,7 +653,6 @@ fn is_defined_call(db: &dyn DefDatabase, target: &CallTarget<ExprId>, body: &Bod
 
 /// Extract the macro name from a `defined(MACRO)` call with diagnostic tracking.
 fn extract_defined_macro_name(
-    db: &dyn DefDatabase,
     args: &[ExprId],
     body: &Body,
     diagnostics: &mut Vec<ConditionDiagnostic>,

@@ -68,33 +68,33 @@ use crate::fold::ParenStrategy;
 use crate::fold::default_fold_body;
 use crate::fold::fold_body;
 
-pub(crate) fn print_expr(db: &dyn InternDatabase, body: &FoldBody, expr: ExprId) -> String {
-    let mut printer = Printer::new(db, body);
+pub(crate) fn print_expr(body: &FoldBody, expr: ExprId) -> String {
+    let mut printer = Printer::new(body);
     printer.print_expr(&expr);
     printer.result()
 }
 
-pub(crate) fn print_pat(db: &dyn InternDatabase, body: &FoldBody, pat: PatId) -> String {
-    let mut printer = Printer::new(db, body);
+pub(crate) fn print_pat(body: &FoldBody, pat: PatId) -> String {
+    let mut printer = Printer::new(body);
     printer.print_pat(&pat);
     printer.result()
 }
 
-pub(crate) fn print_type(db: &dyn InternDatabase, body: &FoldBody, ty: TypeExprId) -> String {
-    let mut printer = Printer::new(db, body);
+pub(crate) fn print_type(body: &FoldBody, ty: TypeExprId) -> String {
+    let mut printer = Printer::new(body);
     printer.print_type(&ty);
     printer.result()
 }
 
-pub(crate) fn print_term(db: &dyn InternDatabase, body: &FoldBody, term: TermId) -> String {
-    let mut printer = Printer::new(db, body);
+pub(crate) fn print_term(body: &FoldBody, term: TermId) -> String {
+    let mut printer = Printer::new(body);
     printer.print_term(&term);
     printer.result()
 }
 
-pub(crate) fn print_record(db: &dyn InternDatabase, body: &RecordBody, record: &Record) -> String {
+pub(crate) fn print_record(body: &RecordBody, record: &Record) -> String {
     let fold_body = default_fold_body(&body.body);
-    let mut printer = Printer::new(db, &fold_body);
+    let mut printer = Printer::new(&fold_body);
 
     writeln!(printer, "-record({},", record.name).unwrap();
     printer.indent();
@@ -107,13 +107,9 @@ pub(crate) fn print_record(db: &dyn InternDatabase, body: &RecordBody, record: &
     printer.result()
 }
 
-pub(crate) fn print_attribute(
-    db: &dyn InternDatabase,
-    body: &AttributeBody,
-    form: &AnyAttribute,
-) -> String {
+pub(crate) fn print_attribute(body: &AttributeBody, form: &AnyAttribute) -> String {
     let fold_body = default_fold_body(&body.body);
-    let mut printer = Printer::new(db, &fold_body);
+    let mut printer = Printer::new(&fold_body);
 
     match form {
         AnyAttribute::CompileOption(_) => writeln!(printer, "-compile(").unwrap(),
@@ -133,11 +129,7 @@ pub(crate) fn print_attribute(
     printer.result()
 }
 
-pub(crate) fn print_function(
-    db: &dyn InternDatabase,
-    body: &FunctionBody,
-    strategy: Strategy,
-) -> String {
+pub(crate) fn print_function(body: &FunctionBody, strategy: Strategy) -> String {
     let mut out = String::new();
 
     if let Some((_, clause)) = body.clauses.iter().next()
@@ -150,7 +142,7 @@ pub(crate) fn print_function(
         write!(out, "{sep}").unwrap();
         sep = ";";
         let fold_body = fold_body(strategy, &clause.body);
-        let mut printer = Printer::new_with_strategy(db, &fold_body, strategy);
+        let mut printer = Printer::new_with_strategy(&fold_body, strategy);
         printer.print_clause(&clause.clause);
         write!(out, "{}", printer.result_raw()).unwrap();
     }
@@ -160,12 +152,8 @@ pub(crate) fn print_function(
 }
 
 #[allow(dead_code)] // This is used for debugging
-pub(crate) fn print_function_clause(
-    db: &dyn InternDatabase,
-    clause: &FunctionClauseBody,
-) -> String {
+pub(crate) fn print_function_clause(clause: &FunctionClauseBody) -> String {
     print_function_clause_with_strategy(
-        db,
         clause,
         Strategy {
             macros: MacroStrategy::Expand,
@@ -174,14 +162,13 @@ pub(crate) fn print_function_clause(
     )
 }
 pub(crate) fn print_function_clause_with_strategy(
-    db: &dyn InternDatabase,
     clause: &FunctionClauseBody,
     strategy: Strategy,
 ) -> String {
     let mut out = String::new();
 
     let fold_body = fold_body(strategy, &clause.body);
-    let mut printer = Printer::new_with_strategy(db, &fold_body, strategy);
+    let mut printer = Printer::new_with_strategy(&fold_body, strategy);
     printer.print_clause(&clause.clause);
     write!(out, "{}", printer.result_raw()).unwrap();
     writeln!(out).unwrap();
@@ -190,7 +177,6 @@ pub(crate) fn print_function_clause_with_strategy(
 }
 
 pub(crate) fn print_function_clause_with_strategy_and_range(
-    db: &dyn InternDatabase,
     clause: &FunctionClauseBody,
     strategy: Strategy,
     source_map: &crate::BodySourceMap,
@@ -198,7 +184,7 @@ pub(crate) fn print_function_clause_with_strategy_and_range(
     let mut out = String::new();
 
     let fold_body = fold_body(strategy, &clause.body);
-    let mut printer = Printer::new_with_strategy_and_range(db, &fold_body, strategy, source_map);
+    let mut printer = Printer::new_with_strategy_and_range(&fold_body, strategy, source_map);
     printer.print_clause(&clause.clause);
     write!(out, "{}", printer.result_raw()).unwrap();
     writeln!(out).unwrap();
@@ -206,13 +192,8 @@ pub(crate) fn print_function_clause_with_strategy_and_range(
     out
 }
 
-pub(crate) fn print_type_alias(
-    db: &dyn InternDatabase,
-    body: &crate::TypeBody,
-    form: &crate::TypeAlias,
-) -> String {
+pub(crate) fn print_type_alias(body: &crate::TypeBody, form: &crate::TypeAlias) -> String {
     print_type_alias_with_strategy(
-        db,
         body,
         form,
         Strategy {
@@ -223,13 +204,12 @@ pub(crate) fn print_type_alias(
 }
 
 pub(crate) fn print_type_alias_with_strategy(
-    db: &dyn InternDatabase,
     body: &crate::TypeBody,
     form: &crate::TypeAlias,
     strategy: Strategy,
 ) -> String {
     let fold_body = fold_body(strategy, &body.body);
-    let mut printer = Printer::new_with_strategy(db, &fold_body, strategy);
+    let mut printer = Printer::new_with_strategy(&fold_body, strategy);
 
     match form {
         TypeAlias::Regular { .. } => write!(printer, "-type ").unwrap(),
@@ -247,13 +227,9 @@ pub(crate) fn print_type_alias_with_strategy(
     printer.result()
 }
 
-pub(crate) fn print_spec(
-    db: &dyn InternDatabase,
-    body: &SpecBody,
-    form: &SpecOrCallback,
-) -> String {
+pub(crate) fn print_spec(body: &SpecBody, form: &SpecOrCallback) -> String {
     let fold_body = default_fold_body(&body.body);
-    let mut printer = Printer::new(db, &fold_body);
+    let mut printer = Printer::new(&fold_body);
 
     match form {
         SpecOrCallback::Spec(spec) => writeln!(printer, "-spec {}", spec.name.name()).unwrap(),
@@ -306,9 +282,9 @@ pub(crate) fn print_spec(
     printer.result()
 }
 
-pub(crate) fn print_define(db: &dyn InternDatabase, body: &DefineBody, define: &Define) -> String {
+pub(crate) fn print_define(body: &DefineBody, define: &Define) -> String {
     let fold_body = default_fold_body(&body.body);
-    let mut printer = Printer::new(db, &fold_body);
+    let mut printer = Printer::new(&fold_body);
     writeln!(printer, "-define({},", define.name).ok();
     printer.indent();
     printer.print_expr(&body.expr);
@@ -319,13 +295,9 @@ pub(crate) fn print_define(db: &dyn InternDatabase, body: &DefineBody, define: &
     printer.result()
 }
 
-pub(crate) fn print_condition(
-    db: &dyn InternDatabase,
-    body: &ConditionBody,
-    condition: &PPCondition,
-) -> String {
+pub(crate) fn print_condition(body: &ConditionBody, condition: &PPCondition) -> String {
     let fold_body = default_fold_body(&body.body);
-    let mut printer = Printer::new(db, &fold_body);
+    let mut printer = Printer::new(&fold_body);
 
     match condition {
         PPCondition::If { .. } => writeln!(printer, "-if(").ok(),
@@ -354,9 +326,9 @@ pub(crate) fn print_condition_simple(_db: &dyn InternDatabase, condition: &PPCon
     }
 }
 
-pub(crate) fn print_ssr(db: &dyn InternDatabase, body: &SsrBody) -> String {
+pub(crate) fn print_ssr(body: &SsrBody) -> String {
     let fold_body = default_fold_body(&body.body);
-    let mut printer = Printer::new(db, &fold_body);
+    let mut printer = Printer::new(&fold_body);
 
     printer.print_herald("SsrBody", &mut |this| {
         this.print_labelled("lhs", true, &mut |this| {
@@ -392,22 +364,22 @@ pub fn print_form_list(db: &dyn DefDatabase, file_id: FileId, strategy: Strategy
                 FormIdx::FunctionClause(function_id) => {
                     let body =
                         db.function_body(InFile::new(file_id, FunctionDefId::new(function_id)));
-                    Some(body.tree_print(dbi, strategy))
+                    Some(body.tree_print(strategy))
                 }
                 FormIdx::TypeAlias(type_alias_id) => {
                     let type_alias = &form_list[type_alias_id];
                     let body = db.type_body(InFile::new(file_id, type_alias_id));
-                    Some(body.tree_print(dbi, type_alias))
+                    Some(body.tree_print(type_alias))
                 }
                 FormIdx::Spec(spec_id) => {
                     let spec = SpecOrCallback::Spec(form_list[spec_id].clone());
                     let body = db.spec_body(InFile::new(file_id, spec_id));
-                    Some(body.tree_print(dbi, spec))
+                    Some(body.tree_print(spec))
                 }
                 FormIdx::Callback(callback_id) => {
                     let spec = SpecOrCallback::Callback(form_list[callback_id].clone());
                     let body = db.callback_body(InFile::new(file_id, callback_id));
-                    Some(body.tree_print(dbi, spec))
+                    Some(body.tree_print(spec))
                 }
                 FormIdx::Record(record_id) => {
                     let body = db.record_body(InFile::new(file_id, record_id));
@@ -421,12 +393,12 @@ pub fn print_form_list(db: &dyn DefDatabase, file_id: FileId, strategy: Strategy
                 FormIdx::CompileOption(attribute_id) => {
                     let attribute = AnyAttribute::CompileOption(form_list[attribute_id].clone());
                     let body = db.compile_body(InFile::new(file_id, attribute_id));
-                    Some(body.tree_print(dbi, attribute))
+                    Some(body.tree_print(attribute))
                 }
                 FormIdx::PPDirective(pp) => match form_list[pp] {
                     PPDirective::Define(define) => {
                         let body = db.define_body(InFile::new(file_id, define));
-                        Some(body.tree_print(dbi, &form_list[define]))
+                        Some(body.tree_print(&form_list[define]))
                     }
                     _ => None,
                 },
@@ -437,7 +409,7 @@ pub fn print_form_list(db: &dyn DefDatabase, file_id: FileId, strategy: Strategy
                         PPCondition::If { .. } | PPCondition::Elif { .. } => {
                             let (body, _) =
                                 db.condition_body_with_source(InFile::new(file_id, cond_id))?;
-                            Some(body.tree_print(dbi, condition))
+                            Some(body.tree_print(condition))
                         }
                         // Ifdef, Ifndef, Else, Endif are printed without bodies
                         _ => Some(print_condition_simple(dbi, condition)),
@@ -451,7 +423,6 @@ pub fn print_form_list(db: &dyn DefDatabase, file_id: FileId, strategy: Strategy
 }
 
 struct Printer<'a> {
-    db: &'a dyn InternDatabase,
     body: &'a FoldBody<'a>,
     expand_macros: bool,
     buf: String,
@@ -463,9 +434,8 @@ struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    fn new(db: &'a dyn InternDatabase, body: &'a FoldBody) -> Self {
+    fn new(body: &'a FoldBody) -> Self {
         Printer {
-            db,
             body,
             expand_macros: true,
             buf: String::new(),
@@ -477,13 +447,8 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn new_with_strategy(
-        db: &'a dyn InternDatabase,
-        body: &'a FoldBody,
-        strategy: Strategy,
-    ) -> Self {
+    fn new_with_strategy(body: &'a FoldBody, strategy: Strategy) -> Self {
         Printer {
-            db,
             body,
             expand_macros: strategy.macros != MacroStrategy::DoNotExpand,
             buf: String::new(),
@@ -496,13 +461,11 @@ impl<'a> Printer<'a> {
     }
 
     fn new_with_strategy_and_range(
-        db: &'a dyn InternDatabase,
         body: &'a FoldBody,
         strategy: Strategy,
         source_map: &'a crate::BodySourceMap,
     ) -> Self {
         Printer {
-            db,
             body,
             expand_macros: strategy.macros != MacroStrategy::DoNotExpand,
             buf: String::new(),

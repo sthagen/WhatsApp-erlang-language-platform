@@ -159,7 +159,7 @@ pub(crate) fn case_to_function_clauses(acc: &mut Assists, ctx: &AssistContext<'_
             );
 
             // Build the call site replacement
-            let call_text = make_call_text(ctx, &name, &scrutinee, &free_vars, &outliving_locals);
+            let call_text = make_call_text(&name, &scrutinee, &free_vars, &outliving_locals);
 
             // Build the new function definition
             let new_indent = IndentLevel::from_node(&insert_after);
@@ -186,7 +186,6 @@ pub(crate) fn case_to_function_clauses(acc: &mut Assists, ctx: &AssistContext<'_
 
 /// Build the call expression text to replace the case expression
 fn make_call_text(
-    ctx: &AssistContext<'_>,
     name: &str,
     scrutinee: &ast::Expr,
     free_vars: &[Var],

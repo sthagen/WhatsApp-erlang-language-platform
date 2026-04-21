@@ -56,7 +56,6 @@ use hir::StringVariant;
 use hir::Term;
 use hir::TypeExpr;
 use hir::Var;
-use hir::db::InternDatabase;
 
 use crate::Condition;
 use crate::SsrMatches;
@@ -72,7 +71,7 @@ pub struct SsrPlaceholder {
 
 impl SsrPlaceholder {
     /// Create from a Var, if it's an SSR placeholder
-    pub fn from_var(var: Var, db: &dyn InternDatabase) -> Option<Self> {
+    pub fn from_var(var: Var) -> Option<Self> {
         if var.is_ssr_placeholder() {
             Some(SsrPlaceholder { var })
         } else {
@@ -94,7 +93,7 @@ impl PlaceholderCache {
     /// Build a placeholder cache by scanning all nodes in the pattern body.
     /// This does the Salsa intern lookups once upfront, so the matching
     /// hot path never needs to access the database for placeholder checks.
-    pub fn build(pattern_body: &FoldBody, db: &dyn InternDatabase) -> Self {
+    pub fn build(pattern_body: &FoldBody) -> Self {
         let mut placeholders = FxHashMap::default();
         // Use FoldBody indexing (pattern_body[id]) instead of raw body iteration
         // so that InvisibleParens strategy is respected: paren ExprIds transparently
@@ -102,21 +101,21 @@ impl PlaceholderCache {
         // to be found in the cache during matching.
         for (expr_id, _expr) in pattern_body.body.exprs.iter() {
             if let Expr::Var(var) = &pattern_body[expr_id]
-                && let Some(placeholder) = SsrPlaceholder::from_var(*var, db)
+                && let Some(placeholder) = SsrPlaceholder::from_var(*var)
             {
                 placeholders.insert(AnyExprId::Expr(expr_id), placeholder);
             }
         }
         for (pat_id, _pat) in pattern_body.body.pats.iter() {
             if let Pat::Var(var) = &pattern_body[pat_id]
-                && let Some(placeholder) = SsrPlaceholder::from_var(*var, db)
+                && let Some(placeholder) = SsrPlaceholder::from_var(*var)
             {
                 placeholders.insert(AnyExprId::Pat(pat_id), placeholder);
             }
         }
         for (type_id, _type_expr) in pattern_body.body.type_exprs.iter() {
             if let TypeExpr::Var(var) = &pattern_body[type_id]
-                && let Some(placeholder) = SsrPlaceholder::from_var(*var, db)
+                && let Some(placeholder) = SsrPlaceholder::from_var(*var)
             {
                 placeholders.insert(AnyExprId::TypeExpr(type_id), placeholder);
             }
@@ -338,7 +337,7 @@ impl PlaceholderMatch {
         if let SubId::AnyExprId(code_id) = self.code_id {
             // The "pattern body" here is the code body itself (equivalence check).
             // Regular code bodies have no SSR placeholders, so the cache is empty.
-            let placeholder_cache = PlaceholderCache::build(body, sema.db.upcast());
+            let placeholder_cache = PlaceholderCache::build(body);
             get_match(
                 debug_print,
                 rule,
@@ -485,9 +484,7 @@ impl<'a> Matcher<'a> {
         if debug_active && let SubId::AnyExprId(any_expr_id) = code {
             println!(
                 "Matcher::try_match:code:---------------\n{}----------------\n",
-                self.code_body
-                    .body
-                    .tree_print_any_expr(self.sema.db.upcast(), *any_expr_id)
+                self.code_body.body.tree_print_any_expr(*any_expr_id)
             );
         }
 
@@ -809,8 +806,8 @@ impl<'a> Matcher<'a> {
                 } else {
                     fail_match!(
                         "Pattern had `{}`, code had `{}`",
-                        render_str(self.sema, pat_lit),
-                        render_str(self.sema, code_lit)
+                        render_str(pat_lit),
+                        render_str(code_lit)
                     );
                 }
             }
@@ -823,8 +820,8 @@ impl<'a> Matcher<'a> {
                 } else {
                     fail_match!(
                         "Pattern had `{}`, code had `{}`",
-                        render_str(self.sema, pat_lit),
-                        render_str(self.sema, code_lit)
+                        render_str(pat_lit),
+                        render_str(code_lit)
                     );
                 }
             }
@@ -954,7 +951,7 @@ fn native_record_name_to_subids(name: &NativeRecordName) -> Vec<SubId> {
     }
 }
 
-fn render_str(sema: &Semantic, lit: &Literal) -> String {
+fn render_str(lit: &Literal) -> String {
     match lit {
         Literal::String(s) => s.as_string(),
         Literal::Char(c) => format!("{c}"),

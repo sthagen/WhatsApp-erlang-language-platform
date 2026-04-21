@@ -87,7 +87,7 @@ impl GenericLinter for ExpressionCanBeSimplifiedLinter {
                                 simplify_binary_op(op, lhs, rhs, clause_id, sema, &def_fb)
                             }
                             hir::AnyExpr::Expr(hir::Expr::UnaryOp { expr, op }) => {
-                                simplify_unary_op(op, expr, clause_id, sema, &def_fb)
+                                simplify_unary_op(op, expr, clause_id, &def_fb)
                             }
                             _ => None,
                         };
@@ -212,7 +212,7 @@ fn simplify_binary_op(
 
         // andalso
         (lhs, BinaryOp::LogicOp(LogicOp::And { lazy: true }), _rhs)
-            if is_literal_atom(sema, lhs, known::true_name) =>
+            if is_literal_atom(lhs, known::true_name) =>
         {
             let rhs_str = to_string(&rhs_id, sema, clause_id, def_fb)?;
             Some(rhs_str.to_string())
@@ -220,7 +220,7 @@ fn simplify_binary_op(
 
         // orelse
         (lhs, BinaryOp::LogicOp(LogicOp::Or { lazy: true }), _rhs)
-            if is_literal_atom(sema, lhs, known::false_name) =>
+            if is_literal_atom(lhs, known::false_name) =>
         {
             let rhs_str = to_string(&rhs_id, sema, clause_id, def_fb)?;
             Some(rhs_str.to_string())
@@ -234,7 +234,6 @@ fn simplify_unary_op(
     op: UnaryOp,
     expr_id: hir::ExprId,
     clause_id: ClauseId,
-    sema: &Semantic,
     def_fb: &InFunctionBody<&FunctionDef>,
 ) -> Option<String> {
     let body = def_fb.body(clause_id);
@@ -245,10 +244,10 @@ fn simplify_unary_op(
         // ==== BOOLEAN OPS ====
 
         // not
-        (expr, UnaryOp::Not) if is_literal_atom(sema, expr, known::true_name) => {
+        (expr, UnaryOp::Not) if is_literal_atom(expr, known::true_name) => {
             Some("false".to_string())
         }
-        (expr, UnaryOp::Not) if is_literal_atom(sema, expr, known::false_name) => {
+        (expr, UnaryOp::Not) if is_literal_atom(expr, known::false_name) => {
             Some("true".to_string())
         }
 
@@ -263,7 +262,7 @@ fn is_empty_list_expr(expr: &hir::Expr) -> bool {
     }
 }
 
-fn is_literal_atom(sema: &Semantic, expr: &hir::Expr, name: Name) -> bool {
+fn is_literal_atom(expr: &hir::Expr, name: Name) -> bool {
     match expr {
         hir::Expr::Literal(Literal::Atom(atom)) => atom.as_name() == name,
         _ => false,
