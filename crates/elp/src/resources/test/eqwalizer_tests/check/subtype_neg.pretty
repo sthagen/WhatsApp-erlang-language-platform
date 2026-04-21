@@ -348,4 +348,20 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   fun(({A, B}) -> {B, A})
 Context expected type: atom()
 
-24 ERRORS
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/subtype_neg.erl:124:13
+    │
+124 │ f1_bar() -> fun f1/1.
+    │             ^^^^^^^^
+    │             │
+    │             f1/1.
+Expression has type:   fun(({A}) -> {A, 'foo'}) with 1 type parameter
+Context expected type: fun(({binary()}) -> {binary(), 'bar'}) with 0 type parameters
+    │             
+
+Because in the expression's type:
+  Here the type is:     fun(({A}) -> {A, 'foo'}) with 1 type parameter
+  Context expects type: fun(({binary()}) -> {binary(), 'bar'}) with 0 type parameters
+  The number of type parameters doesn't match.
+
+25 ERRORS
