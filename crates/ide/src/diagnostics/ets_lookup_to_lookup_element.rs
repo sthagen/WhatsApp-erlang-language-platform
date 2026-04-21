@@ -31,7 +31,9 @@
 //!
 //! The matched tuple key (first element) can be a wildcard (`_`),
 //! an underscore-prefixed variable (`_K`), or even the lookup key
-//! itself (`Key`), since `ets:lookup` already filters by key.
+//! itself (`Key`), since `ets:lookup` already filters by key. The
+//! default branch can similarly use either `_` or a named wildcard
+//! such as `_Else`.
 
 use elp_ide_assists::Assist;
 use elp_ide_db::DiagnosticCode;
@@ -100,7 +102,7 @@ impl SsrPatternsLinter for EtsLookupToLookupElementLinter {
                     format!(
                         "ssr: case ets:lookup({TAB_VAR},{KEY_VAR}) of
                             [{{{RESULT_KEY_VAR}, {VAL_VAR}}}] -> {VAL_VAR};
-                            _ -> {DEFAULT_VAR}
+                            {DEFAULT_PAT_VAR} -> {DEFAULT_VAR}
                           end."
                     ),
                     (),
@@ -125,6 +127,10 @@ impl SsrPatternsLinter for EtsLookupToLookupElementLinter {
         let body_arc = matched.matched_node_body.get_body(ctx.sema)?;
         let body = body_arc.as_ref();
         if !is_not_a_computation(body, &default_match) {
+            return None;
+        }
+        let default_pat_match = matched.get_placeholder_match(ctx.sema, DEFAULT_PAT_VAR);
+        if default_pat_match.is_some() && !is_wildcard_match(ctx.sema, body, &default_pat_match) {
             return None;
         }
         let key_text = matched.placeholder_text(ctx.sema, KEY_VAR)?;
@@ -178,6 +184,7 @@ static TAB_VAR: &str = "_@Tab";
 static KEY_VAR: &str = "_@Key";
 static VAL_VAR: &str = "_@Val";
 static DEFAULT_VAR: &str = "_@Default";
+static DEFAULT_PAT_VAR: &str = "_@DefaultPattern";
 static RESULT_KEY_VAR: &str = "_@ResultKey";
 
 fn is_not_a_computation(body: &Body, matched: &PlaceholderMatch) -> bool {
@@ -488,6 +495,28 @@ mod tests {
         )
     }
 
+    #[test]
+    fn ignores_lookup_with_non_wildcard_default_pattern() {
+        check_diagnostics(
+            r#"
+         //- /src/main.erl
+         -module(main).
+
+         read(Tab, Key) ->
+            case ets:lookup(Tab, Key) of
+                [{_, V}] -> V;
+                Else -> {else, Else}
+            end.
+
+         //- /src/ets.erl
+         -module(ets).
+         -export([lookup/2, lookup_element/4]).
+         lookup(_, _) -> error(not_impl).
+         lookup_element(_, _, _, _) -> error(not_impl).
+            "#,
+        )
+    }
+
     // =================== Fix tests ===================
 
     #[test]
@@ -521,17 +550,13 @@ mod tests {
 
     #[test]
     fn fixes_lookup_with_named_wildcard_key() {
-        // TODO(T256426988): This should detect the pattern and suggest ets:lookup_element/4,
-        // but named wildcards (_IgnoredKey, _Else) are not yet matched by the SSR patterns.
-        // Once fixed, convert this back to a check_fix test expecting:
-        //   ets:lookup_element(Tab, Key, 2, undefined).
-        check_diagnostics(
+        check_fix(
             r#"
          //- /src/main.erl
          -module(main).
 
          read(Tab, Key) ->
-            case ets:lookup(Tab, Key) of
+            ca~se ets:lookup(Tab, Key) of
                 [{_IgnoredKey, V}] -> V;
                 _Else -> undefined
             end.
@@ -542,6 +567,13 @@ mod tests {
          lookup(_, _) -> error(not_impl).
          lookup_element(_, _, _, _) -> error(not_impl).
             "#,
+            expect![[r#"
+         -module(main).
+
+         read(Tab, Key) ->
+            ets:lookup_element(Tab, Key, 2, undefined).
+
+         "#]],
         )
     }
 
