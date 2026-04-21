@@ -712,6 +712,6 @@ impl VarDef {
     }
 
     pub fn name(&self, db: &dyn InternDatabase) -> Name {
-        db.lookup_var(self.hir_var).clone()
+        self.hir_var.as_name()
     }
 }

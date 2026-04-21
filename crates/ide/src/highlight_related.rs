@@ -197,8 +197,8 @@ fn try_format_call_highlights(
 
     let module_atom = call_expr[module_id].as_atom()?;
     let name_atom = call_expr[name_id].as_atom()?;
-    let module_name = sema.db.lookup_atom(module_atom);
-    let function_name = sema.db.lookup_atom(name_atom);
+    let module_name = module_atom.as_name();
+    let function_name = name_atom.as_name();
 
     let info = format_string::match_format_function(&module_name, &function_name, args.len())?;
 

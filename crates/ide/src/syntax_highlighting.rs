@@ -207,7 +207,7 @@ fn find_deprecated_range(
         return None;
     }
     if range_to_highlight.intersect(range.range).is_some() {
-        let name = sema.db.lookup_atom(*fun_atom);
+        let name = fun_atom.as_name();
         if def_map.is_deprecated(&NameArity::new(name, arity)) {
             return Some(range.range);
         }
@@ -222,7 +222,7 @@ fn find_remote_module_file_id(
     function_body: &InFunctionClauseBody<()>,
 ) -> Option<FileId> {
     let module_atom = &function_body[*module].as_atom()?;
-    let module_name = sema.db.lookup_atom(*module_atom);
+    let module_name = module_atom.as_name();
     let module = sema.resolve_module_name(file_id, module_name.as_str())?;
     Some(module.file.file_id)
 }
@@ -403,8 +403,8 @@ fn format_specifier_highlight(
                     && let Some(module_atom) = clause_body[module].as_atom()
                     && let Some(name_atom) = clause_body[name].as_atom()
                     && let Some(info) = format_string::match_format_function(
-                        &sema.db.lookup_atom(module_atom),
-                        &sema.db.lookup_atom(name_atom),
+                        &module_atom.as_name(),
+                        &name_atom.as_name(),
                         args.len(),
                     )
                     && let Some(fmt_info) = find_format_highlight_info(

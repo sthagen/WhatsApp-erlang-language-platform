@@ -140,7 +140,7 @@ fn process_clause(
                     }
                     && is_unused_var(sema, &in_clause, &body_map, &source_file, &pat_id)
                 {
-                    let var_name = var.as_string(sema.db.upcast());
+                    let var_name = var.as_string();
                     if !var_name.starts_with('_') {
                         unused_vars_with_wrong_name.insert(pat_id, var_name);
                     }
@@ -211,7 +211,7 @@ fn pick_new_unused_var_names(
             if unused_vars.contains(v) {
                 None
             } else {
-                let vname = v.as_string(sema.db.upcast());
+                let vname = v.as_string();
                 if !vname.starts_with('_') {
                     None
                 } else {

@@ -87,7 +87,7 @@ pub fn print_type_alias(db: &dyn InternDatabase, body: &TypeBody, form: &TypeAli
 
     printer
         .print_args(form.name().name(), &body.vars, |this, &var| {
-            write!(this, "{}", db.lookup_var(var))
+            write!(this, "{}", var.as_name())
         })
         .expect("write should succeed");
     write!(printer, " :: ").expect("write should succeed");
@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
         match pat {
             Pat::Missing => write!(self, "[missing]"),
             Pat::Literal(lit) => self.print_literal(lit),
-            Pat::Var(var) => write!(self, "{}", self.db.lookup_var(*var)),
+            Pat::Var(var) => write!(self, "{}", var.as_name()),
             Pat::Tuple { pats } => self.print_seq(pats, None, "{", "}", ",", |this, pat| {
                 this.print_pat(&this.body[*pat])
             }),
@@ -318,24 +318,19 @@ impl<'a> Printer<'a> {
                 })
             }
             Pat::RecordIndex { name, field } => {
-                write!(
-                    self,
-                    "#{}.{}",
-                    self.db.lookup_atom(*name),
-                    self.db.lookup_atom(*field)
-                )
+                write!(self, "#{}.{}", name.as_name(), field.as_name())
             }
             Pat::Record { name, fields } => {
-                write!(self, "#{}", self.db.lookup_atom(*name))?;
+                write!(self, "#{}", name.as_name())?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} = ", key.as_name())?;
                     this.print_pat(&this.body[*val])
                 })
             }
             Pat::NativeRecord { name, fields } => {
                 self.print_native_record_name(name)?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} = ", key.as_name())?;
                     this.print_pat(&this.body[*val])
                 })
             }
@@ -403,7 +398,7 @@ impl<'a> Printer<'a> {
             write!(self, "\nwhen ")?;
             let mut sep = "";
             for (var, ty) in guards {
-                write!(self, "{}{} :: ", sep, self.db.lookup_var(*var))?;
+                write!(self, "{}{} :: ", sep, var.as_name())?;
                 sep = ", ";
                 self.print_type(&self.body[*ty])?;
             }
@@ -428,7 +423,7 @@ impl<'a> Printer<'a> {
         match expr {
             Expr::Missing => write!(self, "[missing]"),
             Expr::Literal(lit) => self.print_literal(lit),
-            Expr::Var(var) => write!(self, "{}", self.db.lookup_var(*var)),
+            Expr::Var(var) => write!(self, "{}", var.as_name()),
             Expr::Tuple { exprs } => self.print_seq(exprs, None, "{", "}", ",", |this, expr| {
                 this.print_expr(&this.body[*expr])
             }),
@@ -470,41 +465,31 @@ impl<'a> Printer<'a> {
                 })
             }
             Expr::RecordIndex { name, field } => {
-                write!(
-                    self,
-                    "#{}.{}",
-                    self.db.lookup_atom(*name),
-                    self.db.lookup_atom(*field)
-                )
+                write!(self, "#{}.{}", name.as_name(), field.as_name())
             }
             Expr::Record { name, fields } => {
-                write!(self, "#{}", self.db.lookup_atom(*name))?;
+                write!(self, "#{}", name.as_name())?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} = ", key.as_name())?;
                     this.print_expr(&this.body[*val])
                 })
             }
             Expr::RecordUpdate { expr, name, fields } => {
                 self.print_expr(&self.body[*expr])?;
-                write!(self, "#{}", self.db.lookup_atom(*name))?;
+                write!(self, "#{}", name.as_name())?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} = ", key.as_name())?;
                     this.print_expr(&this.body[*val])
                 })
             }
             Expr::RecordField { expr, name, field } => {
                 self.print_expr(&self.body[*expr])?;
-                write!(
-                    self,
-                    "#{}.{}",
-                    self.db.lookup_atom(*name),
-                    self.db.lookup_atom(*field)
-                )
+                write!(self, "#{}.{}", name.as_name(), field.as_name())
             }
             Expr::NativeRecord { name, fields } => {
                 self.print_native_record_name(name)?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} = ", key.as_name())?;
                     this.print_expr(&this.body[*val])
                 })
             }
@@ -512,14 +497,14 @@ impl<'a> Printer<'a> {
                 self.print_expr(&self.body[*expr])?;
                 self.print_native_record_name(name)?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} = ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} = ", key.as_name())?;
                     this.print_expr(&this.body[*val])
                 })
             }
             Expr::NativeRecordField { expr, name, field } => {
                 self.print_expr(&self.body[*expr])?;
                 self.print_native_record_name(name)?;
-                write!(self, ".{}", self.db.lookup_atom(*field))
+                write!(self, ".{}", field.as_name())
             }
             Expr::Binary { segs } => self.print_seq(segs, None, "<<", ">>", ",", |this, seg| {
                 this.print_bin_segment(seg, |this, expr| this.print_expr(&this.body[expr]))
@@ -743,7 +728,7 @@ impl<'a> Printer<'a> {
         match ty {
             TypeExpr::Missing => write!(self, "[missing]"),
             TypeExpr::Literal(lit) => self.print_literal(lit),
-            TypeExpr::Var(var) => write!(self, "{}", self.db.lookup_var(*var)),
+            TypeExpr::Var(var) => write!(self, "{}", var.as_name()),
             TypeExpr::Tuple { args } => self.print_seq(args, None, "{", "}", ",", |this, ty| {
                 this.print_type(&this.body[*ty])
             }),
@@ -769,16 +754,16 @@ impl<'a> Printer<'a> {
                 })
             }
             TypeExpr::Record { name, fields } => {
-                write!(self, "#{}", self.db.lookup_atom(*name))?;
+                write!(self, "#{}", name.as_name())?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} :: ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} :: ", key.as_name())?;
                     this.print_type(&this.body[*val])
                 })
             }
             TypeExpr::NativeRecord { name, fields } => {
                 self.print_native_record_name(name)?;
                 self.print_seq(fields, None, "{", "}", ",", |this, (key, val)| {
-                    write!(this, "{} :: ", this.db.lookup_atom(*key))?;
+                    write!(this, "{} :: ", key.as_name())?;
                     this.print_type(&this.body[*val])
                 })
             }
@@ -804,7 +789,7 @@ impl<'a> Printer<'a> {
                 write!(self, ")")
             }
             TypeExpr::AnnType { var, ty } => {
-                write!(self, "({} ", self.db.lookup_var(*var))?;
+                write!(self, "({} ", var.as_name())?;
                 write!(self, " :: ")?;
                 self.print_type(&self.body[*ty])?;
                 write!(self, ")")
@@ -882,8 +867,8 @@ impl<'a> Printer<'a> {
                 write!(
                     self,
                     "fun {}:{}/{}",
-                    self.db.lookup_atom(*module),
-                    self.db.lookup_atom(*name),
+                    module.as_name(),
+                    name.as_name(),
                     arity
                 )
             }
@@ -924,7 +909,7 @@ impl<'a> Printer<'a> {
                 write!(
                     self,
                     "{}",
-                    quote::escape_and_quote_atom(self.db.lookup_atom(*atom).as_str())
+                    quote::escape_and_quote_atom(atom.as_name().as_str())
                 )
             }
             Literal::Integer(int) => write!(self, "{}", int.value), // TODO: other bases
@@ -936,12 +921,7 @@ impl<'a> Printer<'a> {
         match name {
             NativeRecordName::Anon => write!(self, "#_"),
             NativeRecordName::Qualified { module, name } => {
-                write!(
-                    self,
-                    "#{}:{}",
-                    self.db.lookup_atom(*module),
-                    self.db.lookup_atom(*name)
-                )
+                write!(self, "#{}:{}", module.as_name(), name.as_name())
             }
         }
     }
@@ -1005,7 +985,7 @@ impl<'a> Printer<'a> {
             write!(self, "/")?;
             let mut sep = "";
             for &ty in &seg.tys {
-                write!(self, "{}{}", sep, self.db.lookup_atom(ty))?;
+                write!(self, "{}{}", sep, ty.as_name())?;
                 sep = "-";
             }
             if let Some(unit) = seg.unit {

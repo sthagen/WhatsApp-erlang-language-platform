@@ -265,7 +265,7 @@ fn is_empty_list_expr(expr: &hir::Expr) -> bool {
 
 fn is_literal_atom(sema: &Semantic, expr: &hir::Expr, name: Name) -> bool {
     match expr {
-        hir::Expr::Literal(Literal::Atom(atom)) => atom.as_name(sema.db.upcast()) == name,
+        hir::Expr::Literal(Literal::Atom(atom)) => atom.as_name() == name,
         _ => false,
     }
 }

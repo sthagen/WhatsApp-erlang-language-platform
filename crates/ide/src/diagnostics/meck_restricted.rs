@@ -98,7 +98,7 @@ fn get_restricted_module_name(
     in_clause: &hir::InFunctionClauseBody<&hir::FunctionDef>,
 ) -> Option<String> {
     if let Expr::Literal(Literal::Atom(atom)) = &in_clause[*expr_id] {
-        let atom_str = atom.as_string(sema.db.upcast());
+        let atom_str = atom.as_string();
         if RESTRICTED_MODULES.contains(&atom_str.as_str()) {
             return Some(atom_str);
         }

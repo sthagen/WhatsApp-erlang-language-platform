@@ -90,7 +90,7 @@ fn should_hint(db: &dyn InternDatabase, param_name: &ParamName, expr: &Expr) -> 
     match param_name {
         ParamName::Name(name) => {
             if let Some(var) = expr.as_var() {
-                let var_name = &var.as_string(db);
+                let var_name = &var.as_string();
                 let normalized_name = name.as_str().trim_start_matches('_');
                 var_name != normalized_name
             } else {

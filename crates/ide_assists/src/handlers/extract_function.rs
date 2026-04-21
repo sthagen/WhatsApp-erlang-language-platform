@@ -410,7 +410,9 @@ impl FunctionBodyToExtract {
     ///
     /// Computes additional info that affects param type and mutability
     fn extracted_function_params(&self, free: FxHashSet<Resolution>) -> Vec<Param> {
-        free.into_iter().map(|(var, _)| Param { var }).collect()
+        let mut params: Vec<_> = free.into_iter().map(|(var, _)| Param { var }).collect();
+        params.sort_by(|a, b| a.var.cmp(&b.var));
+        params
     }
 }
 
@@ -433,7 +435,7 @@ fn calculate_ret_values(
     trailing.into_iter().for_each(|expr: ast::Expr| {
         analyzer.walk_ast_expr(&ctx.sema, ctx.file_id(), expr);
     });
-    locals_bound_in_body
+    let mut ret: Vec<_> = locals_bound_in_body
         .iter()
         .filter_map(|local| {
             if analyzer.free.contains(local) || analyzer.bound.contains(local) {
@@ -442,7 +444,9 @@ fn calculate_ret_values(
                 None
             }
         })
-        .collect()
+        .collect();
+    ret.sort();
+    ret
 }
 
 /// Check whether the node is a valid expression which can be
@@ -467,7 +471,7 @@ fn make_call(ctx: &AssistContext<'_>, fun: &Function) -> String {
     let args = fun
         .params
         .iter()
-        .map(|param| format!("{}", ctx.db().lookup_var(param.var)))
+        .map(|param| format!("{}", param.var.as_name()))
         .collect::<Vec<_>>()
         .join(",");
 
@@ -476,13 +480,13 @@ fn make_call(ctx: &AssistContext<'_>, fun: &Function) -> String {
     match fun.outliving_locals.as_slice() {
         [] => {}
         [local] => {
-            format_to!(buf, "{} = ", local.as_string(ctx.db().upcast()))
+            format_to!(buf, "{} = ", local.as_string())
         }
         vars => {
             buf.push('{');
-            let bindings = vars.iter().format_with(", ", |local, f| {
-                f(&format_args!("{}", local.as_string(ctx.db().upcast())))
-            });
+            let bindings = vars
+                .iter()
+                .format_with(", ", |local, f| f(&format_args!("{}", local.as_string())));
             format_to!(buf, "{}", bindings);
             buf.push_str("} = ");
         }
@@ -519,7 +523,7 @@ impl Function {
     fn make_param_list(&self, ctx: &AssistContext<'_>) -> String {
         self.params
             .iter()
-            .map(|param| format!("{}", ctx.db().lookup_var(param.var)))
+            .map(|param| format!("{}", param.var.as_name()))
             .collect::<Vec<_>>()
             .join(",")
     }
@@ -558,11 +562,11 @@ impl Function {
     fn make_ret_ty(&self, ctx: &AssistContext<'_>) -> Option<String> {
         match self.outliving_locals.as_slice() {
             [] => None,
-            [local] => Some(local.as_string(ctx.db().upcast())),
+            [local] => Some(local.as_string()),
             vars => Some(format!(
                 "{{{}}}", // open and closing braces, around vars
                 vars.iter()
-                    .map(|v| v.as_string(ctx.db().upcast()))
+                    .map(|v| v.as_string())
                     .collect::<Vec<_>>()
                     .join(", ")
             )),
@@ -752,13 +756,13 @@ foo() ->
             expect![[r#"
                 foo() ->
                     N = 1,
-                    {V, J} = fun_name_edited(N),
+                    {J, V} = fun_name_edited(N),
                     V + J.
 
                 $0fun_name_edited(N) ->
                     V = N * N,
                     J = 1,
-                    {V, J}.
+                    {J, V}.
             "#]],
         );
     }
@@ -1047,7 +1051,7 @@ foo() ->
             expect![[r#"
                 foo() ->
                     X = 1,
-                    {J, Bar} = fun_name_edited(X),
+                    {Bar, J} = fun_name_edited(X),
                     J + Bar.
 
                 $0fun_name_edited(X) ->
@@ -1055,7 +1059,7 @@ foo() ->
                                   _ -> {ok, X+2}
                                 end,
                     J = Bar + X + 2,
-                    {J, Bar}.
+                    {Bar, J}.
             "#]],
         );
     }
@@ -1106,10 +1110,10 @@ foo() ->
                 foo() ->
                     M = 2,
                     N = 1,
-                    {V, W} = fun_name_edited(N,M),
+                    {V, W} = fun_name_edited(M,N),
                     V + W.
 
-                $0fun_name_edited(N,M) ->
+                $0fun_name_edited(M,N) ->
                     V = M * N,
                     W = 3,
                     {V, W}.

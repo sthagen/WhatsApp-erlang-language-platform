@@ -182,7 +182,7 @@ impl<'a> Ctx<'a> {
     }
 
     pub fn set_function_info(&mut self, info: &NameArity) {
-        let name = self.db.atom(info.name().clone());
+        let name = Atom::new(info.name());
         let arity = info.arity();
         self.function_info = Some((name, arity));
         self.function_name = Some(info.clone());
@@ -191,7 +191,7 @@ impl<'a> Ctx<'a> {
     pub fn set_function_info_from_ast(&mut self, clause: &ast::FunctionClause) {
         let info = self.resolve_name_arity(clause);
         if let Some(info) = info {
-            let name = self.db.atom(info.name().clone());
+            let name = Atom::new(info.name());
             let arity = info.arity();
             self.function_info = Some((name, arity));
             self.function_name = Some(info.clone());
@@ -336,7 +336,7 @@ impl<'a> Ctx<'a> {
         function_clause: &ast::FunctionClause,
     ) -> Option<NameArity> {
         let name_atom = self.resolve_name(function_clause.name()?)?;
-        let name = self.db.lookup_atom(name_atom);
+        let name = name_atom.as_name();
         let arity = function_clause.args()?.args().count().try_into().ok()?;
         Some(NameArity::new(name, arity))
     }
@@ -362,7 +362,7 @@ impl<'a> Ctx<'a> {
             .and_then(|name| name.args())
             .iter()
             .flat_map(|args| args.args())
-            .map(|var| self.db.var(var.as_name()))
+            .map(|var| Var::new(&var.as_name()))
             .collect();
         let ty = self.lower_optional_type_expr(ty);
         let (body, source_map) = self.finish();
@@ -423,7 +423,7 @@ impl<'a> Ctx<'a> {
                 .flat_map(|guards| guards.guards())
                 .flat_map(|guard| {
                     let ty = self.lower_optional_type_expr(guard.ty());
-                    let var = self.db.var(guard.var()?.var()?.as_name());
+                    let var = Var::new(&guard.var()?.var()?.as_name());
                     Some((var, ty))
                 })
                 .collect();
@@ -776,7 +776,7 @@ impl<'a> Ctx<'a> {
                 self.alloc_pat(Pat::Missing, Some(expr))
             }
             ast::ExprMax::Atom(atom) => {
-                let atom = self.db.atom(atom.as_name());
+                let atom = Atom::new(&atom.as_name());
                 self.alloc_pat(Pat::Literal(Literal::Atom(atom)), Some(expr))
             }
             ast::ExprMax::Binary(bin) => {
@@ -1410,12 +1410,12 @@ impl<'a> Ctx<'a> {
 
     fn import_or_erlang_bif(&mut self, name_expr_id: ExprId, arity: ast::Arity) -> Option<ExprId> {
         let atom = self.body[name_expr_id].as_atom()?;
-        let name = self.db.lookup_atom(atom);
+        let name = atom.as_name();
 
         // Check that it's not imported, e.g. -import(lists, [length/1]).
         if let Some(import_module) = self.imported_module(name, arity) {
             Some(self.module_expr_id(&import_module))
-        } else if is_erlang_fun(&atom.as_string(self.db.upcast()), arity?) {
+        } else if is_erlang_fun(&atom.as_string(), arity?) {
             Some(self.erlang_expr_id())
         } else {
             None
@@ -1450,7 +1450,7 @@ impl<'a> Ctx<'a> {
         if let Some(expr_id) = self.module_expr_ids.get(module) {
             *expr_id
         } else {
-            let atom = self.db.atom(module.clone());
+            let atom = Atom::new(module);
             let expr_id = self.alloc_expr(Expr::Literal(Literal::Atom(atom)), None);
             self.module_expr_ids.insert(module.clone(), expr_id);
             expr_id
@@ -1461,7 +1461,7 @@ impl<'a> Ctx<'a> {
         if let Some(expr_id) = self.erlang_type_expr_id {
             expr_id
         } else {
-            let atom = self.db.atom(module.clone());
+            let atom = Atom::new(module);
             let type_expr_id = self.alloc_type_expr(TypeExpr::Literal(Literal::Atom(atom)), None);
             self.erlang_type_expr_id = Some(type_expr_id);
             type_expr_id
@@ -1496,7 +1496,7 @@ impl<'a> Ctx<'a> {
                 self.alloc_expr(Expr::Closure { clauses, name }, Some(expr))
             }
             ast::ExprMax::Atom(atom) => {
-                let atom = self.db.atom(atom.as_name());
+                let atom = Atom::new(&atom.as_name());
                 self.alloc_expr(Expr::Literal(Literal::Atom(atom)), Some(expr))
             }
             ast::ExprMax::Binary(bin) => {
@@ -2038,7 +2038,7 @@ impl<'a> Ctx<'a> {
             ast::Expr::AnnType(ann) => {
                 let ty = self.lower_optional_type_expr(ann.ty());
                 if let Some(var) = ann.var().and_then(|var| var.var()) {
-                    let var = self.db.var(var.as_name());
+                    let var = Var::new(&var.as_name());
                     self.alloc_type_expr(TypeExpr::AnnType { var, ty }, Some(expr))
                 } else {
                     self.alloc_type_expr(TypeExpr::Missing, Some(expr))
@@ -2305,7 +2305,7 @@ impl<'a> Ctx<'a> {
         arity: ast::Arity,
     ) -> Option<TypeExprId> {
         let atom = self.body[name_expr_id].as_atom()?;
-        if is_erlang_type(&atom.as_string(self.db.upcast()), arity?) {
+        if is_erlang_type(&atom.as_string(), arity?) {
             Some(self.erlang_type_expr_id())
         } else {
             None
@@ -2316,7 +2316,7 @@ impl<'a> Ctx<'a> {
         match expr_max {
             ast::ExprMax::AnonymousFun(_fun) => self.alloc_type_expr(TypeExpr::Missing, Some(expr)),
             ast::ExprMax::Atom(atom) => {
-                let atom = self.db.atom(atom.as_name());
+                let atom = Atom::new(&atom.as_name());
                 self.alloc_type_expr(TypeExpr::Literal(Literal::Atom(atom)), Some(expr))
             }
             ast::ExprMax::Binary(_bin) => self.alloc_type_expr(TypeExpr::Missing, Some(expr)),
@@ -2653,7 +2653,7 @@ impl<'a> Ctx<'a> {
         match expr_max {
             ast::ExprMax::AnonymousFun(_fun) => self.alloc_term(Term::Missing, Some(expr)),
             ast::ExprMax::Atom(atom) => {
-                let atom = self.db.atom(atom.as_name());
+                let atom = Atom::new(&atom.as_name());
                 self.alloc_term(Term::Literal(Literal::Atom(atom)), Some(expr))
             }
             ast::ExprMax::Binary(bin) => {
@@ -2895,12 +2895,12 @@ impl<'a> Ctx<'a> {
             BuiltInMacro::MODULE => {
                 // First check for override
                 if let Some(ref name) = self.module_name_override {
-                    return Some(Literal::Atom(self.db.atom(name.clone())));
+                    return Some(Literal::Atom(Atom::new(name)));
                 }
                 let form_list = self.db.file_form_list(self.file_id());
                 form_list
                     .module_attribute()
-                    .map(|attr| Literal::Atom(self.db.atom(attr.name.clone())))
+                    .map(|attr| Literal::Atom(Atom::new(&attr.name)))
             }
             BuiltInMacro::MODULE_STRING => {
                 // First check for override
@@ -2912,7 +2912,7 @@ impl<'a> Ctx<'a> {
                     .module_attribute()
                     .map(|attr| Literal::String(StringVariant::Normal(attr.name.to_string())))
             }
-            BuiltInMacro::MACHINE => Some(Literal::Atom(self.db.atom(known::ELP))),
+            BuiltInMacro::MACHINE => Some(Literal::Atom(Atom::new(&known::ELP))),
             BuiltInMacro::OTP_RELEASE => {
                 // Use real OTP version if available, otherwise default to 2000
                 let version = elp_base_db::OTP_VERSION
@@ -3023,7 +3023,7 @@ impl<'a> Ctx<'a> {
         let segs = vec![BinarySeg {
             elem,
             size: None,
-            tys: vec![self.db.atom(known::utf8)],
+            tys: vec![Atom::new(&known::utf8)],
             unit: None,
         }];
         Some(Expr::Binary { segs })
@@ -3038,7 +3038,7 @@ impl<'a> Ctx<'a> {
         let segs = vec![BinarySeg {
             elem,
             size: None,
-            tys: vec![self.db.atom(known::utf8)],
+            tys: vec![Atom::new(&known::utf8)],
             unit: None,
         }];
         Some(Pat::Binary { segs })
@@ -3219,7 +3219,7 @@ impl<'a> Ctx<'a> {
             define
                 .args()
                 .zip(args.args())
-                .map(|(var, arg)| (self.db.var(var.as_name()), arg))
+                .map(|(var, arg)| (Var::new(&var.as_name()), arg))
                 .collect()
         } else {
             FxHashMap::default()
@@ -3256,7 +3256,7 @@ impl<'a> Ctx<'a> {
         var: &ast::Var,
         cb: impl FnOnce(&mut Self, ast::MacroExpr) -> R,
     ) -> Result<R, Var> {
-        let var = self.db.var(var.as_name());
+        let var = Var::new(&var.as_name());
         let entry = &self.macro_stack[self.macro_stack_id];
         if let Some(expr) = entry.var_map.get(&var).cloned() {
             let curr_stack_id = self.macro_stack_id;
@@ -3349,7 +3349,7 @@ impl<'a> Ctx<'a> {
         if self.in_macro_rhs {
             let macro_name = self.macro_call_name(call.name());
             if let MacroCallName::Var(var) = macro_name {
-                let name_str = var.as_string(self.db.upcast());
+                let name_str = var.as_string();
                 if name_str == "FUNCTION_NAME" || name_str == "FUNCTION_ARITY" {
                     return;
                 }
@@ -3373,11 +3373,11 @@ impl<'a> Ctx<'a> {
     fn macro_call_name(&self, name: Option<ast::MacroName>) -> MacroCallName {
         match name {
             Some(ast::MacroName::Atom(atom)) => {
-                let atom = self.db.atom(atom.as_name());
+                let atom = Atom::new(&atom.as_name());
                 MacroCallName::Atom(atom)
             }
             Some(ast::MacroName::Var(var)) => {
-                let var = self.db.var(var.as_name());
+                let var = Var::new(&var.as_name());
                 MacroCallName::Var(var)
             }
             None => MacroCallName::Missing,

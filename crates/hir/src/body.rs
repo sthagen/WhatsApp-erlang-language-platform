@@ -394,7 +394,7 @@ impl Body {
 
     pub fn get_atom_name(&self, sema: &Semantic, name: &ExprId) -> Option<Name> {
         match self[*name] {
-            Expr::Literal(Literal::Atom(atom)) => Some(sema.db.lookup_atom(atom)),
+            Expr::Literal(Literal::Atom(atom)) => Some(atom.as_name()),
             _ => None,
         }
     }
@@ -475,7 +475,7 @@ impl Body {
                         [*key_id]
                     {
                         Expr::Literal(Literal::Atom(atom)) => {
-                            if &atom.as_string(db) == key {
+                            if &atom.as_string() == key {
                                 if path.len() == 1 {
                                     Some(AnyExprId::Expr(*val_id))
                                 } else {
@@ -496,7 +496,7 @@ impl Body {
                         .iter()
                         .find_map(|(key_id, val_id)| match &self[*key_id] {
                             Expr::Literal(Literal::Atom(atom)) => {
-                                if &atom.as_string(db) == key {
+                                if &atom.as_string() == key {
                                     if path.len() == 1 {
                                         Some(AnyExprId::Pat(*val_id))
                                     } else {
@@ -521,7 +521,7 @@ impl Body {
                         .iter()
                         .find_map(|(key_id, _op, val_id)| match &self[*key_id] {
                             TypeExpr::Literal(Literal::Atom(atom)) => {
-                                if &atom.as_string(db) == key {
+                                if &atom.as_string() == key {
                                     if path.len() == 1 {
                                         Some(AnyExprId::TypeExpr(*val_id))
                                     } else {
@@ -546,7 +546,7 @@ impl Body {
                         [*key_id]
                     {
                         Term::Literal(Literal::Atom(atom)) => {
-                            if &atom.as_string(db) == key {
+                            if &atom.as_string() == key {
                                 if path.len() == 1 {
                                     Some(AnyExprId::Term(*val_id))
                                 } else {

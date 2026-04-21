@@ -238,7 +238,7 @@ pub(crate) fn print_type_alias_with_strategy(
     }
 
     printer.print_args(form.name().name(), &body.vars, |this, &var| {
-        write!(this, "{}", db.lookup_var(var)).ok();
+        write!(this, "{}", var.as_name()).ok();
     });
     write!(printer, " :: ").ok();
     printer.print_type(&body.ty);
@@ -295,7 +295,7 @@ pub(crate) fn print_spec(
                     if idx > 0 {
                         write!(printer, ", ").unwrap();
                     }
-                    writeln!(printer, "{} ::", db.lookup_var(*var)).unwrap();
+                    writeln!(printer, "{} ::", var.as_name()).unwrap();
                     printer.indent_level += 1;
                     printer.print_type(guard);
                     printer.indent_level -= 1;
@@ -548,7 +548,7 @@ impl<'a> Printer<'a> {
                 write!(self, ")").ok();
             }
             Expr::Var(var) => {
-                write!(self, "Expr::Var({})", self.db.lookup_var(*var)).ok();
+                write!(self, "Expr::Var({})", var.as_name()).ok();
             }
             Expr::Match { lhs, rhs } => {
                 self.print_herald("Expr::Match", &mut |this| {
@@ -613,10 +613,10 @@ impl<'a> Printer<'a> {
             }
             Expr::Record { name, fields } => {
                 self.print_herald("Expr::Record", &mut |this| {
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, expr_id)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_expr(expr_id);
                             writeln!(this, ",").ok();
@@ -628,10 +628,10 @@ impl<'a> Printer<'a> {
             Expr::RecordUpdate { expr, name, fields } => {
                 self.print_herald("Expr::RecordUpdate", &mut |this| {
                     this.print_labelled("expr", true, &mut |this| this.print_expr(expr));
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, expr_id)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_expr(expr_id);
                             writeln!(this, ",").ok();
@@ -642,15 +642,15 @@ impl<'a> Printer<'a> {
             }
             Expr::RecordIndex { name, field } => {
                 self.print_herald("Expr::RecordIndex", &mut |this| {
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
-                    writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
+                    writeln!(this, "field: Atom('{}')", field.as_name()).ok();
                 });
             }
             Expr::RecordField { expr, name, field } => {
                 self.print_herald("Expr::RecordField", &mut |this| {
                     this.print_labelled("expr", true, &mut |this| this.print_expr(expr));
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
-                    writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
+                    writeln!(this, "field: Atom('{}')", field.as_name()).ok();
                 });
             }
             Expr::NativeRecord { name, fields } => {
@@ -658,7 +658,7 @@ impl<'a> Printer<'a> {
                     this.print_native_record_name(name);
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, expr_id)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_expr(expr_id);
                             writeln!(this, ",").ok();
@@ -673,7 +673,7 @@ impl<'a> Printer<'a> {
                     this.print_native_record_name(name);
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, expr_id)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_expr(expr_id);
                             writeln!(this, ",").ok();
@@ -686,7 +686,7 @@ impl<'a> Printer<'a> {
                 self.print_herald("Expr::NativeRecordField", &mut |this| {
                     this.print_labelled("expr", true, &mut |this| this.print_expr(expr));
                     this.print_native_record_name(name);
-                    writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
+                    writeln!(this, "field: Atom('{}')", field.as_name()).ok();
                 });
             }
             Expr::Map { fields } => {
@@ -955,7 +955,7 @@ impl<'a> Printer<'a> {
                 write!(self, ")").ok();
             }
             Pat::Var(var) => {
-                write!(self, "Pat::Var({})", self.db.lookup_var(*var)).ok();
+                write!(self, "Pat::Var({})", var.as_name()).ok();
             }
             Pat::Match { lhs, rhs } => {
                 self.print_herald("Pat::Match", &mut |this| {
@@ -1014,10 +1014,10 @@ impl<'a> Printer<'a> {
             }
             Pat::Record { name, fields } => {
                 self.print_herald("Pat::Record", &mut |this| {
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, pat_id)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_pat(pat_id);
                             writeln!(this, ",").ok();
@@ -1028,8 +1028,8 @@ impl<'a> Printer<'a> {
             }
             Pat::RecordIndex { name, field } => {
                 self.print_herald("Pat::RecordIndex", &mut |this| {
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
-                    writeln!(this, "field: Atom('{}')", this.db.lookup_atom(*field)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
+                    writeln!(this, "field: Atom('{}')", field.as_name()).ok();
                 });
             }
             Pat::NativeRecord { name, fields } => {
@@ -1037,7 +1037,7 @@ impl<'a> Printer<'a> {
                     this.print_native_record_name(name);
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, pat_id)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_pat(pat_id);
                             writeln!(this, ",").ok();
@@ -1160,8 +1160,8 @@ impl<'a> Printer<'a> {
                     write!(
                         this,
                         "fun {}:{}/{}",
-                        this.db.lookup_atom(*module),
-                        this.db.lookup_atom(*name),
+                        module.as_name(),
+                        name.as_name(),
                         arity
                     )
                     .ok();
@@ -1194,7 +1194,7 @@ impl<'a> Printer<'a> {
             TypeExpr::AnnType { var, ty } => {
                 self.print_herald("TypeExpr::AnnType", &mut |this| {
                     this.print_labelled("var", true, &mut |this| {
-                        write!(this, "{}", this.db.lookup_var(*var)).ok();
+                        write!(this, "{}", var.as_name()).ok();
                     });
                     this.print_labelled("ty", true, &mut |this| this.print_type(ty));
                 });
@@ -1310,10 +1310,10 @@ impl<'a> Printer<'a> {
             }
             TypeExpr::Record { name, fields } => {
                 self.print_herald("TypeExpr::Record", &mut |this| {
-                    writeln!(this, "name: Atom('{}')", this.db.lookup_atom(*name)).ok();
+                    writeln!(this, "name: Atom('{}')", name.as_name()).ok();
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, ty)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_type(ty);
                             writeln!(this, ",").ok();
@@ -1327,7 +1327,7 @@ impl<'a> Printer<'a> {
                     this.print_native_record_name(name);
                     this.print_labelled("fields", false, &mut |this| {
                         fields.iter().for_each(|(name, ty)| {
-                            writeln!(this, "Atom('{}'):", this.db.lookup_atom(*name)).ok();
+                            writeln!(this, "Atom('{}'):", name.as_name()).ok();
                             this.indent();
                             this.print_type(ty);
                             writeln!(this, ",").ok();
@@ -1352,7 +1352,7 @@ impl<'a> Printer<'a> {
                 });
             }
             TypeExpr::Var(var) => {
-                write!(self, "TypeExpr::Var({})", self.db.lookup_var(*var)).ok();
+                write!(self, "TypeExpr::Var({})", var.as_name()).ok();
             }
             TypeExpr::MacroCall {
                 expansion,
@@ -1384,7 +1384,7 @@ impl<'a> Printer<'a> {
         match lit {
             Literal::String(string) => write!(self, "String({string:?})"),
             Literal::Char(char) => write!(self, "Char(${char})"),
-            Literal::Atom(atom) => write!(self, "Atom('{}')", self.db.lookup_atom(*atom)),
+            Literal::Atom(atom) => write!(self, "Atom('{}')", atom.as_name()),
             Literal::Integer(int) => write!(self, "Integer({})", int.value), // TODO: other base
             Literal::Float(float) => write!(self, "Float({})", f64::from_bits(*float)),
         }
@@ -1489,13 +1489,7 @@ impl<'a> Printer<'a> {
                 writeln!(self, "name: #_").ok();
             }
             NativeRecordName::Qualified { module, name } => {
-                writeln!(
-                    self,
-                    "name: #{}:{}",
-                    self.db.lookup_atom(*module),
-                    self.db.lookup_atom(*name)
-                )
-                .ok();
+                writeln!(self, "name: #{}:{}", module.as_name(), name.as_name()).ok();
             }
         }
     }
@@ -1560,7 +1554,7 @@ impl<'a> Printer<'a> {
             writeln!(this, "tys").ok();
             this.indent();
             for &ty in &seg.tys {
-                writeln!(this, "{},", this.db.lookup_atom(ty)).ok();
+                writeln!(this, "{},", ty.as_name()).ok();
             }
             this.dedent();
             writeln!(this, "unit").ok();

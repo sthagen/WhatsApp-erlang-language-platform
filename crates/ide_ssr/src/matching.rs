@@ -73,7 +73,7 @@ pub struct SsrPlaceholder {
 impl SsrPlaceholder {
     /// Create from a Var, if it's an SSR placeholder
     pub fn from_var(var: Var, db: &dyn InternDatabase) -> Option<Self> {
-        if var.is_ssr_placeholder(db) {
+        if var.is_ssr_placeholder() {
             Some(SsrPlaceholder { var })
         } else {
             None
@@ -849,8 +849,8 @@ impl<'a> Matcher<'a> {
                 } else {
                     fail_match!(
                         "Pattern had atom `{}`, code had atom `{}`",
-                        self.sema.db.lookup_atom(pat_atom),
-                        self.sema.db.lookup_atom(*code_atom),
+                        pat_atom.as_name(),
+                        code_atom.as_name(),
                     );
                 }
             }
@@ -878,8 +878,8 @@ impl<'a> Matcher<'a> {
         } else {
             fail_match!(
                 "Pattern had var `{}`, code had var `{}`",
-                self.sema.db.lookup_var(*pat_var),
-                self.sema.db.lookup_var(*code_var),
+                pat_var.as_name(),
+                code_var.as_name(),
             );
         }
     }
@@ -958,7 +958,7 @@ fn render_str(sema: &Semantic, lit: &Literal) -> String {
     match lit {
         Literal::String(s) => s.as_string(),
         Literal::Char(c) => format!("{c}"),
-        Literal::Atom(a) => a.as_string(sema.db.upcast()),
+        Literal::Atom(a) => a.as_string(),
         Literal::Integer(i) => format!("{}", i.value),
         Literal::Float(f) => format!("{f}"),
     }

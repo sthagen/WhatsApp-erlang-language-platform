@@ -190,7 +190,7 @@ fn get_placeholder_info(sema: &Semantic, m: &Match) -> Vec<(String, Vec<String>)
         .placeholders_by_var
         .keys()
         .filter_map(|var| {
-            let name = sema.db.lookup_var(*var).to_string();
+            let name = var.as_name().to_string();
             let texts = m.placeholder_texts(sema, &name)?;
             Some((name, texts))
         })
@@ -2066,7 +2066,7 @@ fn ssr_predicates_on_match_expr_pat() {
     expect![[r#"
         Some(
             Var(
-                3,
+                u!("Var"),
             ),
         )
     "#]]
@@ -2080,7 +2080,7 @@ fn ssr_predicates_on_match_expr_pat() {
     expect![[r#"
         Some(
             Atom(
-                1,
+                u!("atom"),
             ),
         )
     "#]]
@@ -2092,7 +2092,7 @@ fn ssr_predicates_on_match_expr_pat() {
     expect![[r#"
         Some(
             Var(
-                3,
+                u!("Var"),
             ),
         )
     "#]]
@@ -2105,7 +2105,7 @@ fn ssr_predicates_on_match_expr_pat() {
     expect![[r#"
         Some(
             Var(
-                3,
+                u!("Var"),
             ),
         )
     "#]]
@@ -2119,7 +2119,7 @@ fn ssr_predicates_on_match_expr_pat() {
     expect![[r#"
         Some(
             Atom(
-                2,
+                u!("aa"),
             ),
         )
     "#]]

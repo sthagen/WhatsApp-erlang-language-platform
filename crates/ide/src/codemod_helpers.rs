@@ -103,7 +103,7 @@ pub(crate) fn statement_range(node: &SyntaxNode) -> TextRange {
 }
 
 pub(crate) fn var_name_starts_with_underscore(db: &dyn InternDatabase, var: &hir::Var) -> bool {
-    var.as_string(db).starts_with('_')
+    var.as_string().starts_with('_')
 }
 
 pub(crate) fn is_wildcard(sema: &Semantic, var: hir::Var) -> bool {
@@ -266,7 +266,7 @@ impl<'a, T> FunctionMatcher<'a, T> {
             .or_else(|| match target {
                 CallTarget::Local { name: _ } => None,
                 CallTarget::Remote { module, .. } => {
-                    let name = sema.db.lookup_atom(body[*module].as_atom()?);
+                    let name = body[*module].as_atom()?.as_name();
                     let label = Some(SmolStr::new(format!("{name}")));
                     self.labels_m.get(&label).copied()
                 }

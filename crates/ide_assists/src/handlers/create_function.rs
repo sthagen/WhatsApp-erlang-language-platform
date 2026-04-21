@@ -52,13 +52,13 @@ pub(crate) fn create_function(acc: &mut Assists, ctx: &AssistContext) -> Option<
                 let (module_name, function_name) = match &target {
                     hir::CallTarget::Local { name } => {
                         let fun_atom = &call_expr[*name].as_atom()?;
-                        let fun_name = ctx.sema.db.lookup_atom(*fun_atom).to_string();
+                        let fun_name = fun_atom.as_name().to_string();
                         (None, fun_name)
                     }
                     hir::CallTarget::Remote { module, name, .. } => {
                         let module = &call_expr[*module].as_atom()?;
                         let fun_atom = &call_expr[*name].as_atom()?;
-                        let fun_name = ctx.sema.db.lookup_atom(*fun_atom).to_string();
+                        let fun_name = fun_atom.as_name().to_string();
                         (Some(*module), fun_name)
                     }
                 };
@@ -66,7 +66,7 @@ pub(crate) fn create_function(acc: &mut Assists, ctx: &AssistContext) -> Option<
 
                 let form_list = ctx.db().file_form_list(ctx.file_id());
                 if let Some(module_name) = module_name {
-                    let module_name = ctx.db().lookup_atom(module_name);
+                    let module_name = module_name.as_name();
                     let module_attr = form_list.module_attribute()?;
                     if module_name != module_attr.name {
                         // Only inline qualified function calls if

@@ -909,6 +909,7 @@ dependencies = [
  "stdx",
  "tracing",
  "trie-rs",
+ "ustr",
 ]
 
 [[package]]

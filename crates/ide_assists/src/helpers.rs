@@ -86,11 +86,8 @@ pub(crate) fn freshen_variable_name(
     vars_in_clause: &Option<FxHashSet<Var>>,
 ) -> String {
     if let Some(vars_in_clause) = vars_in_clause {
-        let is_safe = |name: &String| -> bool {
-            vars_in_clause
-                .iter()
-                .all(|v| name != &v.as_string(sema.db.upcast()))
-        };
+        let is_safe =
+            |name: &String| -> bool { vars_in_clause.iter().all(|v| name != &v.as_string()) };
         if is_safe(&var_name) {
             var_name
         } else {

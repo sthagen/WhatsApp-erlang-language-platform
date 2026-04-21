@@ -762,7 +762,7 @@ impl GleanIndexer {
             hir::AnyExpr::Pat(Pat::Var(var))
             | hir::AnyExpr::TypeExpr(TypeExpr::Var(var))
             | hir::AnyExpr::Expr(Expr::Var(var)) => {
-                let name = var.as_string(db);
+                let name = var.as_string();
                 let (_, range) = ctx.find_range(sema)?;
                 if range.file_id == file_id {
                     Some(XRef {
@@ -1099,7 +1099,7 @@ impl GleanIndexer {
         file_id: FileId,
         ctx: &AnyCallBackCtx,
     ) -> Option<XRef> {
-        let record_name = sema.db.lookup_atom(name);
+        let record_name = name.as_name();
         let def_map = sema.db.def_map(file_id);
         let def = def_map.get_record(&record_name)?;
         let (_, _, expr_source) = ctx.body_with_expr_source(sema)?;

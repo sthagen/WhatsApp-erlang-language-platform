@@ -194,7 +194,7 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
                 let atom = matched.placeholder_is_atom(ctx.sema, STRING_VAR)?;
                 builder.replace(
                     unnecessary_non_literal_range,
-                    escape_and_quote_string(&atom.as_string(ctx.sema.db.upcast())),
+                    escape_and_quote_string(&atom.as_string()),
                 );
                 Some(vec![fix(
                     "rewrite_as_a_string_literal",
@@ -208,8 +208,7 @@ impl SsrPatternsLinter for CouldBeAStringLiteralLinter {
                 to: StringKind::Binary,
             } => {
                 let atom = matched.placeholder_is_atom(ctx.sema, STRING_VAR)?;
-                let list_string =
-                    escape_and_quote_binary_string(&atom.as_string(ctx.sema.db.upcast()));
+                let list_string = escape_and_quote_binary_string(&atom.as_string());
                 builder.replace(unnecessary_non_literal_range, list_string);
                 Some(vec![fix(
                     "rewrite_as_a_binary_string_literal",

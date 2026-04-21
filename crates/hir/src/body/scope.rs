@@ -184,7 +184,7 @@ impl FunctionScopes {
         function_id: InFile<FunctionDefId>,
     ) -> Arc<FunctionScopes> {
         let function_body = db.function_body(function_id);
-        let anonymous_var = db.var(Name::ANONYMOUS);
+        let anonymous_var = Var::new(&Name::ANONYMOUS);
         let clause_scopes = function_body
             .clauses
             .iter()
@@ -198,7 +198,7 @@ impl FunctionScopes {
         function_clause_id: InFile<FunctionClauseId>,
     ) -> Arc<ExprScopes> {
         let function_clause_body = db.function_clause_body(function_clause_id);
-        let anonymous_var = db.var(Name::ANONYMOUS);
+        let anonymous_var = Var::new(&Name::ANONYMOUS);
         Arc::new(ExprScopes::for_clause(&function_clause_body, anonymous_var))
     }
 
@@ -977,12 +977,15 @@ mod tests {
         let clause_scope = scopes.get(clause_id).unwrap();
         let scope = clause_scope.scope_for_expr(expr_id);
 
-        let actual = clause_scope
+        let mut actual = clause_scope
             .scope_chain(scope)
             .flat_map(|scope| clause_scope.entries(scope).names())
-            .map(|it| db.lookup_var(it).as_str().to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
+            .map(|it| it.as_name().as_str().to_string())
+            .collect::<Vec<_>>();
+        actual.sort();
+        let mut expected: Vec<_> = expected.iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        let actual = actual.join("\n");
         let expected = expected.join("\n");
         assert_eq_text!(&expected, &actual);
     }
@@ -1026,7 +1029,7 @@ mod tests {
               end,
               ~.
             ",
-            &["Y", "X"],
+            &["X", "Y"],
         );
     }
 
@@ -1081,7 +1084,7 @@ mod tests {
                 _ -> 0
               end.
             ",
-            &["Val", "X"],
+            &["X", "Val"],
         );
     }
 
@@ -1120,7 +1123,7 @@ mod tests {
               F = fun(X) when is_integer(X) -> ~, X end,
               F.
             ",
-            &["X", "F"],
+            &["F", "X"],
         );
     }
 
@@ -1165,7 +1168,7 @@ mod tests {
               [{X,Y, ~} || X <- As && Y <- Bs]
               .
             ",
-            &["Y", "X", "As", "Bs"],
+            &["As", "Bs", "X", "Y"],
         );
     }
 
@@ -1211,7 +1214,7 @@ mod tests {
                 end,
                 ~.
             ",
-            &["Z", "Y"],
+            &["Y", "Z"],
         );
     }
 

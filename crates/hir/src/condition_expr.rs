@@ -483,7 +483,7 @@ fn hir_to_condition_expr(
 
     match expr {
         Expr::Literal(Literal::Atom(atom)) => {
-            let name_str = db.lookup_atom(*atom);
+            let name_str = atom.as_name();
             match name_str.as_str() {
                 "true" => ConditionExpr::LiteralBool(true),
                 "false" => ConditionExpr::LiteralBool(false),
@@ -581,7 +581,7 @@ fn hir_to_condition_expr(
             // TODO: Consider a predefined macro for built-in macros like ?FILE.
             if matches!(body.exprs[*expansion], Expr::Missing) {
                 // Undefined macro
-                let name = macro_name.as_name(db);
+                let name = macro_name.as_name();
                 diagnostics.push(ConditionDiagnostic::new(format!(
                     "undefined macro '{}' in preprocessor condition",
                     name
@@ -610,23 +610,23 @@ fn get_call_name(db: &dyn DefDatabase, target: &CallTarget<ExprId>, body: &Body)
     match target {
         CallTarget::Local { name } => {
             if let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*name] {
-                return db.lookup_atom(*atom).to_string();
+                return atom.as_name().to_string();
             }
             if let Expr::MacroCall { expansion, .. } = &body.exprs[*name]
                 && let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*expansion]
             {
-                return db.lookup_atom(*atom).to_string();
+                return atom.as_name().to_string();
             }
             "<unknown>".to_string()
         }
         CallTarget::Remote { module, name, .. } => {
             let module_name = if let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*module] {
-                db.lookup_atom(*atom).to_string()
+                atom.as_name().to_string()
             } else {
                 "<unknown>".to_string()
             };
             let func_name = if let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*name] {
-                db.lookup_atom(*atom).to_string()
+                atom.as_name().to_string()
             } else {
                 "<unknown>".to_string()
             };
@@ -641,13 +641,13 @@ fn is_defined_call(db: &dyn DefDatabase, target: &CallTarget<ExprId>, body: &Bod
         CallTarget::Local { name } => {
             // Access the raw expression
             if let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*name] {
-                return db.lookup_atom(*atom) == known::defined;
+                return atom.as_name() == known::defined;
             }
             // Check through macro expansion
             if let Expr::MacroCall { expansion, .. } = &body.exprs[*name]
                 && let Expr::Literal(Literal::Atom(atom)) = &body.exprs[*expansion]
             {
-                return db.lookup_atom(*atom) == known::defined;
+                return atom.as_name() == known::defined;
             }
             false
         }
@@ -671,9 +671,9 @@ fn extract_defined_macro_name(
     // This corresponds to the code evaluate_builtins/2 in elp_epp.erl
     let arg = &body[args[0]];
     match arg {
-        Expr::Literal(Literal::Atom(atom)) => ConditionExpr::Defined(db.lookup_atom(*atom)),
+        Expr::Literal(Literal::Atom(atom)) => ConditionExpr::Defined(atom.as_name()),
         // Handle uppercase identifiers (like FOO) which are parsed as variables
-        Expr::Var(var) => ConditionExpr::Defined(db.lookup_var(*var)),
+        Expr::Var(var) => ConditionExpr::Defined(var.as_name()),
         _ => {
             diagnostics.push(ConditionDiagnostic::new(
                 "defined() argument must be an atom or macro name",

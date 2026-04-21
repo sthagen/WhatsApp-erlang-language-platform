@@ -538,7 +538,7 @@ pub fn from_is_record(
             match &body[args[1]] {
                 Expr::Literal(Literal::Atom(atom)) => {
                     let def_map = sema.def_map(token.file_id);
-                    let record = def_map.get_record(&sema.db.lookup_atom(*atom))?;
+                    let record = def_map.get_record(&atom.as_name())?;
                     match args.len() {
                         2 => reference_direct(Some(record.clone())),
                         3 => match &body[args[2]] {

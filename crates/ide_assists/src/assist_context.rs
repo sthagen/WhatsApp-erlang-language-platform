@@ -268,7 +268,7 @@ impl<'a> AssistContext<'a> {
                     &mut |mut acc, ctx| {
                         match &ctx.item {
                             AnyExpr::Expr(Expr::Var(var)) => {
-                                acc.push(var.as_string(self.db().upcast()));
+                                acc.push(var.as_string());
                             }
                             AnyExpr::Expr(Expr::Literal(_)) => {
                                 acc.push("N".to_string());
@@ -292,7 +292,7 @@ impl<'a> AssistContext<'a> {
         args.iter()
             .enumerate()
             .map(|(i, typ)| match &body[*typ] {
-                hir::TypeExpr::AnnType { var, ty: _ } => var.as_string(self.db().upcast()),
+                hir::TypeExpr::AnnType { var, ty: _ } => var.as_string(),
                 _ => format!("Arg{}", i + 1),
             })
             .collect::<Vec<_>>()

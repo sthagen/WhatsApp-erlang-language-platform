@@ -84,7 +84,7 @@ impl GenericLinter for DependentHeaderLinter {
                         AnyExpr::Expr(expr) => expr.as_record_name().cloned(),
                         _ => None,
                     } {
-                        let record_name = sema.db.lookup_atom(name);
+                        let record_name = name.as_name();
                         if def_map.get_record(&record_name).is_none()
                             && let Some(in_file_ast_ptr) = body_map.any(ctx.item_id)
                             && let Some(expr_ast) = in_file_ast_ptr.to_node(&source_file)

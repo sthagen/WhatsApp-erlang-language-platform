@@ -75,7 +75,7 @@ impl GenericLinter for RecordTupleMatchLinter {
                         && let Pat::Literal(Literal::Atom(atom)) = &in_clause[*pat]
                     {
                         let def_map = sema.def_map(def.file.file_id);
-                        let record_name = &(*atom).as_name(sema.db.upcast());
+                        let record_name = &(*atom).as_name();
                         if let Some(record) = def_map.get_record(record_name)
                             && pats.len() == record.record.fields.len() + 1
                         {

@@ -563,7 +563,7 @@ impl Match {
         sema: &Semantic,
         placeholder_name: &str,
     ) -> Option<Vec<PlaceholderMatch>> {
-        let var = sema.db.var(Name::from_erlang_service(placeholder_name));
+        let var = Var::new(&Name::from_erlang_service(placeholder_name));
         let subids = self.placeholders_by_var.get(&var)?;
         Some(
             subids
@@ -577,7 +577,7 @@ impl Match {
         sema: &Semantic,
         placeholder_name: &str,
     ) -> Option<PlaceholderMatch> {
-        let var = sema.db.var(Name::from_erlang_service(placeholder_name));
+        let var = Var::new(&Name::from_erlang_service(placeholder_name));
         let subids = self.placeholders_by_var.get(&var)?;
         if subids.len() == 1 {
             self.placeholder_values
@@ -786,7 +786,7 @@ mod test {
                         },
                         placeholders_by_var: {
                             Var(
-                                0,
+                                u!("_@A"),
                             ): {
                                 AnyExprId(
                                     Expr(
@@ -872,7 +872,7 @@ mod test {
                         },
                         placeholders_by_var: {
                             Var(
-                                0,
+                                u!("_@A"),
                             ): {
                                 AnyExprId(
                                     Expr(

@@ -113,7 +113,7 @@ impl GenericLinter for MissingCompileWarnMissingSpec {
                     (Found::No, None),
                     &mut |acc, ctx| match &ctx.item {
                         AnyExpr::Term(Term::Literal(Literal::Atom(atom))) => {
-                            let name = sema.db.lookup_atom(*atom);
+                            let name = atom.as_name();
                             if MISSING_SPEC_ALL_OPTIONS.contains(&name) {
                                 (Found::WarnMissingSpecAll, Some(idx))
                             } else if MISSING_SPEC_OPTIONS.contains(&name) {

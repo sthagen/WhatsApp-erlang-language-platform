@@ -22,6 +22,7 @@ regex.workspace = true
 stdx.workspace = true
 tracing.workspace = true
 trie-rs.workspace = true
+ustr.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

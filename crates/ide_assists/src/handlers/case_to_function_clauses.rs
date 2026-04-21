@@ -131,7 +131,7 @@ pub(crate) fn case_to_function_clauses(acc: &mut Assists, ctx: &AssistContext<'_
                     let var_name = var_expr.syntax().text().to_string();
                     scrutinee_vars
                         .iter()
-                        .find(|v| ctx.db().lookup_var(**v).to_string() == var_name)
+                        .find(|v| v.as_name().to_string() == var_name)
                         .filter(|v| body_free_vars.contains(v))
                         .copied()
                 }
@@ -193,11 +193,7 @@ fn make_call_text(
     outliving_locals: &[Var],
 ) -> String {
     let mut args = vec![scrutinee.syntax().text().to_string()];
-    args.extend(
-        free_vars
-            .iter()
-            .map(|var| ctx.db().lookup_var(*var).to_string()),
-    );
+    args.extend(free_vars.iter().map(|var| var.as_name().to_string()));
 
     let args_str = args.join(", ");
 
@@ -205,16 +201,11 @@ fn make_call_text(
     match outliving_locals {
         [] => {}
         [local] => {
-            format_to!(buf, "{} = ", local.as_string(ctx.db().upcast()));
+            format_to!(buf, "{} = ", local.as_string());
         }
         vars => {
             buf.push('{');
-            buf.push_str(
-                &vars
-                    .iter()
-                    .map(|v| v.as_string(ctx.db().upcast()))
-                    .join(", "),
-            );
+            buf.push_str(&vars.iter().map(|v| v.as_string()).join(", "));
             buf.push_str("} = ");
         }
     }
@@ -234,13 +225,10 @@ fn make_function_def(
     new_indent: IndentLevel,
 ) -> String {
     let mut fn_def = String::new();
-    let free_var_names: Vec<String> = free_vars
-        .iter()
-        .map(|v| ctx.db().lookup_var(*v).to_string())
-        .collect();
+    let free_var_names: Vec<String> = free_vars.iter().map(|v| v.as_name().to_string()).collect();
 
     let use_snippet = ctx.config.snippet_cap.is_some();
-    let scrutinee_var_name = scrutinee_var_to_bind.map(|v| ctx.db().lookup_var(v).to_string());
+    let scrutinee_var_name = scrutinee_var_to_bind.map(|v| v.as_name().to_string());
 
     for (i, clause) in clauses.iter().enumerate() {
         let is_first = i == 0;
@@ -306,11 +294,11 @@ fn make_function_def(
         // Add return value if needed
         if !outliving_locals.is_empty() {
             let ret = match outliving_locals {
-                [local] => local.as_string(ctx.db().upcast()),
+                [local] => local.as_string(),
                 vars => format!(
                     "{{{}}}",
                     vars.iter()
-                        .map(|v| v.as_string(ctx.db().upcast()))
+                        .map(|v| v.as_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),

@@ -458,7 +458,7 @@ fn is_seg_formulation_valid_in_pattern<T: Debug>(sema: &Semantic, segs: &[Binary
             if seg
                 .tys
                 .iter()
-                .any(|ty: &hir::Atom| ty.as_string(intern_db) == "binary")
+                .any(|ty: &hir::Atom| ty.as_string() == "binary")
             {
                 seg.size.is_some()
             } else {
@@ -545,11 +545,11 @@ fn is_length_call(sema: &Semantic, body: &Body, pm: &PlaceholderMatch) -> bool {
     let intern_db: &dyn InternDatabase = sema.db.upcast();
     match target {
         CallTarget::Local { name } => {
-            matches!(body[*name].as_atom(), Some(atom) if atom.as_string(intern_db) == "length")
+            matches!(body[*name].as_atom(), Some(atom) if atom.as_string() == "length")
         }
         CallTarget::Remote { module, name, .. } => {
-            matches!(body[*module].as_atom(), Some(atom) if atom.as_string(intern_db) == "erlang")
-                && matches!(body[*name].as_atom(), Some(atom) if atom.as_string(intern_db) == "length")
+            matches!(body[*module].as_atom(), Some(atom) if atom.as_string() == "erlang")
+                && matches!(body[*name].as_atom(), Some(atom) if atom.as_string() == "length")
         }
     }
 }

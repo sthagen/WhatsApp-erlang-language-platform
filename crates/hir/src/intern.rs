@@ -11,44 +11,95 @@
 use std::sync::Arc;
 
 use elp_base_db::salsa;
+use ustr::Ustr;
 
 use crate::Name;
 
 #[salsa::query_group(InternDatabaseStorage)]
 pub trait InternDatabase {
     #[salsa::interned]
-    fn atom(&self, name: Name) -> Atom;
-
-    #[salsa::interned]
-    fn var(&self, name: Name) -> Var;
-
-    #[salsa::interned]
     fn ssr(&self, source: Arc<str>) -> SsrSource;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Atom(salsa::InternId);
+/// An interned atom, backed by a global concurrent string interner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Atom(Ustr);
 
-impl salsa::InternKey for Atom {
-    fn from_intern_id(v: salsa::InternId) -> Self {
-        Atom(v)
-    }
-
-    fn as_intern_id(&self) -> salsa::InternId {
-        self.0
+impl std::hash::Hash for Atom {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.as_str().hash(state);
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Var(salsa::InternId);
+impl PartialOrd for Atom {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
-impl salsa::InternKey for Var {
-    fn from_intern_id(v: salsa::InternId) -> Self {
-        Var(v)
+impl Ord for Atom {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.as_str().cmp(other.0.as_str())
+    }
+}
+
+impl Atom {
+    pub fn new(name: &Name) -> Atom {
+        Atom(Ustr::from(name.as_str()))
     }
 
-    fn as_intern_id(&self) -> salsa::InternId {
+    pub fn as_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn as_name(&self) -> Name {
+        Name::from_erlang_service(self.0.as_str())
+    }
+}
+
+/// An interned variable name, backed by a global concurrent string interner.
+///
+/// Same rationale as `Atom` — see above.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Var(Ustr);
+
+impl std::hash::Hash for Var {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.as_str().hash(state);
+    }
+}
+
+impl PartialOrd for Var {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Var {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.as_str().cmp(other.0.as_str())
+    }
+}
+
+impl Var {
+    pub fn new(name: &Name) -> Var {
+        Var(Ustr::from(name.as_str()))
+    }
+
+    pub fn as_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn as_name(&self) -> Name {
+        Name::from_erlang_service(self.0.as_str())
+    }
+
+    /// Returns true if this variable is an SSR placeholder.
+    /// SSR placeholders are variables with names starting with `_@`.
+    pub fn is_ssr_placeholder(&self) -> bool {
         self.0
+            .as_str()
+            .starts_with(elp_syntax::ast::SSR_PLACEHOLDER_PREFIX)
     }
 }
 
@@ -62,33 +113,5 @@ impl salsa::InternKey for SsrSource {
 
     fn as_intern_id(&self) -> salsa::InternId {
         self.0
-    }
-}
-
-impl Atom {
-    pub fn as_string(&self, db: &dyn InternDatabase) -> String {
-        db.lookup_atom(*self).to_string()
-    }
-
-    pub fn as_name(&self, db: &dyn InternDatabase) -> Name {
-        db.lookup_atom(*self)
-    }
-}
-
-impl Var {
-    pub fn as_string(&self, db: &dyn InternDatabase) -> String {
-        db.lookup_var(*self).to_string()
-    }
-
-    pub fn as_name(&self, db: &dyn InternDatabase) -> Name {
-        db.lookup_var(*self)
-    }
-
-    /// Returns true if this variable is an SSR placeholder.
-    /// SSR placeholders are variables with names starting with `_@`.
-    pub fn is_ssr_placeholder(&self, db: &dyn InternDatabase) -> bool {
-        db.lookup_var(*self)
-            .as_str()
-            .starts_with(elp_syntax::ast::SSR_PLACEHOLDER_PREFIX)
     }
 }

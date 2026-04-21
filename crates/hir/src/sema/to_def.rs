@@ -90,7 +90,7 @@ impl ToDef for ast::Atom {
             AnyExprRef::Term(Term::Literal(Literal::Atom(atom))) => atom,
             _ => return None,
         };
-        let name = sema.db.lookup_atom(*atom);
+        let name = atom.as_name();
         resolve_atom(sema, &name, file_id)
     }
 }
@@ -617,13 +617,13 @@ pub fn resolve_call_target(
 ) -> Option<FunctionDef> {
     let (name, arity, file_id) = match target {
         CallTarget::Local { name } => {
-            let name = sema.db.lookup_atom(body[*name].as_atom()?);
+            let name = body[*name].as_atom()?.as_name();
             (name, arity, file_id)
         }
         #[rustfmt::skip]
         CallTarget::Remote { module, name, .. } => {
-            let module_name = sema.db.lookup_atom(body[*module].as_atom()?);
-            let fn_name: Name = sema.db.lookup_atom(body[*name].as_atom()?);
+            let module_name = body[*module].as_atom()?.as_name();
+            let fn_name: Name = body[*name].as_atom()?.as_name();
             let mo =
                 None; // @oss-only
                 // @fb-only: meta_only::resolve_handle_call_target(sema, arity, file_id, &module_name, &fn_name);
@@ -663,7 +663,7 @@ pub fn resolve_type_target(
     let (file_id, type_expr) = match target {
         CallTarget::Local { name } => (file_id, *name),
         CallTarget::Remote { module, name, .. } => {
-            let module = sema.db.lookup_atom(body[*module].as_atom()?);
+            let module = body[*module].as_atom()?.as_name();
             (
                 resolve_module_name(sema, file_id, &module)?.file.file_id,
                 *name,
@@ -671,7 +671,7 @@ pub fn resolve_type_target(
         }
     };
 
-    let name = sema.db.lookup_atom(body[type_expr].as_atom()?);
+    let name = body[type_expr].as_atom()?.as_name();
     match arity {
         None => sema.db.def_map(file_id).get_type_any_arity(&name).cloned(),
         Some(arity) => {
@@ -732,10 +732,7 @@ fn resolve_record(
         }
         _ => return None,
     };
-    Some((
-        sema.db.lookup_atom(name),
-        field.map(|name| sema.db.lookup_atom(name)),
-    ))
+    Some((name.as_name(), field.map(|name| name.as_name())))
 }
 
 fn resolve_testcase(sema: &Semantic<'_>, file_id: FileId, name: &Name) -> Option<FunctionDef> {
@@ -1147,13 +1144,13 @@ pub(crate) fn look_for_dynamic_call(
 ) -> Option<CallDef> {
     let module_name = if let Some(module) = module {
         let atom = body[module].as_atom()?;
-        Some(sema.db.lookup_atom(atom))
+        Some(atom.as_name())
     } else {
         None
     };
 
     let function_atom = body[fun].as_atom()?;
-    let function_name = sema.db.lookup_atom(function_atom);
+    let function_name = function_atom.as_name();
 
     // Create pattern key and look up in HashMap for O(1) lookup
     let module_str = module_name.as_ref().map(|name| name.as_str());

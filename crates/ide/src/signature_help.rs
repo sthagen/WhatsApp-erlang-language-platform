@@ -102,7 +102,7 @@ pub(crate) fn signature_help(
         match target {
             CallTarget::Local { name } => {
                 let fun_atom = &call_expr[*name].as_atom()?;
-                let fun_name = sema.db.lookup_atom(*fun_atom);
+                let fun_name = fun_atom.as_name();
                 signature_help_for_call(
                     &mut res,
                     sema,
@@ -116,9 +116,9 @@ pub(crate) fn signature_help(
             }
             CallTarget::Remote { module, name, .. } => {
                 let module_atom = &call_expr[*module].as_atom()?;
-                let module_name = sema.db.lookup_atom(*module_atom);
+                let module_name = module_atom.as_name();
                 let fun_atom = &call_expr[*name].as_atom()?;
-                let fun_name = sema.db.lookup_atom(*fun_atom);
+                let fun_name = fun_atom.as_name();
                 let module = sema.resolve_module_name(position.file_id, module_name.as_str())?;
                 signature_help_for_call(
                     &mut res,

@@ -311,7 +311,7 @@ impl Semantic<'_> {
 
     pub fn resolve_module_expr(&self, file_id: FileId, module_expr: &Expr) -> Option<Module> {
         let module_atom: Atom = module_expr.as_atom()?;
-        let module_name: Name = self.db.lookup_atom(module_atom);
+        let module_name: Name = module_atom.as_name();
         self.resolve_module_name(file_id, module_name.as_str())
     }
 
@@ -842,7 +842,7 @@ impl Semantic<'_> {
     pub fn attribute_value_as_atom(&self, file_id: FileId, name: Name) -> Option<String> {
         let attr = self.attribute(file_id, name)?;
         match attr.body[attr.value] {
-            Term::Literal(Literal::Atom(atom)) => Some(atom.as_string(self.db.upcast())),
+            Term::Literal(Literal::Atom(atom)) => Some(atom.as_string()),
             _ => None,
         }
     }
@@ -1162,7 +1162,7 @@ impl Semantic<'_> {
 
     pub fn is_atom_named(&self, expr: &Expr, known_atom: &Name) -> bool {
         match expr {
-            Expr::Literal(Literal::Atom(atom)) => &self.db.lookup_atom(*atom) == known_atom,
+            Expr::Literal(Literal::Atom(atom)) => &atom.as_name() == known_atom,
             _ => false,
         }
     }
@@ -1605,7 +1605,7 @@ impl<'a, T> InFunctionClauseBody<'a, T> {
     }
 
     pub fn as_atom_name(&self, expr: &ExprId) -> Option<Name> {
-        Some(self.sema.db.lookup_atom(self[*expr].as_atom()?))
+        Some(self[*expr].as_atom()?.as_name())
     }
 
     pub fn resolver(&self) -> Resolver {
@@ -1776,12 +1776,7 @@ mod tests {
             .unwrap();
         let usages: Vec<_> = usages
             .iter()
-            .map(|(id, v)| {
-                (
-                    in_clause.range_for_any(*id).unwrap().range,
-                    v.as_string(&db),
-                )
-            })
+            .map(|(id, v)| (in_clause.range_for_any(*id).unwrap().range, v.as_string()))
             .sorted_by_key(|(r, _)| r.start())
             .collect();
         expect.assert_debug_eq(&usages);

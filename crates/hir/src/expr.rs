@@ -231,10 +231,10 @@ pub enum MacroCallName {
 }
 
 impl MacroCallName {
-    pub fn as_name(&self, db: &dyn InternDatabase) -> Name {
+    pub fn as_name(&self) -> Name {
         match self {
-            MacroCallName::Var(var) => var.as_name(db),
-            MacroCallName::Atom(atom) => atom.as_name(db),
+            MacroCallName::Var(var) => var.as_name(),
+            MacroCallName::Atom(atom) => atom.as_name(),
             MacroCallName::Missing => Name::MISSING,
         }
     }
@@ -590,12 +590,12 @@ impl CallTarget<TypeExprId> {
     pub fn label(&self, arity: u32, sema: &Semantic, body: &Body) -> Option<SmolStr> {
         match self {
             CallTarget::Local { name } => {
-                let name = sema.db.lookup_atom(body[*name].as_atom()?);
+                let name = body[*name].as_atom()?.as_name();
                 Some(SmolStr::new(format!("{name}/{arity}")))
             }
             CallTarget::Remote { module, name, .. } => {
-                let name = sema.db.lookup_atom(body[*name].as_atom()?);
-                let module = sema.db.lookup_atom(body[*module].as_atom()?);
+                let name = body[*name].as_atom()?.as_name();
+                let module = body[*module].as_atom()?.as_name();
                 Some(SmolStr::new(format!("{module}:{name}/{arity}",)))
             }
         }
@@ -636,12 +636,12 @@ impl CallTarget<ExprId> {
     pub fn label(&self, arity: u32, sema: &Semantic, body: &Body) -> Option<SmolStr> {
         match self {
             CallTarget::Local { name } => {
-                let name = sema.db.lookup_atom(body[*name].as_atom()?);
+                let name = body[*name].as_atom()?.as_name();
                 Some(SmolStr::new(format!("{name}/{arity}")))
             }
             CallTarget::Remote { module, name, .. } => {
-                let name = sema.db.lookup_atom(body[*name].as_atom()?);
-                let module = sema.db.lookup_atom(body[*module].as_atom()?);
+                let name = body[*name].as_atom()?.as_name();
+                let module = body[*module].as_atom()?.as_name();
                 Some(SmolStr::new(format!("{module}:{name}/{arity}",)))
             }
         }
@@ -650,12 +650,12 @@ impl CallTarget<ExprId> {
     pub fn label_short(&self, sema: &Semantic, body: &Body) -> Option<SmolStr> {
         match self {
             CallTarget::Local { name } => {
-                let name = sema.db.lookup_atom(body[*name].as_atom()?);
+                let name = body[*name].as_atom()?.as_name();
                 Some(SmolStr::new(format!("{name}")))
             }
             CallTarget::Remote { module, name, .. } => {
-                let name = sema.db.lookup_atom(body[*name].as_atom()?);
-                let module = sema.db.lookup_atom(body[*module].as_atom()?);
+                let name = body[*name].as_atom()?.as_name();
+                let module = body[*module].as_atom()?.as_name();
                 Some(SmolStr::new(format!("{module}:{name}",)))
             }
         }
@@ -687,7 +687,7 @@ impl CallTarget<ExprId> {
                 } else {
                     // We may have the erlang module, inserted while lowering
                     let module_atom = &in_clause[*module].as_atom()?;
-                    if in_clause.sema.db.lookup_atom(*module_atom) == known::erlang {
+                    if module_atom.as_name() == known::erlang {
                         Some(name_range)
                     } else {
                         None

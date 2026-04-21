@@ -97,7 +97,7 @@ pub(crate) fn bump_variables(acc: &mut Assists, ctx: &AssistContext) -> Option<(
         let mut var_defs = Vec::default();
         vars.into_iter()
             .filter_map(|(v, vs)| {
-                let var_name = ctx.db().lookup_var(v);
+                let var_name = v.as_name();
                 let nv = NumberedVar::from_var(var_name.as_str())?;
                 Some((vs, nv))
             })

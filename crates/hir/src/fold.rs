@@ -2156,7 +2156,7 @@ bar() ->
             0,
             &mut |acc, ctx| match ctx.item {
                 AnyExpr::Expr(Expr::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2164,7 +2164,7 @@ bar() ->
                     }
                 }
                 AnyExpr::Pat(Pat::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2172,7 +2172,7 @@ bar() ->
                     }
                 }
                 AnyExpr::TypeExpr(TypeExpr::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2180,7 +2180,7 @@ bar() ->
                     }
                 }
                 AnyExpr::Term(Term::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2530,7 +2530,7 @@ bar() ->
             false,
             &mut |acc, ctx| match ctx.item {
                 AnyExpr::Expr(Expr::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         let (body, _) = sema
                             .get_body_and_map(file_id, ctx.form_id().unwrap())
@@ -2835,7 +2835,7 @@ bar() ->
             0,
             &mut |acc, ctx| match ctx.item {
                 AnyExpr::Pat(Pat::Var(v)) => {
-                    if v.as_string(sema.db.upcast()) == "Foo" {
+                    if v.as_string() == "Foo" {
                         acc + 1
                     } else {
                         acc
@@ -2886,7 +2886,7 @@ bar() ->
             0,
             &mut |acc, ctx| match ctx.item {
                 AnyExpr::Expr(Expr::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2894,7 +2894,7 @@ bar() ->
                     }
                 }
                 AnyExpr::Term(Term::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2932,7 +2932,7 @@ bar() ->
             0,
             &mut |acc, ctx| match ctx.item {
                 AnyExpr::Expr(Expr::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {
@@ -2940,7 +2940,7 @@ bar() ->
                     }
                 }
                 AnyExpr::Term(Term::Literal(Literal::Atom(atom))) => {
-                    let atom_name = db.lookup_atom(atom);
+                    let atom_name = atom.as_name();
                     if atom_name.as_str() == hir_atom_str {
                         acc + 1
                     } else {

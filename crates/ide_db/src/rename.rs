@@ -845,7 +845,7 @@ fn is_safe_var(
             resolver_var
                 .all_vars_in_scope(scope_var)
                 .iter()
-                .all(|&var| sema.db.lookup_var(var) != new_name)
+                .all(|&var| var.as_name() != new_name)
         } else {
             false
         }
