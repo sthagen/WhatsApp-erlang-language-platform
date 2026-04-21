@@ -229,6 +229,12 @@ pub struct Diagnostic {
     pub code_doc_uri: Option<String>,
 }
 
+struct SuppressionFixLocation {
+    offset: TextSize,
+    indent: String,
+    suffix: &'static str,
+}
+
 impl Diagnostic {
     pub fn new(code: DiagnosticCode, message: impl Into<String>, range: TextRange) -> Diagnostic {
         let message = message.into();
@@ -352,21 +358,37 @@ impl Diagnostic {
         )
     }
 
-    pub(crate) fn with_fixme_fix(self, sema: &Semantic, file_id: FileId) -> Diagnostic {
-        self.with_suppression_fix(
-            sema,
-            file_id,
-            "fixme_problem",
-            "Add fixme comment",
-            "fixme",
-            GroupLabel::fixme(),
-            Some(AssistUserInput {
-                input_type: AssistUserInputType::StringAndTaskId,
-                prompt: Some("Enter reason for fixme, including task number".to_string()),
-                value: "".to_string(),
-                task_id: None,
-            }),
-        )
+    pub(crate) fn with_default_suppression_fixes(
+        mut self,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Diagnostic {
+        if let Some(location) = self.suppression_fix_location(sema, file_id) {
+            self.push_suppression_fix(
+                file_id,
+                &location,
+                "ignore_problem",
+                "Ignore problem",
+                "ignore",
+                GroupLabel::ignore(),
+                None,
+            );
+            self.push_suppression_fix(
+                file_id,
+                &location,
+                "fixme_problem",
+                "Add fixme comment",
+                "fixme",
+                GroupLabel::fixme(),
+                Some(AssistUserInput {
+                    input_type: AssistUserInputType::StringAndTaskId,
+                    prompt: Some("Enter reason for fixme, including task number".to_string()),
+                    value: "".to_string(),
+                    task_id: None,
+                }),
+            );
+        }
+        self
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -380,61 +402,89 @@ impl Diagnostic {
         group: GroupLabel,
         user_input: Option<AssistUserInput>,
     ) -> Diagnostic {
-        let mut builder = TextEdit::builder();
+        if let Some(location) = self.suppression_fix_location(sema, file_id) {
+            self.push_suppression_fix(
+                file_id, &location, assist_id, label, keyword, group, user_input,
+            );
+        }
+        self
+    }
+
+    fn suppression_fix_location(
+        &self,
+        sema: &Semantic,
+        file_id: FileId,
+    ) -> Option<SuppressionFixLocation> {
         let parsed = sema.parse(file_id);
-        if let Some(token) = parsed
+        let token = parsed
             .value
             .syntax()
             .token_at_offset(self.range.start())
-            .right_biased()
-        {
-            let indent = IndentLevel::from_token(&token);
+            .right_biased()?;
+        let indent = IndentLevel::from_token(&token).to_string();
 
-            let mut offset = start_of_line(&token);
-            let mut suffix = "";
-            if self.range == DIAGNOSTIC_WHOLE_FILE_RANGE {
-                // Change the location to be just before the module form if it exists
-                let form_list = sema.form_list(file_id);
-                if let Some(module_attribute) = form_list.module_attribute() {
-                    let ma_form = module_attribute.form_id.get(&parsed.value);
-                    if let Some(ma_token) = parsed
-                        .value
-                        .syntax()
-                        .token_at_offset(ma_form.syntax().text_range().start())
-                        .right_biased()
-                    {
-                        offset = start_of_line(&ma_token);
-                    }
-                } else {
-                    suffix = "\n";
+        let mut offset = start_of_line(&token);
+        let mut suffix = "";
+        if self.range == DIAGNOSTIC_WHOLE_FILE_RANGE {
+            // Change the location to be just before the module form if it exists
+            let form_list = sema.form_list(file_id);
+            if let Some(module_attribute) = form_list.module_attribute() {
+                let ma_form = module_attribute.form_id.get(&parsed.value);
+                if let Some(ma_token) = parsed
+                    .value
+                    .syntax()
+                    .token_at_offset(ma_form.syntax().text_range().start())
+                    .right_biased()
+                {
+                    offset = start_of_line(&ma_token);
                 }
+            } else {
+                suffix = "\n";
             }
-            let text = format!(
-                "\n{}% elp:{} {}{}",
-                indent,
-                keyword,
-                self.code.as_labeled_code(),
-                suffix
-            );
-
-            builder.insert(offset, text);
-            let edit = builder.finish();
-            let source_change = SourceChange::from_text_edit(file_id, edit);
-            let fix = Assist {
-                id: AssistId(assist_id, AssistKind::QuickFix),
-                label: Label::new(label),
-                group: Some(group),
-                target: self.range,
-                source_change: Some(source_change),
-                user_input,
-                original_diagnostic: None,
-            };
-            match &mut self.fixes {
-                Some(fixes) => fixes.push(fix),
-                None => self.fixes = Some(vec![fix]),
-            };
         }
-        self
+
+        Some(SuppressionFixLocation {
+            offset,
+            indent,
+            suffix,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn push_suppression_fix(
+        &mut self,
+        file_id: FileId,
+        location: &SuppressionFixLocation,
+        assist_id: &'static str,
+        label: &'static str,
+        keyword: &str,
+        group: GroupLabel,
+        user_input: Option<AssistUserInput>,
+    ) {
+        let mut builder = TextEdit::builder();
+        let text = format!(
+            "\n{}% elp:{} {}{}",
+            location.indent,
+            keyword,
+            self.code.as_labeled_code(),
+            location.suffix
+        );
+        builder.insert(location.offset, text);
+        let edit = builder.finish();
+        let source_change = SourceChange::from_text_edit(file_id, edit);
+        let fix = Assist {
+            id: AssistId(assist_id, AssistKind::QuickFix),
+            label: Label::new(label),
+            group: Some(group),
+            target: self.range,
+            source_change: Some(source_change),
+            user_input,
+            original_diagnostic: None,
+        };
+        match &mut self.fixes {
+            Some(fixes) => fixes.push(fix),
+            None => self.fixes = Some(vec![fix]),
+        };
     }
 
     pub fn print(&self, line_index: &LineIndex, use_cli_severity: bool) -> String {
@@ -761,6 +811,7 @@ pub(crate) trait FunctionCallDiagnostics: Linter {
         severity: Severity,
         cli_severity: Severity,
         config: &FunctionCallLinterConfig,
+        include_fixes: bool,
     ) -> Vec<Diagnostic>;
 }
 
@@ -771,6 +822,7 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
         severity: Severity,
         cli_severity: Severity,
         config: &FunctionCallLinterConfig,
+        include_fixes: bool,
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
         let matches = self.matches_functions();
@@ -810,7 +862,8 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
                            }| {
                         let range = match_ctx.range(&UseRange::NameOnly);
                         if range.file_id == def.file.file_id {
-                            let fixes = self.fixes(&match_ctx, ctx);
+                            let fixes =
+                                include_fixes.then(|| self.fixes(&match_ctx, ctx)).flatten();
                             let description = self.match_description(extra);
                             // Use config override if present, otherwise use match_severity
                             let effective_severity = if has_severity_override {
@@ -827,10 +880,8 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
                                 .with_fixes(fixes)
                                 .with_severity(effective_severity)
                                 .with_cli_severity(effective_cli_severity);
-                            if self.can_be_suppressed() {
-                                diag = diag
-                                    .with_ignore_fix(sema, def_fb.file_id())
-                                    .with_fixme_fix(sema, def_fb.file_id());
+                            if include_fixes && self.can_be_suppressed() {
+                                diag = diag.with_default_suppression_fixes(sema, def_fb.file_id());
                             };
                             Some(diag)
                         } else {
@@ -926,6 +977,7 @@ pub(crate) trait SsrPatternsDiagnostics: Linter {
         severity: Severity,
         cli_severity: Severity,
         linter_config: &SsrPatternsLinterConfig,
+        include_fixes: bool,
     ) -> Vec<Diagnostic>;
 }
 
@@ -936,6 +988,7 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
         severity: Severity,
         cli_severity: Severity,
         _linter_config: &SsrPatternsLinterConfig,
+        include_fixes: bool,
     ) -> Vec<Diagnostic> {
         let mut res = Vec::new();
         for (pattern, context) in self.patterns() {
@@ -948,7 +1001,9 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
                 }
                 if Some(true) == self.is_match_valid(context, matched, ctx) {
                     let message = self.pattern_description(context);
-                    let fixes = self.fixes(context, matched, ctx);
+                    let fixes = include_fixes
+                        .then(|| self.fixes(context, matched, ctx))
+                        .flatten();
                     let categories = self.add_categories(context);
                     let range = match self.range(ctx, matched) {
                         None => matched.range.range,
@@ -959,10 +1014,8 @@ impl<T: SsrPatternsLinter> SsrPatternsDiagnostics for T {
                         .add_categories(categories)
                         .with_severity(severity)
                         .with_cli_severity(cli_severity);
-                    if self.can_be_suppressed() {
-                        d = d
-                            .with_ignore_fix(ctx.sema, ctx.file_id)
-                            .with_fixme_fix(ctx.sema, ctx.file_id);
+                    if include_fixes && self.can_be_suppressed() {
+                        d = d.with_default_suppression_fixes(ctx.sema, ctx.file_id);
                     }
                     res.push(d);
                 }
@@ -1064,6 +1117,7 @@ pub(crate) trait GenericDiagnostics: Linter {
         ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
+        include_fixes: bool,
     ) -> Vec<Diagnostic>;
 }
 
@@ -1073,6 +1127,7 @@ impl<T: GenericLinter> GenericDiagnostics for T {
         ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
+        include_fixes: bool,
     ) -> Vec<Diagnostic> {
         let mut res = Vec::new();
         if let Some(matches) = self.matches(ctx) {
@@ -1082,7 +1137,9 @@ impl<T: GenericLinter> GenericDiagnostics for T {
                 }
                 let range = matched.range.range;
                 let message = self.match_description(&matched.context);
-                let fixes = self.fixes(&matched.context, range, ctx);
+                let fixes = include_fixes
+                    .then(|| self.fixes(&matched.context, range, ctx))
+                    .flatten();
                 let tag = self.tag(&matched.context);
                 let related = self.related(&matched.context, ctx);
                 let mut d = Diagnostic::new(self.id(), message, range)
@@ -1092,10 +1149,8 @@ impl<T: GenericLinter> GenericDiagnostics for T {
                     .add_categories(self.add_categories(&matched.context))
                     .with_severity(severity)
                     .with_cli_severity(cli_severity);
-                if self.can_be_suppressed() {
-                    d = d
-                        .with_ignore_fix(ctx.sema, ctx.file_id)
-                        .with_fixme_fix(ctx.sema, ctx.file_id);
+                if include_fixes && self.can_be_suppressed() {
+                    d = d.with_default_suppression_fixes(ctx.sema, ctx.file_id);
                 }
                 res.push(d);
             }
@@ -1187,7 +1242,7 @@ pub enum DiagnosticsTrigger {
     Change,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct DiagnosticsConfig {
     pub experimental: bool,
     pub disabled: FxHashSet<DiagnosticCode>,
@@ -1198,11 +1253,32 @@ pub struct DiagnosticsConfig {
     pub include_generated: bool,
     pub include_suppressed: bool,
     pub include_otp: bool,
+    pub include_fixes: bool,
     pub use_cli_severity: bool,
     pub recursive: bool,
     /// Used in `elp lint` to request erlang service diagnostics if
     /// needed.
     pub request_erlang_service_diagnostics: bool,
+}
+
+impl Default for DiagnosticsConfig {
+    fn default() -> Self {
+        Self {
+            experimental: false,
+            disabled: FxHashSet::default(),
+            enabled: EnabledDiagnostics::new(),
+            lints_from_config: LintsFromConfig::default(),
+            lint_config: None,
+            diagnostic_filter: None,
+            include_generated: false,
+            include_suppressed: false,
+            include_otp: false,
+            include_fixes: true,
+            use_cli_severity: false,
+            recursive: false,
+            request_erlang_service_diagnostics: false,
+        }
+    }
 }
 
 impl DiagnosticsConfig {
@@ -1279,6 +1355,11 @@ impl DiagnosticsConfig {
 
     pub fn set_include_suppressed(mut self, value: bool) -> DiagnosticsConfig {
         self.include_suppressed = value;
+        self
+    }
+
+    pub fn set_include_fixes(mut self, value: bool) -> DiagnosticsConfig {
+        self.include_fixes = value;
         self
     }
 
@@ -2074,8 +2155,13 @@ fn diagnostics_from_linters(
                     } else {
                         FunctionCallLinterConfig::default()
                     };
-                    let diagnostics =
-                        function_linter.diagnostics(ctx, severity, cli_severity, &linter_config);
+                    let diagnostics = function_linter.diagnostics(
+                        ctx,
+                        severity,
+                        cli_severity,
+                        &linter_config,
+                        config.include_fixes,
+                    );
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::SsrPatterns(ssr_linter) => {
@@ -2086,12 +2172,22 @@ fn diagnostics_from_linters(
                     } else {
                         SsrPatternsLinterConfig::default()
                     };
-                    let diagnostics =
-                        ssr_linter.diagnostics(ctx, severity, cli_severity, &linter_config);
+                    let diagnostics = ssr_linter.diagnostics(
+                        ctx,
+                        severity,
+                        cli_severity,
+                        &linter_config,
+                        config.include_fixes,
+                    );
                     res.extend(filter_for_manual_section(diagnostics));
                 }
                 DiagnosticLinter::Generic(generic_linter) => {
-                    let diagnostics = generic_linter.diagnostics(ctx, severity, cli_severity);
+                    let diagnostics = generic_linter.diagnostics(
+                        ctx,
+                        severity,
+                        cli_severity,
+                        config.include_fixes,
+                    );
                     res.extend(filter_for_manual_section(diagnostics));
                 }
             }

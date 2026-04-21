@@ -162,21 +162,18 @@ fn partition_to_funs(
                 }
                 ClauseSeparator::Dot => {
                     current.push(head_info.clone());
-                    res.push(current.clone());
-                    current = Vec::default();
+                    res.push(std::mem::take(&mut current));
                 }
                 ClauseSeparator::Missing => {
                     if !current.is_empty() {
-                        res.push(current.clone());
-                        current = Vec::default();
+                        res.push(std::mem::take(&mut current));
                     }
                 }
             }
         } else {
             // Start a new one.
             if !current.is_empty() {
-                res.push(current.clone());
-                current = Vec::default();
+                res.push(std::mem::take(&mut current));
             }
         }
     });
@@ -203,6 +200,14 @@ fn head_mismatch_anonymous_funs(
 }
 
 type HeadInfo = (String, TextRange, usize, TextRange);
+
+fn earliest_location(locations: &[TextRange]) -> Option<TextRange> {
+    locations.iter().copied().min_by_key(|range| range.start())
+}
+
+fn earliest_start(locations: &[TextRange]) -> Option<elp_syntax::TextSize> {
+    earliest_location(locations).map(|range| range.start())
+}
 
 trait Validate<A>
 where
@@ -238,59 +243,33 @@ where
         // 1. Create a map of names to locations
         let mut attrs: FxHashMap<A, Vec<TextRange>> = FxHashMap::default();
 
+        for head in heads {
+            let attr = self.get_attr(head);
+            let attr_loc = self.get_loc(head);
+            attrs.entry(attr).or_default().push(attr_loc);
+        }
+
         if attrs.len() == 1 {
             // Only one attr in the funDecl, nothing more to be done
             return Some(());
         }
 
-        for head in heads {
-            let attr = self.get_attr(head);
-            let attr_loc = self.get_loc(head);
-            match attrs.get(&attr) {
-                None => {
-                    attrs.insert(attr.clone(), vec![attr_loc]);
-                }
-                Some(ranges) => {
-                    let mut ranges = ranges.clone();
-                    ranges.push(attr_loc);
-                    attrs.insert(attr.clone(), ranges);
-                }
-            }
-        }
-
         // 2. Find the attrs with the highest count.  On a tie, take the
         // one occuring earliest in the file
-        let mut highest = None;
-        for (attr, locations) in attrs {
-            match highest {
-                None => highest = Some((attr.clone(), locations.clone())),
-                Some((ref _cur_attr, ref cur_highest)) => {
-                    match locations.len().cmp(&cur_highest.len()) {
-                        Ordering::Equal => {
-                            // Keep the one closet to the beginning
-                            let mut locs = locations.clone();
-                            let mut cur = cur_highest.clone();
-                            locs.sort_by_key(|a| a.start());
-                            cur.sort_by_key(|a| a.start());
-                            if locs[0].start() < cur[0].start() {
-                                highest = Some((attr.clone(), locations.clone()));
-                            }
-                        }
-                        Ordering::Greater => {
-                            highest = Some((attr.clone(), locations.clone()));
-                        }
-                        Ordering::Less => {}
-                    }
+        let (hattr, ref_loc) = attrs
+            .into_iter()
+            .max_by(|(_, locations), (_, cur_highest)| {
+                match locations.len().cmp(&cur_highest.len()) {
+                    Ordering::Equal => earliest_start(cur_highest).cmp(&earliest_start(locations)),
+                    other => other,
                 }
-            }
-        }
+            })
+            .and_then(|(attr, locations)| {
+                earliest_location(&locations).map(|ref_loc| (attr, ref_loc))
+            })?;
 
         // 3. Report mismatch for all not highest, against earliest
         // occurrence of highest
-        let (hattr, hlocs) = highest?;
-        let mut hlocs = hlocs;
-        hlocs.sort_by_key(|a| a.start());
-        let ref_loc = hlocs[0];
         for head in heads {
             let attr = self.get_attr(head);
             let attr_loc = self.get_loc(head);

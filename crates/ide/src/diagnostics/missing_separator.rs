@@ -50,6 +50,7 @@ impl GenericDiagnostics for MissingSeparatorLinter {
         ctx: &LinterContext,
         severity: Severity,
         cli_severity: Severity,
+        _include_fixes: bool,
     ) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
         let def_map = ctx.sema.def_map(ctx.file_id);

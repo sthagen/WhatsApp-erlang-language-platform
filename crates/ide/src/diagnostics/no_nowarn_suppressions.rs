@@ -12,8 +12,6 @@ use elp_ide_db::elp_base_db::FileRange;
 use elp_syntax::AstNode;
 use elp_syntax::ast;
 use elp_syntax::match_ast;
-use lazy_static::lazy_static;
-use regex::Regex;
 
 use crate::diagnostics::DiagnosticCode;
 use crate::diagnostics::GenericLinter;
@@ -42,10 +40,6 @@ impl GenericLinter for NoNoWarnSuppressionsLinter {
     ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
         let sema = ctx.sema;
         let file_id = ctx.file_id;
-        lazy_static! {
-            static ref NOWARN_REGEX: Regex = Regex::new(r"^nowarn_").expect("valid regex");
-        }
-
         let mut res = Vec::new();
         let form_list = sema.db.file_form_list(file_id);
         for (_compile_option_idx, compile_option) in form_list.compile_attributes() {
@@ -54,10 +48,10 @@ impl GenericLinter for NoNoWarnSuppressionsLinter {
                 // Blindly search for any atom matching the nowarn_ prefix
                 for n in expr.syntax().descendants() {
                     match_ast! {
-                        match n {
-                            ast::Atom(atom) => {
-                                if let Some(atom_text) = atom.text()
-                                    && NOWARN_REGEX.is_match(&atom_text) {
+                    match n {
+                        ast::Atom(atom) => {
+                            if let Some(atom_text) = atom.text()
+                                    && atom_text.starts_with("nowarn_") {
                                         let range = atom.syntax().text_range();
                                         res.push(GenericLinterMatchContext { range: FileRange { file_id, range }, context: () });
                                     }
