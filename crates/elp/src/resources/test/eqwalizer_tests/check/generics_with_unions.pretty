@@ -102,14 +102,6 @@ Expression has type:   term()
 Context expected type: T
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:230:5
-    │
-230 │     overlap_2([ok]).
-    │     ^^^^^^^^^^^^^^^ overlap_2(['ok']).
-Expression has type:   'ok'
-Context expected type: ['ok']
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generics_with_unions.erl:233:18
     │
 233 │ trick(_, {B}) -> B.
@@ -156,4 +148,4 @@ error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
 392 │     Q2 = where2(Q, {a, 123}),
     │          ^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
-15 ERRORS
+14 ERRORS
