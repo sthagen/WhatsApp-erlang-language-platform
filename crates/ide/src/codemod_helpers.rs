@@ -654,6 +654,51 @@ pub(crate) fn find_call_in_function<CallCtx, MakeCtx, Res>(
     )
 }
 
+pub(crate) fn find_call_in_file_with_matchers<CallCtx, MakeCtx, Res>(
+    res: &mut Vec<Res>,
+    sema: &Semantic,
+    file_id: FileId,
+    matcher: &FunctionMatcher<'_, CallCtx>,
+    excluded_matcher: &FunctionMatcher<'_, CallCtx>,
+    check_call: CheckCall<CallCtx, MakeCtx>,
+    make: Make<MakeCtx, Res>,
+) -> Option<()> {
+    sema.for_each_function(file_id, |def| {
+        let _ = find_call_in_function_with_matchers(
+            res,
+            sema,
+            def,
+            matcher,
+            excluded_matcher,
+            check_call,
+            make,
+        );
+    });
+    Some(())
+}
+
+pub(crate) fn find_call_in_file<CallCtx, MakeCtx, Res>(
+    res: &mut Vec<Res>,
+    sema: &Semantic,
+    file_id: FileId,
+    mfas: &[(&FunctionMatch, CallCtx)],
+    excluded_mfas: &[(&FunctionMatch, CallCtx)],
+    check_call: CheckCall<CallCtx, MakeCtx>,
+    make: Make<MakeCtx, Res>,
+) -> Option<()> {
+    let matcher = FunctionMatcher::new(mfas);
+    let excluded_matcher = FunctionMatcher::new(excluded_mfas);
+    find_call_in_file_with_matchers(
+        res,
+        sema,
+        file_id,
+        &matcher,
+        &excluded_matcher,
+        check_call,
+        make,
+    )
+}
+
 /// Helper function to create a fix that replaces the module name in a remote call.
 /// This is useful for linters that need to rename module references (e.g., replacing
 /// `old_module:function()` with `new_module:function()`).

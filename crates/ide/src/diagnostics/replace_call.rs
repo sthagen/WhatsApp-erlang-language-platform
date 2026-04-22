@@ -42,7 +42,7 @@ use crate::codemod_helpers::FunctionMatch;
 use crate::codemod_helpers::FunctionMatcher;
 use crate::codemod_helpers::MFA;
 use crate::codemod_helpers::MatchCtx;
-use crate::codemod_helpers::find_call_in_function_with_matchers;
+use crate::codemod_helpers::find_call_in_file;
 use crate::codemod_helpers::statement_range;
 use crate::diagnostics::DiagnosticCode;
 use crate::fix;
@@ -79,57 +79,52 @@ pub fn replace_call_site_if_args_match(
 ) {
     let mfas = [(fm, ())];
     let excluded_mfas: [(&FunctionMatch, ()); 0] = [];
-    let matcher = FunctionMatcher::new(&mfas);
-    let excluded_matcher = FunctionMatcher::new(&excluded_mfas);
-    sema.for_each_function(file_id, |def| {
-        find_call_in_function_with_matchers(
-            acc,
-            sema,
-            def,
-            &matcher,
-            &excluded_matcher,
-            &args_match,
-            &move |MatchCtx {
-                       sema,
-                       def_fb,
-                       target,
-                       args,
-                       extra,
-                       range,
-                       ..
-                   }: MatchCtx<'_, (String, String)>| {
-                let mfa =
-                    MFA::from_call_target(target, args.arity(), sema, &def_fb.body(), file_id)?;
-                let mfa_str = mfa.label();
+    let _ = find_call_in_file(
+        acc,
+        sema,
+        file_id,
+        &mfas,
+        &excluded_mfas,
+        &args_match,
+        &move |MatchCtx {
+                   sema,
+                   def_fb,
+                   target,
+                   args,
+                   extra,
+                   range,
+                   ..
+               }: MatchCtx<'_, (String, String)>| {
+            let mfa = MFA::from_call_target(target, args.arity(), sema, &def_fb.body(), file_id)?;
+            let mfa_str = mfa.label();
 
-                let range = if range.file_id == file_id {
-                    Some(range.range)
-                } else {
-                    None
-                }?;
-                let diag = diagnostic_builder(&mfa, &extra.0, range)?;
+            let range = if range.file_id == file_id {
+                Some(range.range)
+            } else {
+                None
+            }?;
+            let diag = diagnostic_builder(&mfa, &extra.0, range)?;
 
-                if let Some(edit) = replace_call(
-                    replacement,
-                    sema,
-                    def_fb,
-                    file_id,
-                    args.as_slice(),
-                    target,
-                    &range,
-                ) {
-                    Some(diag.with_fixes(Some(vec![fix(
-                        "replace_call_site",
-                        &format!("Replace call to '{:?}' {}", &mfa_str, extra.1),
-                        SourceChange::from_text_edit(file_id, edit),
-                        range,
-                    )])))
-                } else {
-                    Some(diag)
-                }
-            },
-        );
-    });
+            if let Some(edit) = replace_call(
+                replacement,
+                sema,
+                def_fb,
+                file_id,
+                args.as_slice(),
+                target,
+                &range,
+            ) {
+                Some(diag.with_fixes(Some(vec![fix(
+                    "replace_call_site",
+                    &format!("Replace call to '{:?}' {}", &mfa_str, extra.1),
+                    SourceChange::from_text_edit(file_id, edit),
+                    range,
+                )])))
+            } else {
+                Some(diag)
+            }
+        },
+    );
 }
 
 #[allow(dead_code)] // @oss-only
