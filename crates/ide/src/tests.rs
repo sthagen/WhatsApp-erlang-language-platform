@@ -40,21 +40,6 @@ use crate::diagnostics::Severity;
 use crate::fixture;
 
 #[track_caller]
-pub(crate) fn check_ct_fix(fixture_before: &str, fixture_after: &str) {
-    let config = DiagnosticsConfig::default().disable(DiagnosticCode::UndefinedFunction);
-    let diagnostic_filter = &|_d: &Diagnostic| true;
-    let assist_filter = &|_d: &Assist| true;
-    check_filtered_ct_fix_with_config(
-        fixture_before,
-        fixture_after,
-        config,
-        &vec![],
-        diagnostic_filter,
-        assist_filter,
-    );
-}
-
-#[track_caller]
 pub(crate) fn check_filtered_ct_fix_with_config(
     fixture_before: &str,
     fixture_after: &str,
