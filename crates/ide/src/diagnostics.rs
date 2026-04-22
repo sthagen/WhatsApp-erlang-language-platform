@@ -88,9 +88,10 @@ use crate::FunctionMatch;
 use crate::RootDatabase;
 use crate::SourceDatabase;
 use crate::codemod_helpers::CheckCallCtx;
+use crate::codemod_helpers::FunctionMatcher;
 use crate::codemod_helpers::MatchCtx;
 use crate::codemod_helpers::UseRange;
-use crate::codemod_helpers::find_call_in_function;
+use crate::codemod_helpers::find_call_in_function_with_matchers;
 use crate::common_test;
 
 mod application_env;
@@ -839,6 +840,8 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
             .chain(excluded_matches_from_config)
             .map(|m| (m, ()))
             .collect();
+        let matcher = FunctionMatcher::new(&mfas);
+        let excluded_matcher = FunctionMatcher::new(&excluded_mfas);
         // Check if there's a config-level severity override
         let base_severity = self.severity(ctx.sema, ctx.file_id);
         let has_severity_override = severity != base_severity;
@@ -847,12 +850,12 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
             .def_map_local(ctx.file_id)
             .get_functions()
             .for_each(|(_, def)| {
-                find_call_in_function(
+                find_call_in_function_with_matchers(
                     &mut diagnostics,
                     ctx.sema,
                     def,
-                    &mfas,
-                    &excluded_mfas,
+                    &matcher,
+                    &excluded_matcher,
                     &move |check_ctx| self.check_match(&check_ctx),
                     &move |match_ctx @ MatchCtx {
                                sema,

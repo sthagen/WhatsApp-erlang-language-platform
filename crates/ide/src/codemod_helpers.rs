@@ -239,6 +239,14 @@ impl<'a, T> FunctionMatcher<'a, T> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.match_any.is_none()
+            && self.labels_full.is_empty()
+            && self.labels_full_typed.is_empty()
+            && self.labels_mf.is_empty()
+            && self.labels_m.is_empty()
+    }
+
     pub fn get_match(
         &self,
         target: &CallTarget<ExprId>,
@@ -247,23 +255,48 @@ impl<'a, T> FunctionMatcher<'a, T> {
         sema: &Semantic,
         body: &Body,
     ) -> Option<(&'a FunctionMatch, &'a T)> {
-        self.match_any
-            .or_else(|| self.labels_full.get(&target.label(arity, body)).copied())
-            .or_else(|| {
-                let (types, match_val, t) =
-                    self.labels_full_typed.get(&target.label(arity, body))?;
-                self.types_match(args?, types, sema, body)
-                    .then_some((match_val, t))
-            })
-            .or_else(|| self.labels_mf.get(&target.label_short(body)).copied())
-            .or_else(|| match target {
-                CallTarget::Local { name: _ } => None,
-                CallTarget::Remote { module, .. } => {
-                    let name = body[*module].as_atom()?.as_name();
-                    let label = Some(SmolStr::new(format!("{name}")));
-                    self.labels_m.get(&label).copied()
-                }
-            })
+        if let Some(match_any) = self.match_any {
+            return Some(match_any);
+        }
+
+        let full_label = if self.labels_full.is_empty() && self.labels_full_typed.is_empty() {
+            None
+        } else {
+            target.label(arity, body)
+        };
+
+        if !self.labels_full.is_empty()
+            && let Some(matched) = self.labels_full.get(&full_label).copied()
+        {
+            return Some(matched);
+        }
+
+        if !self.labels_full_typed.is_empty()
+            && let Some((types, match_val, t)) = self.labels_full_typed.get(&full_label)
+            && let Some(args) = args
+            && self.types_match(args, types, sema, body)
+        {
+            return Some((match_val, t));
+        }
+
+        if !self.labels_mf.is_empty() {
+            let short_label = target.label_short(body);
+            if let Some(matched) = self.labels_mf.get(&short_label).copied() {
+                return Some(matched);
+            }
+        }
+
+        if !self.labels_m.is_empty()
+            && let CallTarget::Remote { module, .. } = target
+            && let Some(module_atom) = body[*module].as_atom()
+        {
+            let module_label = Some(SmolStr::new(format!("{}", module_atom.as_name())));
+            if let Some(matched) = self.labels_m.get(&module_label).copied() {
+                return Some(matched);
+            }
+        }
+
+        None
     }
 
     fn types_match(
@@ -515,18 +548,17 @@ pub enum UseRange {
     NameOnly,
 }
 
-pub(crate) fn find_call_in_function<CallCtx, MakeCtx, Res>(
+pub(crate) fn find_call_in_function_with_matchers<CallCtx, MakeCtx, Res>(
     res: &mut Vec<Res>,
     sema: &Semantic,
     def: &FunctionDef,
-    mfas: &[(&FunctionMatch, CallCtx)],
-    excluded_mfas: &[(&FunctionMatch, CallCtx)],
+    matcher: &FunctionMatcher<'_, CallCtx>,
+    excluded_matcher: &FunctionMatcher<'_, CallCtx>,
     check_call: CheckCall<CallCtx, MakeCtx>,
     make: Make<MakeCtx, Res>,
 ) -> Option<()> {
     let def_fb = def.in_function_body(sema, def);
-    let matcher = FunctionMatcher::new(mfas);
-    let excluded_matcher = FunctionMatcher::new(excluded_mfas);
+    let has_exclusions = !excluded_matcher.is_empty();
     def_fb.clone().fold_function(
         Strategy {
             macros: MacroStrategy::ExpandButIncludeMacroCall,
@@ -544,61 +576,82 @@ pub(crate) fn find_call_in_function<CallCtx, MakeCtx, Res>(
                 },
                 AnyExpr::Expr(Expr::Call { target, args }) => Some((target, Args::Args(args))),
                 _ => None,
-            } && let None = excluded_matcher.get_match(
-                &target,
-                args.arity(),
-                Some(args.as_slice()),
-                sema,
-                &def_fb.body(clause_id),
-            ) && let Some((mfa, t)) = matcher.get_match(
-                &target,
-                args.arity(),
-                Some(args.as_slice()),
-                sema,
-                &def_fb.body(clause_id),
-            ) {
-                let in_clause = &def_fb.in_clause(clause_id);
-                let context = CheckCallCtx {
-                    sema,
-                    mfa,
-                    parents: ctx.parents,
-                    t,
-                    target: &target,
-                    args: &args,
-                    in_clause,
-                };
-                if let Some(extra) = check_call(context) {
-                    // Got one.
-                    let call_expr_id = if let Some((hir_idx, _macro_def)) = ctx.in_macro {
-                        hir_idx.idx
-                    } else {
-                        ctx.item_id
+            } {
+                let arity = args.arity();
+                let args_slice = args.as_slice();
+                let body = def_fb.body(clause_id);
+                if (!has_exclusions
+                    || excluded_matcher
+                        .get_match(&target, arity, Some(args_slice), sema, body.as_ref())
+                        .is_none())
+                    && let Some((mfa, t)) =
+                        matcher.get_match(&target, arity, Some(args_slice), sema, body.as_ref())
+                {
+                    let in_clause = &def_fb.in_clause(clause_id);
+                    let context = CheckCallCtx {
+                        sema,
+                        mfa,
+                        parents: ctx.parents,
+                        t,
+                        target: &target,
+                        args: &args,
+                        in_clause,
                     };
-                    if let Some(range) = &def_fb.range_for_any(clause_id, call_expr_id) {
-                        let range_surface_mf = if ctx.in_macro.is_none() {
-                            target.range(in_clause)
+                    if let Some(extra) = check_call(context) {
+                        // Got one.
+                        let call_expr_id = if let Some((hir_idx, _macro_def)) = ctx.in_macro {
+                            hir_idx.idx
                         } else {
-                            // We need to rather use the full range, of the macro
-                            None
+                            ctx.item_id
                         };
-                        if let Some(diag) = make(MatchCtx {
-                            sema,
-                            def_fb: in_clause,
-                            target: &target,
-                            args: &args,
-                            extra: &extra,
-                            range_surface_mf,
-                            range: *range,
-                        }) {
-                            res.push(diag)
+                        if let Some(range) = &def_fb.range_for_any(clause_id, call_expr_id) {
+                            let range_surface_mf = if ctx.in_macro.is_none() {
+                                target.range(in_clause)
+                            } else {
+                                // We need to rather use the full range, of the macro
+                                None
+                            };
+                            if let Some(diag) = make(MatchCtx {
+                                sema,
+                                def_fb: in_clause,
+                                target: &target,
+                                args: &args,
+                                extra: &extra,
+                                range_surface_mf,
+                                range: *range,
+                            }) {
+                                res.push(diag)
+                            }
                         }
                     }
                 }
-            };
+            }
             acc
         },
     );
     Some(())
+}
+
+pub(crate) fn find_call_in_function<CallCtx, MakeCtx, Res>(
+    res: &mut Vec<Res>,
+    sema: &Semantic,
+    def: &FunctionDef,
+    mfas: &[(&FunctionMatch, CallCtx)],
+    excluded_mfas: &[(&FunctionMatch, CallCtx)],
+    check_call: CheckCall<CallCtx, MakeCtx>,
+    make: Make<MakeCtx, Res>,
+) -> Option<()> {
+    let matcher = FunctionMatcher::new(mfas);
+    let excluded_matcher = FunctionMatcher::new(excluded_mfas);
+    find_call_in_function_with_matchers(
+        res,
+        sema,
+        def,
+        &matcher,
+        &excluded_matcher,
+        check_call,
+        make,
+    )
 }
 
 /// Helper function to create a fix that replaces the module name in a remote call.

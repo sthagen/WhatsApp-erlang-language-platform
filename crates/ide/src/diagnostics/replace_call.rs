@@ -42,7 +42,7 @@ use crate::codemod_helpers::FunctionMatch;
 use crate::codemod_helpers::FunctionMatcher;
 use crate::codemod_helpers::MFA;
 use crate::codemod_helpers::MatchCtx;
-use crate::codemod_helpers::find_call_in_function;
+use crate::codemod_helpers::find_call_in_function_with_matchers;
 use crate::codemod_helpers::statement_range;
 use crate::diagnostics::DiagnosticCode;
 use crate::fix;
@@ -77,13 +77,17 @@ pub fn replace_call_site_if_args_match(
     sema: &Semantic,
     file_id: FileId,
 ) {
+    let mfas = [(fm, ())];
+    let excluded_mfas: [(&FunctionMatch, ()); 0] = [];
+    let matcher = FunctionMatcher::new(&mfas);
+    let excluded_matcher = FunctionMatcher::new(&excluded_mfas);
     sema.for_each_function(file_id, |def| {
-        find_call_in_function(
+        find_call_in_function_with_matchers(
             acc,
             sema,
             def,
-            &[(fm, ())],
-            &[],
+            &matcher,
+            &excluded_matcher,
             &args_match,
             &move |MatchCtx {
                        sema,
