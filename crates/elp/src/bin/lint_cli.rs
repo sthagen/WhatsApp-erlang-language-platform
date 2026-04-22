@@ -68,6 +68,8 @@ use hir::InFile;
 use itertools::Itertools;
 use paths::Utf8PathBuf;
 use rayon::prelude::ParallelBridge;
+
+type DiagnosticsResult = (Vec<(String, FileId, DiagnosticCollection)>, bool, bool);
 use rayon::prelude::ParallelIterator;
 
 use crate::args::Lint;
@@ -208,7 +210,7 @@ fn do_diagnostics_all(
     args: &Lint,
     loaded: &LoadResult,
     module: &Option<String>,
-) -> Result<(Vec<(String, FileId, DiagnosticCollection)>, bool, bool)> {
+) -> Result<DiagnosticsResult> {
     let module_index = analysis.module_index(*project_id).unwrap();
 
     let ignored_apps: FxHashSet<Option<Option<AppName>>> = args

@@ -23,6 +23,9 @@ use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
 
+type MatchExpected<'a> = &'a [(&'a str, &'a [(&'a str, &'a [&'a str])])];
+type MatchResult = Vec<(String, Vec<(String, Vec<String>)>)>;
+
 use crate::Match;
 use crate::MatchFinder;
 use crate::SsrRule;
@@ -200,7 +203,7 @@ fn get_placeholder_info(sema: &Semantic, m: &Match) -> Vec<(String, Vec<String>)
 }
 
 #[track_caller]
-fn assert_matches(pattern: &str, code: &str, expected: &[(&str, &[(&str, &[&str])])]) {
+fn assert_matches(pattern: &str, code: &str, expected: MatchExpected) {
     assert_matches_with_strategy(
         Strategy {
             macros: MacroStrategy::Expand,
@@ -217,7 +220,7 @@ fn assert_matches_with_strategy(
     strategy: Strategy,
     pattern: &str,
     code: &str,
-    expected: &[(&str, &[(&str, &[&str])])],
+    expected: MatchExpected,
 ) {
     let (db, position, _selections) = single_file(code);
     if !expected.is_empty() && expected[0].0.is_empty() {
@@ -232,7 +235,7 @@ fn assert_matches_with_strategy(
     let matches = match_finder.matches().flattened();
 
     // Build actual results as tuples of (matched_text, placeholder_info)
-    let actual: Vec<(String, Vec<(String, Vec<String>)>)> = matches
+    let actual: MatchResult = matches
         .matches
         .iter()
         .map(|m| {
@@ -243,7 +246,7 @@ fn assert_matches_with_strategy(
         .collect();
 
     // Convert expected to owned types for comparison
-    let expected_owned: Vec<(String, Vec<(String, Vec<String>)>)> = expected
+    let expected_owned: MatchResult = expected
         .iter()
         .map(|(text, placeholders)| {
             (

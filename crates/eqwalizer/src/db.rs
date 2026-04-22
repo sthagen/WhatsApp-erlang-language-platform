@@ -31,6 +31,11 @@ use elp_types_db::eqwalizer::form::RecDecl;
 use elp_types_db::eqwalizer::form::TypeDecl;
 use parking_lot::Mutex;
 
+type TypeDeclMap = BTreeMap<ModuleName, BTreeMap<Id, Arc<TypeDecl>>>;
+type FunSpecMap = BTreeMap<ModuleName, BTreeMap<Id, Arc<FunSpec>>>;
+type OverloadedFunSpecMap = BTreeMap<ModuleName, BTreeMap<Id, Arc<OverloadedFunSpec>>>;
+type CallbacksResult = (Arc<Vec<Callback>>, Arc<BTreeSet<Id>>);
+
 use crate::EqwalizerConfig;
 use crate::EqwalizerDiagnostics;
 use crate::ast;
@@ -119,10 +124,7 @@ pub trait EqwalizerDiagnosticsDatabase: EqwalizerErlASTStorage + SourceDatabase 
         module: ModuleName,
     ) -> Result<Arc<Vec<u8>>, Error>;
 
-    fn custom_types(
-        &self,
-        project_id: ProjectId,
-    ) -> Result<Arc<BTreeMap<ModuleName, BTreeMap<Id, Arc<TypeDecl>>>>, Error>;
+    fn custom_types(&self, project_id: ProjectId) -> Result<Arc<TypeDeclMap>, Error>;
 
     fn type_decl(
         &self,
@@ -180,21 +182,18 @@ pub trait EqwalizerDiagnosticsDatabase: EqwalizerErlASTStorage + SourceDatabase 
         id: Id,
     ) -> Result<Option<Arc<Vec<u8>>>, Error>;
 
-    fn custom_fun_specs(
-        &self,
-        project_id: ProjectId,
-    ) -> Result<Arc<BTreeMap<ModuleName, BTreeMap<Id, Arc<FunSpec>>>>, Error>;
+    fn custom_fun_specs(&self, project_id: ProjectId) -> Result<Arc<FunSpecMap>, Error>;
 
     fn custom_overloaded_fun_specs(
         &self,
         project_id: ProjectId,
-    ) -> Result<Arc<BTreeMap<ModuleName, BTreeMap<Id, Arc<OverloadedFunSpec>>>>, Error>;
+    ) -> Result<Arc<OverloadedFunSpecMap>, Error>;
 
     fn callbacks(
         &self,
         project_id: ProjectId,
         module: ModuleName,
-    ) -> Result<(Arc<Vec<Callback>>, Arc<BTreeSet<Id>>), Error>;
+    ) -> Result<CallbacksResult, Error>;
 
     fn callbacks_bytes(
         &self,
@@ -332,10 +331,10 @@ static EQWALIZER_TYPES: LazyLock<ModuleName> = LazyLock::new(|| ModuleName::new(
 fn custom_types(
     db: &dyn EqwalizerDiagnosticsDatabase,
     project_id: ProjectId,
-) -> Result<Arc<BTreeMap<ModuleName, BTreeMap<Id, Arc<TypeDecl>>>>, Error> {
+) -> Result<Arc<TypeDeclMap>, Error> {
     match db.transitive_stub(project_id, EQWALIZER_TYPES.clone()) {
         Ok(stub) => {
-            let mut result: BTreeMap<ModuleName, BTreeMap<Id, Arc<TypeDecl>>> = BTreeMap::new();
+            let mut result: TypeDeclMap = BTreeMap::new();
             for (id, type_decl) in stub.types.iter() {
                 let (module_name, ty_name) = id
                     .name
@@ -485,10 +484,10 @@ static EQWALIZER_SPECS: LazyLock<ModuleName> = LazyLock::new(|| ModuleName::new(
 fn custom_fun_specs(
     db: &dyn EqwalizerDiagnosticsDatabase,
     project_id: ProjectId,
-) -> Result<Arc<BTreeMap<ModuleName, BTreeMap<Id, Arc<FunSpec>>>>, Error> {
+) -> Result<Arc<FunSpecMap>, Error> {
     match db.transitive_stub(project_id, EQWALIZER_SPECS.clone()) {
         Ok(stub) => {
-            let mut result: BTreeMap<ModuleName, BTreeMap<Id, Arc<FunSpec>>> = BTreeMap::new();
+            let mut result: FunSpecMap = BTreeMap::new();
             for (id, fun_spec) in stub.specs.iter() {
                 let (module_name, ty_name) = id
                     .name
@@ -515,11 +514,10 @@ fn custom_fun_specs(
 fn custom_overloaded_fun_specs(
     db: &dyn EqwalizerDiagnosticsDatabase,
     project_id: ProjectId,
-) -> Result<Arc<BTreeMap<ModuleName, BTreeMap<Id, Arc<OverloadedFunSpec>>>>, Error> {
+) -> Result<Arc<OverloadedFunSpecMap>, Error> {
     match db.transitive_stub(project_id, EQWALIZER_SPECS.clone()) {
         Ok(stub) => {
-            let mut result: BTreeMap<ModuleName, BTreeMap<Id, Arc<OverloadedFunSpec>>> =
-                BTreeMap::new();
+            let mut result: OverloadedFunSpecMap = BTreeMap::new();
             for (id, overloaded_fun_spec) in stub.overloaded_specs.iter() {
                 let parts: Vec<&str> = id.name.split(":").collect();
                 let module = ModuleName::new(parts[0]);
@@ -545,7 +543,7 @@ fn callbacks(
     db: &dyn EqwalizerDiagnosticsDatabase,
     project_id: ProjectId,
     module: ModuleName,
-) -> Result<(Arc<Vec<Callback>>, Arc<BTreeSet<Id>>), Error> {
+) -> Result<CallbacksResult, Error> {
     let stub = db.transitive_stub(project_id, module)?;
     Ok((stub.callbacks.clone(), stub.optional_callbacks.clone()))
 }

@@ -112,6 +112,12 @@ use types::XRef;
 use types::XRefFile;
 use types::XRefTarget;
 
+type IndexResult = (
+    FxHashMap<String, IndexedFacts>,
+    FxHashMap<GleanFileId, String>,
+    Vec<String>,
+);
+
 #[derive(Clone, Debug, Default)]
 struct IndexConfig {
     pub multi: bool,
@@ -257,14 +263,7 @@ impl GleanIndexer {
     }
 
     /// Returns (facts, module_index, errored_file_paths).
-    fn index(
-        &self,
-        config: IndexConfig,
-    ) -> Result<(
-        FxHashMap<String, IndexedFacts>,
-        FxHashMap<GleanFileId, String>,
-        Vec<String>,
-    )> {
+    fn index(&self, config: IndexConfig) -> Result<IndexResult> {
         let ctx = self.analysis.with_db(|db| {
             let project_id = self.project_id;
             let files = Self::project_files(db, project_id);
