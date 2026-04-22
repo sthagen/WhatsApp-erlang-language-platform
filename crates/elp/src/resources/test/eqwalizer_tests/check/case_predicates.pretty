@@ -94,14 +94,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 174 │   lists:nth(1, L).
     │                ^ L.
 Expression has type:   #{dynamic() => dynamic()}
-Context expected type: [T]
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/case_predicates.erl:174:16
-    │
-174 │   lists:nth(1, L).
-    │                ^ L.
-Expression has type:   #{dynamic() => dynamic()}
 Context expected type: [dynamic()]
 
-11 ERRORS
+10 ERRORS

@@ -1,17 +1,7 @@
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/kp_02.erl:24:21
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+   ┌─ check/src/kp_02.erl:24:11
    │
 24 │     Res = transform(pure_fun(fun id/1), A),
-   │                     ^^^^^^^^^^^^^^^^^^
-   │                     │
-   │                     pure_fun(id/1).
-Expression has type:   fun((X) -> X) with 1 type parameter
-Context expected type: fun((T1) -> Ret) with 0 type parameters
-   │                     
-
-Because in the expression's type:
-  Here the type is:     fun((X) -> X) with 1 type parameter
-  Context expects type: fun((T1) -> Ret) with 0 type parameters
-  The number of type parameters doesn't match.
+   │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
 1 ERROR

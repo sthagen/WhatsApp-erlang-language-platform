@@ -144,42 +144,16 @@ Because in the expression's type:
     Context expects type: K
   ]
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:379:28
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+    ┌─ check/src/generics_with_unions.erl:379:10
     │
 379 │     Q2 = where1({i, atom}, Q),
-    │                            ^
-    │                            │
-    │                            Q.
-Expression has type:   query()
-Context expected type: fun(({'i', 'atom'}) -> 'ok')
-    │                            
+    │          ^^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
-Because in the expression's type:
-  fun((
-    { 'i', 
-      Here the type is:     'atom'
-      Context expects type: number()
-    }
-  ) -> 'ok')
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generics_with_unions.erl:392:17
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+    ┌─ check/src/generics_with_unions.erl:392:10
     │
 392 │     Q2 = where2(Q, {a, 123}),
-    │                 ^
-    │                 │
-    │                 Q.
-Expression has type:   query()
-Context expected type: fun(({'a', number()}) -> 'ok')
-    │                 
-
-Because in the expression's type:
-  fun((
-    { 'a', 
-      Here the type is:     number()
-      Context expects type: atom()
-    }
-  ) -> 'ok')
+    │          ^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
 15 ERRORS

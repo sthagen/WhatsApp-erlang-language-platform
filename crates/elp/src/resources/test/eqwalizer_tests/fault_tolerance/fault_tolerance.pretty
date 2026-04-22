@@ -233,23 +233,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 108 │     M1,
     │     ^^ M1.
 Expression has type:   #{dynamic() => dynamic()}
-Context expected type: [T]
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ fault_tolerance/src/fault_tolerance.erl:108:5
-    │
-108 │     M1,
-    │     ^^ M1.
-Expression has type:   #{dynamic() => dynamic()}
 Context expected type: [dynamic()]
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ fault_tolerance/src/fault_tolerance.erl:109:5
-    │
-109 │     M2
-    │     ^^ M2.
-Expression has type:   #{dynamic() => dynamic()}
-Context expected type: [T]
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ fault_tolerance/src/fault_tolerance.erl:109:5
@@ -914,4 +898,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   term()
 Context expected type: number()
 
-109 ERRORS
+107 ERRORS

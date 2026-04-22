@@ -6,183 +6,61 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   atom()
 Context expected type: pid()
 
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+   ┌─ check/src/generic_fun_application.erl:38:5
+   │
+38 │     lmap(fun atom_to_pid/1, [2, 4]).
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
+
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/generic_fun_application.erl:38:5
    │
 38 │     lmap(fun atom_to_pid/1, [2, 4]).
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lmap(atom_to_pid/1, [2, 4]).
-Expression has type:   [pid()]
+Expression has type:   [dynamic()]
 Context expected type: 'ok'
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:38:29
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+   ┌─ check/src/generic_fun_application.erl:43:5
    │
-38 │     lmap(fun atom_to_pid/1, [2, 4]).
-   │                             ^^^^^^
-   │                             │
-   │                             [2, 4].
-Expression has type:   [number()]
-Context expected type: [atom()]
-   │                             
-
-Because in the expression's type:
-  [
-    Here the type is:     number()
-    Context expects type: atom()
-  ]
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:38:29
-   │
-38 │     lmap(fun atom_to_pid/1, [2, 4]).
-   │                             ^^^^^^
-   │                             │
-   │                             [2, 4].
-Expression has type:   [number()]
-Context expected type: [dynamic(atom())]
-   │                             
-
-Because in the expression's type:
-  [
-    Here the type is:     number()
-    Context expects type: atom()
-  ]
+43 │     mapl([2, 4], fun atom_to_pid/1).
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/generic_fun_application.erl:43:5
    │
 43 │     mapl([2, 4], fun atom_to_pid/1).
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mapl([2, 4], atom_to_pid/1).
-Expression has type:   [pid()]
+Expression has type:   [dynamic()]
 Context expected type: 'ok'
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:43:18
-   │
-43 │     mapl([2, 4], fun atom_to_pid/1).
-   │                  ^^^^^^^^^^^^^^^^^
-   │                  │
-   │                  atom_to_pid/1.
-Expression has type:   fun((atom()) -> pid())
-Context expected type: fun((number()) -> B)
-   │                  
-
-Because in the expression's type:
-  fun((atom()) ->
-    Here the type is:     pid()
-    Context expects type: B
-  )
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:43:18
-   │
-43 │     mapl([2, 4], fun atom_to_pid/1).
-   │                  ^^^^^^^^^^^^^^^^^
-   │                  │
-   │                  atom_to_pid/1.
-Expression has type:   fun((atom()) -> pid())
-Context expected type: fun((dynamic() | number()) -> pid())
-   │                  
-
-Because in the expression's type:
-  fun((
-    Here the type is a union type with some valid candidates: dynamic()
-    However the following candidate: number()
-    Differs from the expected type:  atom()
-  ) -> pid())
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:47:33
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+   ┌─ check/src/generic_fun_application.erl:47:9
    │
 47 │     X = lmap(fun atom_to_pid/1, [2, 4]),
-   │                                 ^^^^^^
-   │                                 │
-   │                                 [2, 4].
-Expression has type:   [number()]
-Context expected type: [atom()]
-   │                                 
-
-Because in the expression's type:
-  [
-    Here the type is:     number()
-    Context expects type: atom()
-  ]
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:47:33
-   │
-47 │     X = lmap(fun atom_to_pid/1, [2, 4]),
-   │                                 ^^^^^^
-   │                                 │
-   │                                 [2, 4].
-Expression has type:   [number()]
-Context expected type: [dynamic(atom())]
-   │                                 
-
-Because in the expression's type:
-  [
-    Here the type is:     number()
-    Context expects type: atom()
-  ]
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/generic_fun_application.erl:48:5
    │
 48 │     X.
    │     ^ X.
-Expression has type:   [pid()]
+Expression has type:   [dynamic()]
 Context expected type: 'ok'
 
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:52:22
+error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
+   ┌─ check/src/generic_fun_application.erl:52:9
    │
 52 │     X = mapl([2, 4], fun atom_to_pid/1),
-   │                      ^^^^^^^^^^^^^^^^^
-   │                      │
-   │                      atom_to_pid/1.
-Expression has type:   fun((atom()) -> pid())
-Context expected type: fun((number()) -> B)
-   │                      
-
-Because in the expression's type:
-  fun((atom()) ->
-    Here the type is:     pid()
-    Context expects type: B
-  )
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:52:22
-   │
-52 │     X = mapl([2, 4], fun atom_to_pid/1),
-   │                      ^^^^^^^^^^^^^^^^^
-   │                      │
-   │                      atom_to_pid/1.
-Expression has type:   fun((atom()) -> pid())
-Context expected type: fun((dynamic() | number()) -> pid())
-   │                      
-
-Because in the expression's type:
-  fun((
-    Here the type is a union type with some valid candidates: dynamic()
-    However the following candidate: number()
-    Differs from the expected type:  atom()
-  ) -> pid())
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Ill-typed poly-application
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/generic_fun_application.erl:53:5
    │
 53 │     X.
    │     ^ X.
-Expression has type:   [pid()]
+Expression has type:   [dynamic()]
 Context expected type: 'ok'
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:67:23
-   │
-67 │ test08_neg() -> lhead(h).
-   │                       ^ 'h'.
-Expression has type:   'h'
-Context expected type: [LH]
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/generic_fun_application.erl:67:23
@@ -208,22 +86,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
    │             │
    │             M.
 Expression has type:   #{true => pid()}
-Context expected type: #{a => T}
-   │             
-
-Because in the expression's type:
-  Here the type is:     #{true => ...}
-  Context expects type: #{...}
-  The expected map has no corresponding key for: true.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:95:13
-   │
-95 │     map_att(M).
-   │             ^
-   │             │
-   │             M.
-Expression has type:   #{true => pid()}
 Context expected type: #{a => dynamic()}
    │             
 
@@ -231,14 +93,6 @@ Because in the expression's type:
   Here the type is:     #{true => ...}
   Context expects type: #{...}
   The expected map has no corresponding key for: true.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-   ┌─ check/src/generic_fun_application.erl:99:13
-   │
-99 │     map_att(3).
-   │             ^ 3.
-Expression has type:   number()
-Context expected type: #{a => T}
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
    ┌─ check/src/generic_fun_application.erl:99:13
@@ -262,15 +116,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 102 │ test13_neg() -> lmap({}, [2, 4]).
     │                      ^^ {}.
 Expression has type:   {}
-Context expected type: fun((A) -> B)
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:102:22
-    │
-102 │ test13_neg() -> lmap({}, [2, 4]).
-    │                      ^^ {}.
-Expression has type:   {}
-Context expected type: fun((number()) -> dynamic())
+Context expected type: fun((dynamic()) -> dynamic())
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generic_fun_application.erl:105:18
@@ -286,15 +132,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 105 │ test13b_neg() -> mapl([2, 4], {}).
     │                               ^^ {}.
 Expression has type:   {}
-Context expected type: fun((number()) -> B)
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:105:31
-    │
-105 │ test13b_neg() -> mapl([2, 4], {}).
-    │                               ^^ {}.
-Expression has type:   {}
-Context expected type: fun((number()) -> dynamic())
+Context expected type: fun((dynamic()) -> dynamic())
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generic_fun_application.erl:119:5
@@ -464,14 +302,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 276 │     fun0_id(F).
     │             ^ F.
 Expression has type:   fun((A) -> B)
-Context expected type: fun(() -> X)
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:276:13
-    │
-276 │     fun0_id(F).
-    │             ^ F.
-Expression has type:   fun((A) -> B)
 Context expected type: fun(() -> dynamic())
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
@@ -532,14 +362,6 @@ Expression has type:   B
 Context expected type: C
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:432:18
-    │
-432 │ test_dict1(D) -> num_and_t(D, D).
-    │                  ^^^^^^^^^^^^^^^ num_and_t(D, D).
-Expression has type:   #{atom() => pid()}
-Context expected type: 'ok'
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generic_fun_application.erl:432:28
     │
 432 │ test_dict1(D) -> num_and_t(D, D).
@@ -563,23 +385,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │                │
     │                #{..}.
 Expression has type:   #{T => number()}
-Context expected type: #{a := T}
-    │                
-
-Because in the expression's type:
-  Here the type is:     #{...}
-  Context expects type: #{a := ..., ...}
-  The type of the expression is missing the following required keys: a.
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:441:16
-    │
-441 │     shape_vars(#{T => 3}, 3).
-    │                ^^^^^^^^^
-    │                │
-    │                #{..}.
-Expression has type:   #{T => number()}
-Context expected type: #{a := term()}
+Context expected type: #{a := dynamic()}
     │                
 
 Because in the expression's type:
@@ -595,29 +401,12 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │               │
     │               F.
 Expression has type:   fun((#{a => number()}) -> number())
-Context expected type: fun((#{{T} => T}) -> T)
-    │               
-
-Because in the expression's type:
-  fun((#{a => number()}) ->
-    Here the type is:     number()
-    Context expects type: T
-  )
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:446:15
-    │
-446 │     dict_vars(F, N).
-    │               ^
-    │               │
-    │               F.
-Expression has type:   fun((#{a => number()}) -> number())
-Context expected type: fun((#{{number()} => number()}) -> number())
+Context expected type: fun((#{{dynamic()} => dynamic()}) -> dynamic())
     │               
 
 Because in the expression's type:
   fun((
-    Here the type is:     #{{number()} => number()}
+    Here the type is:     #{{dynamic()} => dynamic()}
     Context expects type: #{...} (no default association)
     The expected map has no default association while the type of the expression has one.
   ) -> number())
@@ -638,22 +427,6 @@ Because in the expression's type:
     Here the type is:     'b'
     Context expects type: 'c'
   )
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:478:17
-    │
-478 │     takesShape1(#{}).
-    │                 ^^^
-    │                 │
-    │                 #{..}.
-Expression has type:   #{}
-Context expected type: #{a := T}
-    │                 
-
-Because in the expression's type:
-  Here the type is:     #{...}
-  Context expects type: #{a := ..., ...}
-  The type of the expression is missing the following required keys: a.
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/generic_fun_application.erl:478:17
@@ -792,23 +565,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │         │
     │         #{..}.
 Expression has type:   #{extra := number(), t := pid(), u := number()}
-Context expected type: #{t := T, u := U}
-    │         
-
-Because in the expression's type:
-  #{ u =>
-    Here the type is:     number()
-    Context expects type: U
-  , ... }
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:684:9
-    │
-684 │         #{u => 1, t => Pid, extra => 3}
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │         │
-    │         #{..}.
-Expression has type:   #{extra := number(), t := pid(), u := number()}
 Context expected type: #{t := dynamic(), u := dynamic()}
     │         
 
@@ -849,14 +605,6 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 752 │     _ = fun_with_tuple({a, b}, {}),
     │                                ^^ {}.
 Expression has type:   {}
-Context expected type: [A]
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:752:32
-    │
-752 │     _ = fun_with_tuple({a, b}, {}),
-    │                                ^^ {}.
-Expression has type:   {}
 Context expected type: [dynamic()]
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
@@ -867,26 +615,20 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │                        │
     │                        Props.
 Expression has type:   {'error', term()} | [{atom(), binary()}]
-Context expected type: [{term(), V}]
+Context expected type: [{dynamic(), dynamic()}]
     │                        
 
 Because in the expression's type:
-  Here the type is:     {'error', term()}
-  Context expects type: [{term(), V}]
+  Here the type is a union type with some valid candidates: [{atom(), binary()}]
+  However the following candidate: {'error', term()}
+  Differs from the expected type:  [{dynamic(), dynamic()}]
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/generic_fun_application.erl:773:24
+    ┌─ check/src/generic_fun_application.erl:777:14
     │
-773 │     V = props_get(key, Props, undefined),
-    │                        ^^^^^
-    │                        │
-    │                        Props.
-Expression has type:   {'error', term()} | [{atom(), binary()}]
-Context expected type: [{term(), 'undefined'}]
-    │                        
+777 │         Z -> {Z}
+    │              ^^^ {Z}.
+Expression has type:   {dynamic()}
+Context expected type: 'error' | {'error', atom()}
 
-Because in the expression's type:
-  Here the type is:     {'error', term()}
-  Context expects type: [{term(), 'undefined'}]
-
-75 ERRORS
+59 ERRORS

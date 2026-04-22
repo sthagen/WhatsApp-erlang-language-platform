@@ -531,23 +531,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 648 │     catch lists:map({}, {}).
     │                     ^^ {}.
 Expression has type:   {}
-Context expected type: fun((A) -> B)
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:648:21
-    │
-648 │     catch lists:map({}, {}).
-    │                     ^^ {}.
-Expression has type:   {}
 Context expected type: fun((dynamic()) -> dynamic())
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:648:25
-    │
-648 │     catch lists:map({}, {}).
-    │                         ^^ {}.
-Expression has type:   {}
-Context expected type: [A]
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/misc.erl:648:25
@@ -563,23 +547,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 652 │     X = (catch lists:map({}, {})),
     │                          ^^ {}.
 Expression has type:   {}
-Context expected type: fun((A) -> B)
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:652:26
-    │
-652 │     X = (catch lists:map({}, {})),
-    │                          ^^ {}.
-Expression has type:   {}
 Context expected type: fun((dynamic()) -> dynamic())
-
-error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
-    ┌─ check/src/misc.erl:652:30
-    │
-652 │     X = (catch lists:map({}, {})),
-    │                              ^^ {}.
-Expression has type:   {}
-Context expected type: [A]
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/misc.erl:652:30
@@ -872,4 +840,4 @@ error: non_exported_id (See https://fb.me/eqwalizer_errors#non_exported_id)
 1011 │ -type non_exported_id_t() :: any_fun_type:f1().
      │                              ^^^^^^^^^^^^^^^^^ Type exists but is not exported: any_fun_type:f1/0
 
-93 ERRORS
+89 ERRORS
