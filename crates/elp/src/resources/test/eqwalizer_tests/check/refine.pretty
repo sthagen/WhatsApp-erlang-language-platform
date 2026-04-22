@@ -294,17 +294,55 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   #my_rec{}
 Context expected type: 'ok'
 
-error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
-    ┌─ check/src/refine.erl:250:19
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/refine.erl:250:23
     │
 250 │ use2_neg(F, X) -> ftt(F, X).
-    │                   ^^^^^^^^^ Ill-typed poly-application
+    │                       ^
+    │                       │
+    │                       F.
+Expression has type:   fun((#my_rec{}) -> 'ok')
+Context expected type: fun((T) -> 'ok')
+    │                       
 
-error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
-    ┌─ check/src/refine.erl:262:19
+Because in the expression's type:
+  fun((
+    Here the type is:     T
+    Context expects type: #my_rec{}
+  ) -> 'ok')
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/refine.erl:250:26
+    │
+250 │ use2_neg(F, X) -> ftt(F, X).
+    │                          ^ X.
+Expression has type:   {'my_rec', atom(), number()}
+Context expected type: T
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/refine.erl:262:23
     │
 262 │ use4_neg(F, X) -> ftt(F, X).
-    │                   ^^^^^^^^^ Ill-typed poly-application
+    │                       ^
+    │                       │
+    │                       F.
+Expression has type:   fun(({'my_rec', atom(), number()}) -> 'ok')
+Context expected type: fun((T) -> 'ok')
+    │                       
+
+Because in the expression's type:
+  fun((
+    Here the type is:     T
+    Context expects type: {'my_rec', atom(), number()}
+  ) -> 'ok')
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/refine.erl:262:26
+    │
+262 │ use4_neg(F, X) -> ftt(F, X).
+    │                          ^ X.
+Expression has type:   #my_rec{}
+Context expected type: T
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/refine.erl:278:21
@@ -391,4 +429,4 @@ error: reveal_type (See https://fb.me/eqwalizer_errors#reveal_type)
 386 │     eqwalizer:reveal_type(A),
     │                           ^ number()
 
-36 ERRORS
+38 ERRORS

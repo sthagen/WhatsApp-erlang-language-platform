@@ -41,15 +41,30 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   'nok'
 Context expected type: T
 
-error: poly_no_solution (See https://fb.me/eqwalizer_errors#poly_no_solution)
-    ┌─ check/src/funs2.erl:99:5
-    │  
- 99 │ ╭     generic(
-100 │ │         fun(X) -> X end,
-101 │ │         fun erlang:atom_to_list/1,
-102 │ │         fun erlang:list_to_atom/1
-103 │ │     ),
-    │ ╰─────^ Ill-typed poly-application
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/funs2.erl:101:9
+    │
+101 │         fun erlang:atom_to_list/1,
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │         │
+    │         erlang:atom_to_list/1.
+Expression has type:   fun((atom()) -> string())
+Context expected type: fun((T) -> T)
+    │         
+
+Because in the expression's type:
+  fun((atom()) ->
+    Here the type is:     string()
+    Context expects type: T
+  )
+
+error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
+    ┌─ check/src/funs2.erl:102:9
+    │
+102 │         fun erlang:list_to_atom/1
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^ erlang:list_to_atom/1.
+Expression has type:   fun((string()) -> atom())
+Context expected type: T
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
     ┌─ check/src/funs2.erl:152:27
@@ -59,4 +74,4 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
 Expression has type:   atom()
 Context expected type: number()
 
-6 ERRORS
+7 ERRORS
