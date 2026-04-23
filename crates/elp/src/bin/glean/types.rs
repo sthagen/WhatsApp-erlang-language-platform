@@ -150,21 +150,84 @@ impl From<Location> for TextRange {
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "predicate")]
+#[expect(
+    dead_code,
+    reason = "erlang.2 variants used once into_schema2_facts() lands"
+)]
 pub(crate) enum Fact {
     #[serde(rename = "src.File")]
     File { facts: Vec<FileFact> },
     #[serde(rename = "src.FileLines")]
     FileLine { facts: Vec<Key<FileLinesFact>> },
-    #[serde(rename = "erlang.FunctionDeclaration")]
+    #[serde(rename = "erlang.FunctionDeclaration.1")]
     FunctionDeclaration {
         facts: Vec<Key<FunctionDeclarationFact>>,
     },
-    #[serde(rename = "erlang.XRefsViaFqnByFile")]
+    #[serde(rename = "erlang.XRefsViaFqnByFile.1")]
     XRef { facts: Vec<Key<XRefFact>> },
-    #[serde(rename = "erlang.DeclarationComment")]
+    #[serde(rename = "erlang.DeclarationComment.1")]
     DeclarationComment { facts: Vec<Key<CommentFact>> },
-    #[serde(rename = "erlang.Module")]
+    #[serde(rename = "erlang.Module.1")]
     Module { facts: Vec<Key<ModuleFact>> },
+    // ── erlang.2 predicates ──
+    #[serde(rename = "erlang.FunctionDeclaration.2")]
+    FuncDecl2 { facts: Vec<Key<Schema2FuncDecl>> },
+    #[serde(rename = "erlang.MacroDeclaration.2")]
+    MacroDecl2 { facts: Vec<Key<Schema2MacroDecl>> },
+    #[serde(rename = "erlang.RecordDeclaration.2")]
+    RecordDecl2 { facts: Vec<Key<Schema2RecordDecl>> },
+    #[serde(rename = "erlang.TypeDeclaration.2")]
+    TypeDecl2 { facts: Vec<Key<Schema2TypeDecl>> },
+    #[serde(rename = "erlang.HeaderDeclaration.2")]
+    HeaderDecl2 { facts: Vec<Key<Schema2HeaderDecl>> },
+    #[serde(rename = "erlang.CallbackDeclaration.2")]
+    CallbackDecl2 {
+        facts: Vec<Key<Schema2CallbackDecl>>,
+    },
+    #[serde(rename = "erlang.RecordFieldDeclaration.2")]
+    RecordFieldDecl2 {
+        facts: Vec<Key<Schema2RecordFieldDecl>>,
+    },
+    #[serde(rename = "erlang.ModuleDeclaration.2")]
+    Module2 { facts: Vec<Key<Schema2ModuleDecl>> },
+    #[serde(rename = "erlang.MacroUsage.2")]
+    MacroUsage2 { facts: Vec<Key<Schema2MacroUsage>> },
+    #[serde(rename = "erlang.VarDeclaration.2")]
+    VarDecl2 { facts: Vec<Key<Schema2VarDecl>> },
+    #[serde(rename = "erlang.FunctionDefinition.2")]
+    FuncDef2 { facts: Vec<Key<Schema2FuncDef>> },
+    #[serde(rename = "erlang.MacroDefinition.2")]
+    MacroDef2 { facts: Vec<Key<Schema2MacroDef>> },
+    #[serde(rename = "erlang.RecordDefinition.2")]
+    RecordDef2 { facts: Vec<Key<Schema2RecordDef>> },
+    #[serde(rename = "erlang.TypeDefinition.2")]
+    TypeDef2 { facts: Vec<Key<Schema2TypeDef>> },
+    #[serde(rename = "erlang.CallbackDefinition.2")]
+    CallbackDef2 { facts: Vec<Key<Schema2CallbackDef>> },
+    #[serde(rename = "erlang.ModuleDefinition.2")]
+    ModuleDef2 { facts: Vec<Key<Schema2ModuleDef>> },
+    #[serde(rename = "erlang.DeclarationLocation.2")]
+    DeclLocation2 {
+        facts: Vec<Key<Schema2DeclLocation>>,
+    },
+    #[serde(rename = "erlang.MacroUsageLocation.2")]
+    MacroUsageLocation2 {
+        facts: Vec<Key<Schema2MacroUsageLocation>>,
+    },
+    #[serde(rename = "erlang.VarLocation.2")]
+    VarLocation2 { facts: Vec<Key<Schema2VarLocation>> },
+    #[serde(rename = "erlang.XRefsByFile.2")]
+    TypedXRefs2 { facts: Vec<Key<Schema2XRefsByFile>> },
+    #[serde(rename = "erlang.VarXRefsByFile.2")]
+    VarXRefs2 {
+        facts: Vec<Key<Schema2VarXRefsByFile>>,
+    },
+    #[serde(rename = "erlang.FileDeclarations.2")]
+    FileDecls2 {
+        facts: Vec<Key<Schema2FileDeclarations>>,
+    },
+    #[serde(rename = "erlang.DeclarationComment.2")]
+    DeclComment2 { facts: Vec<Key<Schema2CommentFact>> },
 }
 
 #[derive(Serialize, Debug)]
@@ -363,4 +426,257 @@ pub(crate) struct DocDecl {
     pub(crate) target: Box<Declaration>,
     pub(crate) span: Location,
     pub(crate) text: String,
+}
+
+// ── erlang.2 output types ──────────────────────────────────────────
+
+#[derive(Serialize, Debug, Clone)]
+#[expect(
+    dead_code,
+    reason = "variants constructed in into_schema2_facts() (next diff)"
+)]
+pub(crate) enum Schema2Declaration {
+    #[serde(rename = "func")]
+    Func(Key<Schema2FuncDecl>),
+    #[serde(rename = "macro_")]
+    Macro(Key<Schema2MacroDecl>),
+    #[serde(rename = "record_")]
+    Record(Key<Schema2RecordDecl>),
+    #[serde(rename = "type_")]
+    Type(Key<Schema2TypeDecl>),
+    #[serde(rename = "header_")]
+    Header(Key<Schema2HeaderDecl>),
+    #[serde(rename = "callback_")]
+    Callback(Key<Schema2CallbackDecl>),
+    #[serde(rename = "record_field")]
+    RecordField(Key<Schema2RecordFieldDecl>),
+    #[serde(rename = "module_")]
+    Module(Key<Schema2ModuleDecl>),
+}
+
+// ── Declaration identity types ──
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2Fqn {
+    pub(crate) module: String,
+    pub(crate) name: String,
+    pub(crate) arity: u32,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2FuncDecl {
+    pub(crate) fqn: Schema2Fqn,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2MacroDecl {
+    pub(crate) name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) arity: Option<u32>,
+    pub(crate) module: String,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2RecordDecl {
+    pub(crate) name: String,
+    pub(crate) module: String,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2TypeDecl {
+    pub(crate) name: String,
+    pub(crate) arity: u32,
+    pub(crate) module: String,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2HeaderDecl {
+    pub(crate) name: String,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2CallbackDecl {
+    pub(crate) name: String,
+    pub(crate) arity: u32,
+    pub(crate) module: String,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2RecordFieldDecl {
+    pub(crate) record_name: String,
+    pub(crate) field_name: String,
+    pub(crate) module: String,
+    pub(crate) app: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2ModuleDecl {
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) name: String,
+    pub(crate) app: String,
+}
+
+// ── Definition types ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2FuncDef {
+    pub(crate) declaration: Key<Schema2FuncDecl>,
+    pub(crate) exported: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) deprecated: Option<String>,
+    pub(crate) is_on_load: bool,
+    pub(crate) is_nif: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) spec_text: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2MacroDef {
+    pub(crate) declaration: Key<Schema2MacroDecl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) definition_text: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2RecordDef {
+    pub(crate) declaration: Key<Schema2RecordDecl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) definition_text: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2TypeDef {
+    pub(crate) declaration: Key<Schema2TypeDecl>,
+    pub(crate) exported: bool,
+    pub(crate) opaque: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) definition_text: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2CallbackDef {
+    pub(crate) declaration: Key<Schema2CallbackDecl>,
+    pub(crate) optional_: bool,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2ModuleDef {
+    pub(crate) declaration: Key<Schema2ModuleDecl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) oncall: Option<String>,
+    pub(crate) exports: Vec<Key<Schema2FuncDecl>>,
+    pub(crate) behaviours: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) exdoc_link: Option<String>,
+    pub(crate) compile_options: Vec<String>,
+}
+
+// ── Location types ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2DeclLocation {
+    pub(crate) declaration: Schema2Declaration,
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) span: Location,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2MacroUsageLocation {
+    pub(crate) usage: Key<Schema2MacroUsage>,
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) span: Location,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2VarLocation {
+    pub(crate) var_: Key<Schema2VarDecl>,
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) span: Location,
+}
+
+// ── MacroUsage + VarDeclaration ──
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2MacroUsage {
+    pub(crate) name: String,
+    pub(crate) module: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) arity: Option<u32>,
+    pub(crate) app: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) expansion: Option<String>,
+    pub(crate) links: Vec<String>,
+    pub(crate) content_hash: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub(crate) struct Schema2VarDecl {
+    pub(crate) name: String,
+    pub(crate) module: String,
+    pub(crate) app: String,
+    pub(crate) span_start: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) type_text: Option<String>,
+}
+
+// ── XRef types ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2XRef {
+    pub(crate) target: Schema2Declaration,
+    pub(crate) source: Location,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2XRefsByFile {
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) xrefs: Vec<Schema2XRef>,
+}
+
+// ── Variable xrefs ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2VarXRef {
+    pub(crate) target_name: String,
+    pub(crate) target_span_start: u32,
+    pub(crate) sources: Vec<Location>,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2VarXRefsByFile {
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) xrefs: Vec<Schema2VarXRef>,
+}
+
+// ── Bulk file index ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2FileDeclarations {
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) declarations: Vec<Schema2Declaration>,
+}
+
+// ── Comment ──
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2CommentFact {
+    pub(crate) declaration: Schema2Declaration,
+    #[serde(rename = "file")]
+    pub(crate) file_id: GleanFileId,
+    pub(crate) span: Location,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) text: Option<String>,
 }
