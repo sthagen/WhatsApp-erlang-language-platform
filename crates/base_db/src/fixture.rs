@@ -13,10 +13,6 @@
 // Based on rust-analyzer base_db::fixture
 
 use std::collections::hash_map::Entry;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::Arc as StdArc;
 
@@ -26,18 +22,11 @@ use elp_project_model::AppType;
 use elp_project_model::Project;
 use elp_project_model::ProjectAppData;
 use elp_project_model::ProjectBuildData;
-use elp_project_model::ProjectManifest;
-use elp_project_model::buck::BuckQueryConfig;
 use elp_project_model::buck::IncludeMapping;
-use elp_project_model::json::JsonConfig;
-use elp_project_model::otp::ERTS_APP;
-use elp_project_model::otp::KERNEL_APP;
 use elp_project_model::otp::Otp;
-use elp_project_model::otp::STDLIB_APP;
 use elp_project_model::otp::find_otp_app;
 use elp_project_model::otp::read_otp_app_sources;
 use elp_project_model::rebar::RebarProject;
-use elp_project_model::temp_dir::TempDir;
 use elp_project_model::test_fixture::DiagnosticsEnabled;
 use elp_project_model::test_fixture::FixtureWithProjectMeta;
 use elp_project_model::test_fixture::RangeOrOffset;
@@ -45,7 +34,6 @@ use elp_syntax::TextRange;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use paths::AbsPathBuf;
-use paths::Utf8Path;
 use vfs::FileId;
 use vfs::VfsPath;
 use vfs::file_set::FileSet;
@@ -53,7 +41,6 @@ use vfs::file_set::FileSet;
 use crate::FilePosition;
 use crate::FileRange;
 use crate::ProjectApps;
-use crate::ProjectId;
 use crate::SourceDatabaseExt;
 use crate::SourceRoot;
 use crate::change::Change;
@@ -115,58 +102,18 @@ pub struct ChangeFixture {
 }
 
 struct Builder {
-    project_dir: Option<TempDir>,
     diagnostics_enabled: DiagnosticsEnabled,
 }
 
 impl Builder {
     fn new(diagnostics_enabled: DiagnosticsEnabled) -> Builder {
-        let project_dir = if diagnostics_enabled.needs_fixture_on_disk() {
-            let tmp_dir = TempDir::new().keep();
-            let tmp_dir_path: &Path = tmp_dir.path();
-
-            // When trying to debug a fixture, you can set it to a
-            // well-known directory location as shown in the next line
-            // let tmp_dir_path = Path::new("/tmp/elp_fixture");
-
-            let _ = fs::create_dir_all(tmp_dir_path);
-
-            // See comment in `TempDir::new` as to why we need this.
-            #[cfg(target_os = "macos")]
-            let tmp_dir_path = tmp_dir_path.canonicalize().unwrap();
-
-            Some(TempDir {
-                path: tmp_dir_path.to_path_buf(),
-                // When trying to debug a fixture, set this to true.
-                keep: false,
-            })
-        } else {
-            None
-        };
-
         Builder {
-            project_dir,
             diagnostics_enabled,
         }
     }
 
-    fn absolute_path(&self, path: String) -> String {
-        if let Some(project_dir) = &self.project_dir {
-            let project_dir_str = project_dir.path().as_os_str().to_str().unwrap();
-            format!("{project_dir_str}/{path}")
-        } else {
-            path
-        }
-    }
-
-    fn project_dir(&self) -> Option<&Utf8Path> {
-        self.project_dir
-            .as_ref()
-            .and_then(|d| Utf8Path::from_path(d.path()))
-    }
-
     fn needs_otp(&self) -> bool {
-        self.project_dir().is_some() || self.diagnostics_enabled.use_eqwalizer
+        self.diagnostics_enabled.use_eqwalizer
     }
 }
 
@@ -182,7 +129,7 @@ impl ChangeFixture {
         let fixture_with_meta = FixtureWithProjectMeta::parse(test_fixture);
         let FixtureWithProjectMeta {
             fixture,
-            mut diagnostics_enabled,
+            diagnostics_enabled,
             expect_parse_errors,
             otp_apps: mut requested_otp_apps,
         } = fixture_with_meta.clone();
@@ -251,16 +198,7 @@ impl ChangeFixture {
 
             change.change_file(file_id, Some(Arc::from(entry.text)));
 
-            let path = if diagnostics_enabled.needs_fixture_on_disk()
-                && entry.path.char_indices().nth(0) == Some((0, '/'))
-            {
-                let mut path = entry.path.clone();
-                path.remove(0);
-                let path: String = builder.absolute_path(path);
-                VfsPath::new_real_path(path)
-            } else {
-                VfsPath::new_real_path(entry.path)
-            };
+            let path = VfsPath::new_real_path(entry.path);
             // When src_app is specified, place the file into that app's
             // SourceRoot/FileSet instead. This models buck's shared source
             // root scenario (e.g., lib + test targets in the same directory).
@@ -387,68 +325,9 @@ impl ChangeFixture {
         project.project_build_data = ProjectBuildData::Rebar(rebar_project);
         project.include_mapping = project_include_mapping;
 
-        if let Some(project_dir) = builder.project_dir() {
-            // Dump a copy of the fixture into a temp dir
-            let files: Vec<(String, String)> = fixture
-                .iter()
-                .map(|entry| (entry.path.clone(), entry.text.clone()))
-                .collect();
-            let project_dir_str = project_dir.as_os_str().to_str().unwrap();
-
-            let tmp_dir_path = project_dir;
-            for (path, text) in files {
-                let path = tmp_dir_path.join(&path[1..]);
-                let parent = path.parent().unwrap();
-                fs::create_dir_all(parent).unwrap();
-                let mut tmp_file = File::create(path).unwrap();
-                write!(tmp_file, "{}", &text).unwrap();
-            }
-
-            let json_config_file = format!("{project_dir_str}/build_info.json");
-
-            let mut writer = File::create(&json_config_file).unwrap();
-
-            let json_str = serde_json::to_string_pretty::<JsonConfig>(
-                &project.as_json(AbsPathBuf::assert(project_dir.to_path_buf())),
-            )
-            .unwrap();
-            writer.write_all(json_str.as_bytes()).unwrap();
-
-            let first_fixture = &fixture_with_meta.fixture[0];
-
-            if first_fixture.path.char_indices().nth(0) == Some((0, '/')) {
-                let mut path = first_fixture.path.clone();
-                path.remove(0);
-                project_dir.join(path)
-            } else {
-                project_dir.join(first_fixture.path.clone())
-            };
-            let (elp_config, manifest) =
-                ProjectManifest::discover(&AbsPathBuf::assert(json_config_file.into())).unwrap();
-            let loaded_project = Project::load(
-                &manifest,
-                &elp_config,
-                &BuckQueryConfig::BuildGeneratedCode,
-                &|_| {},
-            )
-            .unwrap();
-            project = loaded_project;
-        }
-
         let projects = [project.clone()];
 
-        let project_apps = if diagnostics_enabled.needs_fixture_on_disk() {
-            // The static manifest already includes OTP
-            let mut project_apps = ProjectApps::new(&projects, IncludeOtp::No);
-
-            let last_project = ProjectId(projects.len() as u32 - 1);
-            project_apps.all_apps.push((last_project, &ERTS_APP));
-            project_apps.all_apps.push((last_project, &STDLIB_APP));
-            project_apps.all_apps.push((last_project, &KERNEL_APP));
-            project_apps
-        } else {
-            ProjectApps::new(&projects, IncludeOtp::Yes)
-        };
+        let project_apps = ProjectApps::new(&projects, IncludeOtp::Yes);
         change.set_app_structure(project_apps.app_structure());
 
         let mut roots = Vec::new();
@@ -466,10 +345,6 @@ impl ChangeFixture {
             }
         }
         change.set_roots(roots);
-
-        // Store the projects so the buildinfo does not get dropped
-        // prematurely and the tempdir deleted.
-        diagnostics_enabled.tmp_dir = builder.project_dir.map(|d| (projects.to_vec(), d));
         (
             ChangeFixture {
                 file_position,

@@ -24,7 +24,6 @@ use elp_ide::diagnostics::RemoveElpReported;
 use elp_ide::diagnostics_collection::DiagnosticCollection;
 use elp_ide::elp_ide_db::elp_base_db::AbsPathBuf;
 use elp_ide::elp_ide_db::elp_base_db::FileId;
-use elp_ide::elp_ide_db::elp_base_db::FileKind;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_ide::elp_ide_db::elp_base_db::Vfs;
 use elp_log::timeit_with_telemetry;
@@ -65,9 +64,6 @@ pub enum TelemetryData {
     MetaDiagnostics {
         file_url: Url,
     },
-    CommonTestDiagnostics {
-        file_url: Url,
-    },
     Initialize,
     References {
         file_url: Url,
@@ -95,9 +91,6 @@ impl fmt::Display for TelemetryData {
             }
             TelemetryData::MetaDiagnostics { file_url } => {
                 write!(f, "Meta Diagnostics file_url: {file_url}")
-            }
-            TelemetryData::CommonTestDiagnostics { file_url } => {
-                write!(f, "CT Diagnostics file_url: {file_url}")
             }
             TelemetryData::Initialize => {
                 write!(f, "Initialize")
@@ -287,28 +280,6 @@ impl Snapshot {
         let file_url = self.file_id_to_url(file_id);
         let _timer = timeit_with_telemetry!(TelemetryData::EqwalizerDiagnostics { file_url });
         self.analysis.types_for_file(file_id).ok()?
-    }
-
-    pub fn ct_diagnostics(
-        &self,
-        file_id: FileId,
-        config: &DiagnosticsConfig,
-    ) -> Option<Vec<diagnostics::Diagnostic>> {
-        let file_kind = self.analysis.file_kind(file_id).ok()?;
-        if file_kind != FileKind::TestModule {
-            return None;
-        }
-
-        if !config.include_otp && self.is_otp(file_id) {
-            return None;
-        }
-
-        let file_url = self.file_id_to_url(file_id);
-        let _timer = timeit_with_telemetry!(TelemetryData::CommonTestDiagnostics {
-            file_url: file_url.clone()
-        });
-
-        self.analysis.ct_diagnostics(file_id, config).ok()
     }
 
     pub fn erlang_service_diagnostics(

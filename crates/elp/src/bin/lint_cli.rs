@@ -325,8 +325,6 @@ fn do_diagnostics_one(
             diagnostics.set_erlang_service(file_id, diags);
         }
     }
-    // CT diagnostics are always included (--include-ct-diagnostics is now a no-op)
-    diagnostics.set_ct(file_id, db.ct_diagnostics(file_id, config)?);
     if args.include_eqwalizer_diagnostics {
         if args.check_eqwalize_all {
             let project_id = db.project_id(file_id).unwrap().unwrap();

@@ -384,7 +384,6 @@ foo() -> ok.
     fn test_suite_no_warning() {
         check_diagnostics(
             r#"
-//- common_test
 //- /my_app/test/my_SUITE.erl
 -module(my_SUITE).
 -export([all/0, my_test/1]).

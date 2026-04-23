@@ -97,7 +97,6 @@ use text_size::TextRange;
 use text_size::TextSize;
 
 use crate::AppName;
-use crate::Project;
 use crate::ProjectAppData;
 use crate::otp::Otp;
 use crate::temp_dir::TempDir;
@@ -130,36 +129,9 @@ pub struct DiagnosticsEnabled {
     pub use_native: bool,
     pub use_erlang_service: bool,
     pub use_eqwalizer: bool,
-    pub use_ct: bool,
-    /// Keep a copy of the project we loaded the fixture from, as it
-    /// has a reference to the temporary directory holding build_info
-    /// for Eqwalizer. Ditto for the TempDir we dump the test fixture
-    /// to.  This is dropped when it goes out of scope, so we need to
-    /// keep it around. This structure is used to manage the services
-    /// that need it, so it is a good place for it to go.
-    #[allow(unused)]
-    pub tmp_dir: Option<(Vec<Project>, TempDir)>,
 }
 
 impl DiagnosticsEnabled {
-    pub fn needs_fixture_on_disk(&self) -> bool {
-        let DiagnosticsEnabled {
-            use_native: _,
-            use_erlang_service: _,
-            use_eqwalizer: _,
-            use_ct,
-            tmp_dir: _,
-        } = self;
-        *use_ct
-    }
-
-    #[track_caller]
-    pub fn assert_ct_enabled(&self) {
-        if !self.use_ct {
-            panic!("Expecting `//- common_test` at top of fixture");
-        }
-    }
-
     #[track_caller]
     pub fn assert_erlang_service_enabled(&self) {
         if !self.use_erlang_service {
@@ -175,10 +147,8 @@ impl DiagnosticsEnabled {
             use_native: _,
             use_erlang_service,
             use_eqwalizer,
-            use_ct,
-            tmp_dir: _,
         } = &self;
-        if !(*use_erlang_service || *use_ct || *use_eqwalizer) {
+        if !(*use_erlang_service || *use_eqwalizer) {
             self.use_native = true;
         }
     }
@@ -213,12 +183,6 @@ impl FixtureWithProjectMeta {
         // ---------------------------------------
         // Each of the following is optional, but they must always
         // appear in the same (alphabetical) order
-        if let Some(meta) = fixture.strip_prefix("//- common_test") {
-            let (_meta, remain) = meta.split_once('\n').unwrap();
-            diagnostics_enabled.use_ct = true;
-            fixture = remain;
-        }
-
         if let Some(meta) = fixture.strip_prefix("//- eqwalizer") {
             let (_meta, remain) = meta.split_once('\n').unwrap();
             diagnostics_enabled.use_eqwalizer = true;
@@ -938,7 +902,6 @@ foo() -> ok.
 bar() -> ok.
 "#,
         );
-        assert!(!fixture.diagnostics_enabled.use_ct);
         assert!(!fixture.diagnostics_enabled.use_erlang_service);
         let parsed = fixture.fixture;
         assert_eq!(2, parsed.len());
@@ -967,7 +930,6 @@ foo() -> ok.
 bar() -> ok.
 "#,
         );
-        assert!(!fixture.diagnostics_enabled.use_ct);
         assert!(fixture.diagnostics_enabled.use_erlang_service);
         let parsed = fixture.fixture;
         assert_eq!(2, parsed.len());
@@ -981,20 +943,6 @@ bar() -> ok.
         assert_eq!("/foo.erl", meta0.path);
 
         assert_eq!("/bar.erl", meta1.path);
-    }
-
-    #[test]
-    fn parse_fixture_common_test() {
-        let fixture = FixtureWithProjectMeta::parse(
-            r#"
-//- common_test
-//- /foo.erl
--module(foo).
-foo() -> ok.
-"#,
-        );
-        assert!(fixture.diagnostics_enabled.use_ct);
-        assert!(!fixture.diagnostics_enabled.use_erlang_service);
     }
 
     #[test]

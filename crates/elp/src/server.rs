@@ -161,7 +161,6 @@ pub enum Task {
         Spinner,
         Vec<(ProjectId, Vec<(FileId, Vec<diagnostics::Diagnostic>)>)>,
     ),
-    CommonTestDiagnostics(Spinner, Vec<(FileId, Vec<diagnostics::Diagnostic>)>),
     ErlangServiceDiagnostics(Vec<(FileId, LabeledDiagnostics)>),
     CompileDeps(Spinner),
     Progress(ProgressTask),
@@ -290,7 +289,6 @@ pub struct Server {
     native_diagnostics_requested: bool,
     eqwalizer_and_erlang_service_diagnostics_requested: bool,
     eqwalizer_project_diagnostics_requested: bool,
-    ct_diagnostics_requested: bool,
     cache_scheduled: bool,
     eqwalize_all_scheduled: FxHashSet<ProjectId>,
     eqwalize_all_completed: bool,
@@ -358,7 +356,6 @@ impl Server {
             native_diagnostics_requested: false,
             eqwalizer_and_erlang_service_diagnostics_requested: false,
             eqwalizer_project_diagnostics_requested: false,
-            ct_diagnostics_requested: false,
             cache_scheduled: false,
             eqwalize_all_scheduled: FxHashSet::default(),
             eqwalize_all_completed: false,
@@ -529,10 +526,6 @@ impl Server {
                     spinner.end();
                     self.eqwalizer_project_diagnostics_completed(diags)
                 }
-                Task::CommonTestDiagnostics(spinner, diags) => {
-                    spinner.end();
-                    self.ct_diagnostics_completed(diags)
-                }
                 Task::ErlangServiceDiagnostics(diags) => {
                     self.erlang_service_diagnostics_completed(diags)
                 }
@@ -592,10 +585,6 @@ impl Server {
 
             if mem::take(&mut self.eqwalizer_project_diagnostics_requested) {
                 self.update_eqwalizer_project_diagnostics();
-            }
-
-            if mem::take(&mut self.ct_diagnostics_requested) {
-                self.update_ct_diagnostics();
             }
         }
 
@@ -742,7 +731,6 @@ impl Server {
                 if this.config.eqwalizer().all {
                     this.eqwalizer_project_diagnostics_requested = true;
                 }
-                this.ct_diagnostics_requested = true;
                 this.native_diagnostics_requested = true;
                 if let Ok(path) = convert::abs_path(&params.text_document.uri) {
                     let vfs_path = VfsPath::from(path.clone());
@@ -886,7 +874,6 @@ impl Server {
                         if this.config.eqwalizer().all {
                             this.eqwalizer_project_diagnostics_requested = true;
                         }
-                        this.ct_diagnostics_requested = true;
                         this.native_diagnostics_requested = true;
                     } else {
                         this.vfs_loader.handle.invalidate(path);
@@ -1131,7 +1118,6 @@ impl Server {
                 Arc::make_mut(&mut self.eqwalizer_types).insert(file.file_id, Arc::new(vec![]));
                 Arc::make_mut(&mut self.diagnostics)
                     .set_erlang_service(file.file_id, LabeledDiagnostics::default());
-                Arc::make_mut(&mut self.diagnostics).set_ct(file.file_id, vec![]);
             }
         }
         if self.initial_load_status == InitialLoading::DoneButVfsChanges {
@@ -1278,34 +1264,6 @@ impl Server {
         });
     }
 
-    fn update_ct_diagnostics(&mut self) {
-        if self.status != Status::Running {
-            return;
-        }
-
-        log::info!("Recomputing CT diagnostics");
-
-        let opened_documents = self.opened_documents();
-        let snapshot = self.snapshot();
-
-        let spinner = self.progress.begin_spinner("Common Test".to_string());
-
-        let config = self.diagnostics_config.clone();
-        self.task_pool.handle.spawn(move || {
-            let diagnostics = opened_documents
-                .into_par_iter()
-                .map_with(snapshot, |snapshot, file_id| {
-                    snapshot
-                        .ct_diagnostics(file_id, &config)
-                        .map(|diags| (file_id, diags))
-                })
-                .flatten()
-                .collect();
-
-            Task::CommonTestDiagnostics(spinner, diagnostics)
-        });
-    }
-
     #[allow(clippy::type_complexity)]
     fn eqwalizer_diagnostics_completed(
         &mut self,
@@ -1330,12 +1288,6 @@ impl Server {
     ) {
         for (_project_id, diagnostics) in diags {
             Arc::make_mut(&mut self.diagnostics).set_eqwalizer_project(diagnostics);
-        }
-    }
-
-    fn ct_diagnostics_completed(&mut self, diags: Vec<(FileId, Vec<diagnostics::Diagnostic>)>) {
-        for (file_id, diagnostics) in diags {
-            Arc::make_mut(&mut self.diagnostics).set_ct(file_id, diagnostics);
         }
     }
 

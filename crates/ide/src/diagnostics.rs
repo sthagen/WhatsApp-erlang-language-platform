@@ -92,7 +92,6 @@ use crate::codemod_helpers::FunctionMatcher;
 use crate::codemod_helpers::MatchCtx;
 use crate::codemod_helpers::UseRange;
 use crate::codemod_helpers::find_call_in_function_with_matchers;
-use crate::common_test;
 
 mod application_env;
 mod atoms_exhaustion;
@@ -2812,27 +2811,6 @@ pub fn ct_info(db: &RootDatabase, file_id: FileId) -> Arc<CommonTestInfo> {
     }
 
     db.ct_info(file_id)
-}
-
-/// Diagnostics requiring the erlang_service
-pub fn ct_diagnostics(
-    db: &RootDatabase,
-    file_id: FileId,
-    config: &DiagnosticsConfig,
-) -> Vec<Diagnostic> {
-    let mut res: Vec<Diagnostic> = Vec::new();
-    let sema = Semantic::new(db);
-
-    if let CommonTestInfo::Result { all, groups } = &*ct_info(db, file_id) {
-        // @fb-only: let testcases = common_test::runnable_names(&sema, file_id, all, groups).ok();
-        // @fb-only: meta_only::ct_diagnostics(&mut res, &sema, file_id, testcases);
-    };
-    let metadata = db.elp_metadata(file_id);
-    res.into_iter()
-        .filter(|d| {
-            !config.disabled.contains(&d.code) && !d.should_be_suppressed(&metadata, config)
-        })
-        .collect()
 }
 
 /// Match the message part of the diagnostics produced by the

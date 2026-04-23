@@ -25,7 +25,6 @@ pub struct DiagnosticCollection {
     pub(crate) erlang_service: FxHashMap<FileId, LabeledDiagnostics>,
     pub(crate) eqwalizer: FxHashMap<FileId, Vec<Diagnostic>>,
     pub(crate) eqwalizer_project: FxHashMap<FileId, Vec<Diagnostic>>,
-    pub(crate) ct: FxHashMap<FileId, Vec<Diagnostic>>,
     changes: FxHashSet<FileId>,
 }
 
@@ -63,13 +62,6 @@ impl DiagnosticCollection {
         }
     }
 
-    pub fn set_ct(&mut self, file_id: FileId, diagnostics: Vec<Diagnostic>) {
-        if !are_all_diagnostics_equal(&self.ct, file_id, &diagnostics) {
-            set_diagnostics(&mut self.ct, file_id, diagnostics);
-            self.changes.insert(file_id);
-        }
-    }
-
     pub fn set_erlang_service(&mut self, file_id: FileId, diagnostics: LabeledDiagnostics) {
         if !are_all_labeled_diagnostics_equal(&self.erlang_service, file_id, &diagnostics) {
             set_labeled_diagnostics(&mut self.erlang_service, file_id, diagnostics);
@@ -86,7 +78,6 @@ impl DiagnosticCollection {
     pub fn clear(&mut self, file_id: FileId) {
         self.set_native(file_id, LabeledDiagnostics::default());
         self.set_eqwalizer(file_id, vec![]);
-        self.set_ct(file_id, vec![]);
         self.set_erlang_service(file_id, LabeledDiagnostics::default());
     }
 
@@ -108,9 +99,7 @@ impl DiagnosticCollection {
             .into_iter()
             .chain(eqwalizer_project)
             .dedup_by(are_diagnostics_equal);
-        let ct = self.ct.get(&file_id).into_iter().flatten().cloned();
         combined.extend(eqwalizer_combined);
-        combined.extend(ct);
         combined
     }
 
@@ -160,14 +149,12 @@ impl DiagnosticCollection {
             erlang_service,
             eqwalizer,
             eqwalizer_project,
-            ct,
             changes,
         } = self;
         native.is_empty()
             && erlang_service.is_empty()
             && eqwalizer.is_empty()
             && eqwalizer_project.is_empty()
-            && ct.is_empty()
             && changes.is_empty()
     }
 }

@@ -265,8 +265,6 @@ mod tests {
     fn test_missing_no_link_meck_new_1() {
         check_diagnostics(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link1_SUITE.erl
    -module(missing_no_link1_SUITE).
    -export([all/0, init_per_suite/1]).
@@ -290,8 +288,6 @@ mod tests {
     fn test_missing_no_link_init_per_group() {
         check_diagnostics(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link2_SUITE.erl
    -module(missing_no_link2_SUITE).
    -export([all/0, init_per_group/2]).
@@ -316,8 +312,6 @@ mod tests {
     fn test_missing_no_warning_outside_known_functions() {
         check_diagnostics(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link3_SUITE.erl
    -module(missing_no_link3_SUITE).
    -export([all/0, init_per_suite/1]).
@@ -341,8 +335,6 @@ mod tests {
     fn test_missing_no_link_meck_new_2() {
         check_diagnostics(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link4_SUITE.erl
    -module(missing_no_link4_SUITE).
    -export([all/0, init_per_suite/1]).
@@ -366,8 +358,6 @@ mod tests {
     fn test_missing_no_link_in_fun() {
         check_diagnostics(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link5_SUITE.erl
    -module(missing_no_link5_SUITE).
    -export([all/0, init_per_suite/1]).
@@ -391,8 +381,6 @@ mod tests {
     fn test_fix_missing_no_link_option_new_1() {
         check_fix(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link6_SUITE.erl
 -module(missing_no_link6_SUITE).
 -export([all/0, init_per_suite/1]).
@@ -426,8 +414,6 @@ a(_Config) ->
     fn test_fix_missing_no_link_option_new_2() {
         check_fix(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link7_SUITE.erl
 -module(missing_no_link7_SUITE).
 -export([all/0, init_per_suite/1]).
@@ -461,8 +447,6 @@ a(_Config) ->
     fn test_fix_missing_no_link_option_new_2_empty_list() {
         check_fix(
             r#"
-//- common_test
-//- native
 //- /my_app/test/missing_no_link8_SUITE.erl
 -module(missing_no_link8_SUITE).
 -export([all/0, init_per_suite/1]).
