@@ -20,6 +20,7 @@ use elp_project_model::test_fixture::DiagnosticsEnabled;
 use expect_test::expect_file;
 use fxhash::FxHashSet;
 
+use super::types::Fact;
 use super::*;
 use crate::test_utils::resource_file;
 
@@ -109,6 +110,81 @@ fn serialization_test() {
     let expected = resource_file!("glean/serialization_test.out");
     assert_eq!(expected.data().trim(), &out);
     assert_eq!(err, "")
+}
+
+#[test]
+fn schema2_serialization_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/glean_module1.erl
+    -module(glean_module1).
+    -export([hello/1]).
+    hello(X) -> X.
+    "#;
+    let (facts, _, _, _, module_index) = facts_with_annotations(spec);
+    let app_index = FxHashMap::default();
+    let schema2_facts = facts.into_schema2_facts(&module_index, &app_index);
+
+    let predicates: Vec<&str> = schema2_facts
+        .iter()
+        .filter_map(|f| match f {
+            Fact::FuncDecl2 { facts } if !facts.is_empty() => Some("FunctionDeclaration.2"),
+            Fact::FuncDef2 { facts } if !facts.is_empty() => Some("FunctionDefinition.2"),
+            Fact::DeclLocation2 { facts } if !facts.is_empty() => Some("DeclarationLocation.2"),
+            Fact::FileDecls2 { facts } if !facts.is_empty() => Some("FileDeclarations.2"),
+            Fact::Module2 { facts } if !facts.is_empty() => Some("ModuleDeclaration.2"),
+            Fact::ModuleDef2 { facts } if !facts.is_empty() => Some("ModuleDefinition.2"),
+            _ => None,
+        })
+        .collect();
+
+    for expected in [
+        "FunctionDeclaration.2",
+        "FunctionDefinition.2",
+        "DeclarationLocation.2",
+        "FileDeclarations.2",
+        "ModuleDeclaration.2",
+        "ModuleDefinition.2",
+    ] {
+        assert!(
+            predicates.contains(&expected),
+            "Expected {expected} in schema2 output, got: {predicates:?}",
+        );
+    }
+}
+
+#[test]
+fn schema2_dual_write_test() {
+    // Verify dual-write produces both erlang.1 and erlang.2 facts
+    let spec = r#"
+    //- /glean/app_glean/src/glean_module1.erl
+    -module(glean_module1).
+    -export([hello/1]).
+    hello(X) -> X.
+    "#;
+    let (facts, _, _, _, module_index) = facts_with_annotations(spec);
+    let app_index = FxHashMap::default();
+
+    // Simulate dual-write: clone for v1, original for v2
+    let v1_facts = facts.clone().into_glean_facts(&module_index);
+    let v2_facts = facts.into_schema2_facts(&module_index, &app_index);
+
+    // v1 should have FunctionDeclaration.1
+    let has_v1_func = v1_facts
+        .iter()
+        .any(|f| matches!(f, Fact::FunctionDeclaration { facts } if !facts.is_empty()));
+    assert!(
+        has_v1_func,
+        "Dual-write should produce erlang.1 FunctionDeclaration"
+    );
+
+    // v2 should have FunctionDeclaration.2
+    let has_v2_func = v2_facts
+        .iter()
+        .any(|f| matches!(f, Fact::FuncDecl2 { facts } if !facts.is_empty()));
+    assert!(
+        has_v2_func,
+        "Dual-write should produce erlang.2 FunctionDeclaration.2"
+    );
 }
 
 #[test]
