@@ -271,10 +271,6 @@ pub fn run_shell(
         }
     }
     telemetry::report_elapsed_time("shell done", start_time);
-    // Leak the loaded project data to skip expensive destructor cascade.
-    // The Salsa database accumulates large caches whose Arc drop chain
-    // can hang for significant time. The OS reclaims all memory on process exit.
-    std::mem::forget(loaded);
     Ok(())
 }
 

@@ -95,10 +95,7 @@ pub fn eqwalize_module(
     telemetry::report_elapsed_time("eqwalize operational", start_time);
     let r = do_eqwalize_module(args, &mut loaded, cli);
     telemetry::report_elapsed_time("eqwalize done", start_time);
-    // Leak the loaded project data to skip expensive destructor cascade.
-    // The Salsa database accumulates large caches whose Arc drop chain
-    // can hang for significant time. The OS reclaims all memory on process exit.
-    std::mem::forget(loaded);
+
     r
 }
 
@@ -174,10 +171,7 @@ pub fn eqwalize_all(
     telemetry::report_elapsed_time("eqwalize-all operational", start_time);
     let r = do_eqwalize_all(args, &mut loaded, cli);
     telemetry::report_elapsed_time("eqwalize-all done", start_time);
-    // Leak the loaded project data to skip expensive destructor cascade.
-    // The Salsa database accumulates large caches whose Arc drop chain
-    // can hang for significant time. The OS reclaims all memory on process exit.
-    std::mem::forget(loaded);
+
     r
 }
 
@@ -262,10 +256,7 @@ pub fn eqwalize_app(
     telemetry::report_elapsed_time("eqwalize-app operational", start_time);
     let r = do_eqwalize_app(args, &mut loaded, cli);
     telemetry::report_elapsed_time("eqwalize-app done", start_time);
-    // Leak the loaded project data to skip expensive destructor cascade.
-    // The Salsa database accumulates large caches whose Arc drop chain
-    // can hang for significant time. The OS reclaims all memory on process exit.
-    std::mem::forget(loaded);
+
     r
 }
 
@@ -339,10 +330,7 @@ pub fn eqwalize_target(
     telemetry::report_elapsed_time("eqwalize-target operational", start_time);
     let r = do_eqwalize_target(args, &mut loaded, cli);
     telemetry::report_elapsed_time("eqwalize-target done", start_time);
-    // Leak the loaded project data to skip expensive destructor cascade.
-    // The Salsa database accumulates large caches whose Arc drop chain
-    // can hang for significant time. The OS reclaims all memory on process exit.
-    std::mem::forget(loaded);
+
     r
 }
 
@@ -499,10 +487,7 @@ pub fn eqwalize_stats(
             )?;
         }
     }
-    // Leak the loaded project data to skip expensive destructor cascade.
-    // The Salsa database accumulates large caches whose Arc drop chain
-    // can hang for significant time. The OS reclaims all memory on process exit.
-    std::mem::forget(loaded);
+
     Ok(())
 }
 

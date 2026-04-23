@@ -10,6 +10,7 @@
 
 use elp_ide::AnalysisHost;
 use elp_ide::elp_ide_db::RootDatabase;
+use elp_ide::elp_ide_db::elp_base_db::FileSetConfig;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_ide::elp_ide_db::elp_base_db::fixture::ChangeFixture;
 use elp_project_model::test_fixture::FixtureWithProjectMeta;
@@ -18,7 +19,6 @@ use vfs::AbsPathBuf;
 use vfs::FileId;
 use vfs::Vfs;
 use vfs::VfsPath;
-use vfs::file_set::FileSetConfig;
 
 use super::types::LoadResult;
 use crate::document::Document;
@@ -34,14 +34,14 @@ pub fn load_result(fixture_str: &str) -> LoadResult {
     let analysis_host = AnalysisHost::new(db);
     let (vfs, line_ending_map) = load_info_from_fixture(fixture_str);
 
-    LoadResult {
+    LoadResult::new(
         analysis_host,
         vfs,
         line_ending_map,
-        project_id: ProjectId(0),
+        ProjectId(0),
         project,
-        file_set_config: FileSetConfig::default(),
-    }
+        FileSetConfig::default(),
+    )
 }
 
 fn load_info_from_fixture(fixture: &str) -> (Vfs, FxHashMap<FileId, LineEndings>) {

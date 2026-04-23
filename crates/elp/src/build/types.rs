@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::mem::ManuallyDrop;
+
 use elp_ide::Analysis;
 use elp_ide::AnalysisHost;
 use elp_ide::elp_ide_db::EqwalizerProgressReporter;
@@ -25,10 +27,15 @@ use crate::line_endings::LineEndings;
 use crate::reload::apply_source_roots;
 use crate::reload::apply_vfs_text_changes;
 
+/// Expensive-to-drop fields are wrapped in `ManuallyDrop` so that
+/// dropping a `LoadResult` leaks them instead of running the Salsa
+/// destructor cascade. The OS reclaims all memory on process exit.
+/// Use `into_parts()` when you need owned `AnalysisHost`/`Vfs`
+/// (e.g. for memory-usage measurement).
 #[derive(Debug)]
 pub struct LoadResult {
-    pub analysis_host: AnalysisHost,
-    pub vfs: Vfs,
+    pub analysis_host: ManuallyDrop<AnalysisHost>,
+    pub vfs: ManuallyDrop<Vfs>,
     pub line_ending_map: FxHashMap<FileId, LineEndings>,
     pub project_id: ProjectId,
     pub project: Project,
@@ -45,13 +52,23 @@ impl LoadResult {
         file_set_config: FileSetConfig,
     ) -> Self {
         LoadResult {
-            analysis_host,
-            vfs,
+            analysis_host: ManuallyDrop::new(analysis_host),
+            vfs: ManuallyDrop::new(vfs),
             line_ending_map,
             project_id,
             project,
             file_set_config,
         }
+    }
+
+    pub fn into_parts(self) -> (AnalysisHost, Vfs) {
+        let LoadResult {
+            analysis_host, vfs, ..
+        } = self;
+        (
+            ManuallyDrop::into_inner(analysis_host),
+            ManuallyDrop::into_inner(vfs),
+        )
     }
 
     pub fn with_eqwalizer_progress_bar<R>(

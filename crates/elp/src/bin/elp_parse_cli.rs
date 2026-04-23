@@ -198,16 +198,9 @@ pub fn parse_all(
             writeln!(cli, "No errors reported")?;
         }
         if args.is_format_normal() && args.report_system_stats {
-            // print_memory_usage takes ownership and drops analysis_host and
-            // vfs to measure freed memory, so we skip the usual mem::forget
-            // here — the destructor cascade serves the profiling purpose.
-            print_memory_usage(loaded.analysis_host, loaded.vfs, cli)?;
+            let (analysis_host, vfs) = loaded.into_parts();
+            print_memory_usage(analysis_host, vfs, cli)?;
             writeln!(cli, "{}", memory_used)?;
-        } else {
-            // Leak the loaded project data to skip expensive destructor cascade.
-            // The Salsa database accumulates large caches whose Arc drop chain
-            // can hang for significant time. The OS reclaims all memory on process exit.
-            std::mem::forget(loaded);
         }
         Ok(())
     } else {
@@ -255,16 +248,9 @@ pub fn parse_all(
         telemetry::report_elapsed_time("parse-elp done", start_time);
 
         if args.is_format_normal() && args.report_system_stats {
-            // print_memory_usage takes ownership and drops analysis_host and
-            // vfs to measure freed memory, so we skip the usual mem::forget
-            // here — the destructor cascade serves the profiling purpose.
-            print_memory_usage(loaded.analysis_host, loaded.vfs, cli)?;
+            let (analysis_host, vfs) = loaded.into_parts();
+            print_memory_usage(analysis_host, vfs, cli)?;
             writeln!(cli, "{}", memory_used)?;
-        } else {
-            // Leak the loaded project data to skip expensive destructor cascade.
-            // The Salsa database accumulates large caches whose Arc drop chain
-            // can hang for significant time. The OS reclaims all memory on process exit.
-            std::mem::forget(loaded);
         }
 
         if err_in_diag {
