@@ -91,10 +91,13 @@ pub(crate) fn add_local(
     if trigger.is_some() {
         return false;
     }
-    let prefix = &helpers::atom_value(parsed, file_position.offset).unwrap_or_default();
+    // Without an atom at the cursor, every type would match the empty prefix.
+    let Some(prefix) = helpers::atom_value(parsed, file_position.offset) else {
+        return false;
+    };
     let def_map = sema.def_map(file_position.file_id);
     let completions = def_map.get_types().iter().filter_map(|(name_arity, _)| {
-        if name_arity.name().starts_with(prefix) {
+        if name_arity.name().starts_with(&prefix) {
             Some(create_call_completion(name_arity))
         } else {
             None
@@ -297,6 +300,25 @@ mod test {
         -module(sample2).
         -export_type([alias2/0]).
         -type alias2() :: ok.
+        "#,
+            None,
+            expect![""],
+        );
+    }
+
+    #[test]
+    fn no_completions_when_no_atom_at_cursor() {
+        check(
+            r#"
+        //- expect_parse_errors
+        //- /src/sample.erl
+        -module(sample).
+        -type alias() :: ok.
+        -type other_alias() :: ok.
+        -spec foo() -> ~.
+        foo() -> ok.
+        //- /src/other.erl
+        -module(other).
         "#,
             None,
             expect![""],

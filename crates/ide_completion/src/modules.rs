@@ -28,10 +28,13 @@ pub(crate) fn add_completions(
     if trigger.is_some() {
         return false;
     }
-    let prefix = &helpers::atom_value(parsed, file_position.offset).unwrap_or_default();
+    // Without an atom at the cursor, every module would match the empty prefix.
+    let Some(prefix) = helpers::atom_value(parsed, file_position.offset) else {
+        return false;
+    };
     if let Some(modules) = sema.resolve_module_names(file_position.file_id) {
         let completions = modules.into_iter().filter_map(|m| {
-            if m.starts_with(prefix) {
+            if m.starts_with(&prefix) {
                 let label = m.to_string();
                 Some(Completion {
                     // Sort modules after types in type completion context
@@ -165,6 +168,24 @@ foo() ->
             expect![[r#"
                 {label:match1, kind:Module, contents:SameAsLabel, position:None, sort_text:2_match1}
                 {label:match2, kind:Module, contents:SameAsLabel, position:None, sort_text:2_match2}"#]],
+        );
+    }
+
+    #[test]
+    fn test_no_completions_when_no_atom_at_cursor() {
+        check(
+            r#"
+    //- expect_parse_errors
+    //- /src/sample.erl
+    -module(sample).
+    foo() ->
+        ~
+    //- /src/other1.erl
+    -module(other1).
+    //- /src/other2.erl
+    -module(other2).
+    "#,
+            expect![""],
         );
     }
 }

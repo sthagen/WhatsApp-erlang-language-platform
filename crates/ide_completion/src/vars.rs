@@ -152,9 +152,7 @@ mod test {
         Another = 42,
     "#,
             None,
-            expect![
-                "{label:sample1, kind:Module, contents:SameAsLabel, position:None, sort_text:2_sample1}"
-            ],
+            expect![""],
         );
     }
 

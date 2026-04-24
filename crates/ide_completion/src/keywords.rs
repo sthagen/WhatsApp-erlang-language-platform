@@ -186,9 +186,7 @@ mod test {
     -type foo() :: ~.
     "#,
             None,
-            expect![[r#"
-                {label:foo/0, kind:Type, contents:Snippet("foo()"), position:None, sort_text:1_foo/0}
-                {label:main, kind:Module, contents:SameAsLabel, position:None, sort_text:2_main}"#]],
+            expect![""],
         );
     }
 
@@ -234,8 +232,7 @@ mod test {
                 {label:try, kind:Keyword, contents:SameAsLabel, position:None}
                 {label:undefined, kind:Keyword, contents:SameAsLabel, position:None}
                 {label:when, kind:Keyword, contents:SameAsLabel, position:None}
-                {label:xor, kind:Keyword, contents:SameAsLabel, position:None}
-                {label:main, kind:Module, contents:SameAsLabel, position:None, sort_text:2_main}"#]],
+                {label:xor, kind:Keyword, contents:SameAsLabel, position:None}"#]],
         );
 
         check(
@@ -278,8 +275,7 @@ mod test {
                 {label:try, kind:Keyword, contents:SameAsLabel, position:None}
                 {label:undefined, kind:Keyword, contents:SameAsLabel, position:None}
                 {label:when, kind:Keyword, contents:SameAsLabel, position:None}
-                {label:xor, kind:Keyword, contents:SameAsLabel, position:None}
-                {label:main, kind:Module, contents:SameAsLabel, position:None, sort_text:2_main}"#]],
+                {label:xor, kind:Keyword, contents:SameAsLabel, position:None}"#]],
         );
     }
 }
