@@ -463,15 +463,27 @@ impl GleanIndexer {
         // @fb-only: let exdoc_link = elp_ide::meta_only::exdoc_links::module_exdoc_link(&module, &sema);
         let exdoc_link: Option<String> = None; // @oss-only
 
-        ModuleFact::new(
-            file_id,
+        let def_map = db.def_map(file_id);
+        let callbacks: Vec<types::CallbackInfo> = def_map
+            .get_callbacks()
+            .iter()
+            .map(|(na, cb_def)| types::CallbackInfo {
+                name: na.name().to_string(),
+                arity: na.arity(),
+                optional: cb_def.optional,
+            })
+            .collect();
+
+        ModuleFact {
+            file_id: file_id.into(),
             name,
             oncall,
-            (!exports.is_empty()).then_some(exports),
-            (!behaviours.is_empty()).then_some(behaviours),
+            exports: (!exports.is_empty()).then_some(exports),
+            behaviours: (!behaviours.is_empty()).then_some(behaviours),
             module_doc,
             exdoc_link,
-        )
+            callbacks,
+        }
     }
 
     fn add_xref_based_declarations(

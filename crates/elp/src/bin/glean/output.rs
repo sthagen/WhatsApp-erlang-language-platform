@@ -321,14 +321,14 @@ impl IndexedFacts {
         let mut record_decls: Vec<Key<Schema2RecordDecl>> = vec![];
         let mut type_decls: Vec<Key<Schema2TypeDecl>> = vec![];
         let mut header_decls: Vec<Key<Schema2HeaderDecl>> = vec![];
-        let callback_decls: Vec<Key<Schema2CallbackDecl>> = vec![]; // TODO: populate
+        let mut callback_decls: Vec<Key<Schema2CallbackDecl>> = vec![];
         let record_field_decls: Vec<Key<Schema2RecordFieldDecl>> = vec![]; // TODO: populate
         let mut var_decls: Vec<Key<Schema2VarDecl>> = vec![];
         let mut func_defs: Vec<Key<Schema2FuncDef>> = vec![];
         let macro_defs: Vec<Key<Schema2MacroDef>> = vec![]; // TODO: populate with definition_text
         let record_defs: Vec<Key<Schema2RecordDef>> = vec![]; // TODO: populate with definition_text
         let mut type_defs: Vec<Key<Schema2TypeDef>> = vec![];
-        let callback_defs: Vec<Key<Schema2CallbackDef>> = vec![]; // TODO: populate
+        let mut callback_defs: Vec<Key<Schema2CallbackDef>> = vec![];
         let mut decl_locations: Vec<Key<Schema2DeclLocation>> = vec![];
         let mut var_locations: Vec<Key<Schema2VarLocation>> = vec![];
         let mut comments: Vec<Key<Schema2CommentFact>> = vec![];
@@ -661,6 +661,26 @@ impl IndexedFacts {
                     }
                 })
                 .collect();
+            let (cb_defs, cb_decls): (Vec<_>, Vec<_>) = mf
+                .callbacks
+                .iter()
+                .map(|cb| {
+                    let cb_decl = Schema2CallbackDecl {
+                        name: cb.name.clone(),
+                        arity: cb.arity,
+                        module: mf.name.clone(),
+                        app: app.clone(),
+                    };
+                    let cb_def = Schema2CallbackDef {
+                        declaration: cb_decl.clone().into(),
+                        optional_: cb.optional,
+                    }
+                    .into();
+                    (cb_def, cb_decl.into())
+                })
+                .unzip();
+            callback_defs.extend(cb_defs);
+            callback_decls.extend(cb_decls);
             module2_defs.push(
                 Schema2ModuleDef {
                     declaration: decl.clone().into(),

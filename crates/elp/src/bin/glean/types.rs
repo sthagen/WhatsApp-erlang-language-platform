@@ -81,28 +81,15 @@ pub(crate) struct ModuleFact {
     pub(crate) module_doc: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) exdoc_link: Option<String>,
+    #[serde(skip)]
+    pub(crate) callbacks: Vec<CallbackInfo>,
 }
 
-impl ModuleFact {
-    pub(crate) fn new(
-        file_id: FileId,
-        name: String,
-        oncall: Option<String>,
-        exports: Option<Vec<String>>,
-        behaviours: Option<Vec<String>>,
-        module_doc: Option<String>,
-        exdoc_link: Option<String>,
-    ) -> Self {
-        Self {
-            file_id: file_id.into(),
-            name,
-            oncall,
-            exports,
-            behaviours,
-            module_doc,
-            exdoc_link,
-        }
-    }
+#[derive(Debug, Clone)]
+pub(crate) struct CallbackInfo {
+    pub(crate) name: String,
+    pub(crate) arity: u32,
+    pub(crate) optional: bool,
 }
 
 #[derive(Serialize, Debug, Clone)]

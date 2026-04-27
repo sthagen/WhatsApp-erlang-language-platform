@@ -80,6 +80,7 @@ fn serialization_test() {
         behaviours: Some(vec!["test_behaviour".to_string()]),
         module_doc: Some("Test module documentation".to_string()),
         exdoc_link: Some("https://example.com/docs/test_module.html".to_string()),
+        callbacks: vec![],
     };
 
     let facts = IndexedFacts {
