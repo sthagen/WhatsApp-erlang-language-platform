@@ -16,7 +16,6 @@
 // allows the user to specify a "third" field to explain the reason of a deprecation, but
 // XRef itself ignores that field, which is intended to be used by other tools.
 // This diagnostic does just that and shows the message at the call-site.
-// It also provides a mechanism to augment deprecation information with extra information, such as a URI.
 
 use elp_ide_assists::Assist;
 use elp_ide_db::elp_base_db::FileId;
@@ -32,16 +31,12 @@ use hir::Semantic;
 use hir::Strategy;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
-use lazy_static::lazy_static;
 
 use super::Diagnostic;
 use super::DiagnosticCode;
 use super::DiagnosticConditions;
 use super::DiagnosticDescriptor;
 use super::Severity;
-use crate::codemod_helpers::FunctionMatch;
-use crate::codemod_helpers::FunctionMatcher;
-// @fb-only: use crate::diagnostics;
 use crate::fix;
 
 pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
@@ -56,62 +51,11 @@ pub(crate) static DESCRIPTOR: DiagnosticDescriptor = DiagnosticDescriptor {
     },
 };
 
-#[derive(Debug, Clone)]
-pub struct DeprecationDetails {
-    severity: Severity,
-    uri: Option<String>,
-    message: Option<String>,
-}
-
-#[allow(dead_code)] // @oss-only
-impl DeprecationDetails {
-    pub fn new() -> Self {
-        DeprecationDetails {
-            severity: Severity::Warning,
-            uri: None,
-            message: None,
-        }
-    }
-
-    pub fn with_uri(mut self, uri: Option<String>) -> Self {
-        self.uri = uri;
-        self
-    }
-
-    pub fn with_message(mut self, message: Option<String>) -> Self {
-        self.message = message;
-        self
-    }
-}
-
 fn deprecated_function(diagnostics: &mut Vec<Diagnostic>, sema: &Semantic, file_id: FileId) {
-    lazy_static! {
-        static ref DEPRECATED_FUNCTIONS: Vec<(FunctionMatch, DeprecationDetails)> = {
-            let matches: Vec<Vec<(FunctionMatch, DeprecationDetails)>>  = vec![
-                // @fb-only: diagnostics::meta_only::deprecated_function_matches(),
-            ];
-            matches.into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        };
-    }
-    let matches = &DEPRECATED_FUNCTIONS;
-    let matches = matches
-        .iter()
-        .map(|(m, d)| (m, d.clone()))
-        .collect::<Vec<_>>();
-    sema.for_each_function(file_id, |def| {
-        check_function(diagnostics, sema, def, &matches)
-    });
+    sema.for_each_function(file_id, |def| check_function(diagnostics, sema, def));
 }
 
-fn check_function(
-    diagnostics: &mut Vec<Diagnostic>,
-    sema: &Semantic,
-    def: &FunctionDef,
-    matches: &[(&FunctionMatch, DeprecationDetails)],
-) {
-    let matcher = FunctionMatcher::new(matches);
+fn check_function(diagnostics: &mut Vec<Diagnostic>, sema: &Semantic, def: &FunctionDef) {
     let def_fb = def.in_function_body(sema, def);
     def_fb.clone().fold_function(
         Strategy {
@@ -124,41 +68,32 @@ fn check_function(
                 let arity = args.len() as u32;
                 if let Some(target_def) =
                     target.resolve_call(arity, sema, def_fb.file_id(), &def_fb.body(clause_id))
+                    && target_def.deprecated
                 {
-                    let match_result = matcher.get_match(
-                        &target,
-                        args.len() as u32,
-                        Some(&args),
-                        sema,
-                        &def_fb.body(clause_id),
-                    );
-                    let details = match_result.map(|(_match, details)| details.clone());
-                    if target_def.deprecated || match_result.is_some() {
-                        let expr_id = if let Some((hir_idx, _macro_def)) = ctx.in_macro {
-                            hir_idx.idx
+                    let expr_id = if let Some((hir_idx, _macro_def)) = ctx.in_macro {
+                        hir_idx.idx
+                    } else {
+                        ctx.item_id
+                    };
+                    if let Some(range) = def_fb.range_for_any(clause_id, expr_id)
+                        && def.file.file_id == range.file_id
+                    {
+                        let range_mf = if ctx.in_macro.is_none() {
+                            let in_clause = &def_fb.in_clause(clause_id);
+                            target.range(in_clause)
                         } else {
-                            ctx.item_id
+                            None
                         };
-                        if let Some(range) = def_fb.range_for_any(clause_id, expr_id)
-                            && def.file.file_id == range.file_id
-                        {
-                            let range_mf = if ctx.in_macro.is_none() {
-                                let in_clause = &def_fb.in_clause(clause_id);
-                                target.range(in_clause)
-                            } else {
-                                None
-                            };
-                            let range = range_mf.unwrap_or(range);
-                            let d = make_diagnostic(range.range, &target_def, details)
-                                .with_fixes(Some(vec![fix_xref_ignore(
-                                    sema,
-                                    def_fb.file_id(),
-                                    &target_def,
-                                    range.range,
-                                )]))
-                                .with_ignore_fix(sema, def_fb.file_id());
-                            diagnostics.push(d)
-                        }
+                        let range = range_mf.unwrap_or(range);
+                        let d = make_diagnostic(range.range, &target_def)
+                            .with_fixes(Some(vec![fix_xref_ignore(
+                                sema,
+                                def_fb.file_id(),
+                                &target_def,
+                                range.range,
+                            )]))
+                            .with_ignore_fix(sema, def_fb.file_id());
+                        diagnostics.push(d)
                     }
                 }
             };
@@ -167,13 +102,9 @@ fn check_function(
     );
 }
 
-fn make_diagnostic(
-    range: TextRange,
-    def: &FunctionDef,
-    details: Option<DeprecationDetails>,
-) -> Diagnostic {
+fn make_diagnostic(range: TextRange, def: &FunctionDef) -> Diagnostic {
     let base_message = format!("Function '{}' is deprecated.", def.name);
-    let base_message = match &def.deprecated_desc {
+    let message = match &def.deprecated_desc {
         Some(desc) => {
             let desc = desc.to_string();
             let desc = strip_quotes(desc.as_str());
@@ -181,24 +112,9 @@ fn make_diagnostic(
         }
         None => base_message,
     };
-    let (severity, uri, message) = match details {
-        Some(DeprecationDetails {
-            severity,
-            uri,
-            message,
-        }) => {
-            let message = match message {
-                Some(message) => format!("{base_message}\n{message}"),
-                None => base_message,
-            };
-            (severity, uri, message)
-        }
-        None => (Severity::Warning, None, base_message),
-    };
     Diagnostic::new(DiagnosticCode::DeprecatedFunction, message, range)
-        .with_severity(severity)
+        .with_severity(Severity::Warning)
         .deprecated()
-        .with_uri(uri)
 }
 
 fn strip_quotes(s: &str) -> &str {

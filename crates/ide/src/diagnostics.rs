@@ -297,11 +297,6 @@ impl Diagnostic {
         self
     }
 
-    pub(crate) fn with_uri(mut self, uri: Option<String>) -> Diagnostic {
-        self.code_doc_uri = uri;
-        self
-    }
-
     pub(crate) fn with_fixes(mut self, fixes: Option<Vec<Assist>>) -> Diagnostic {
         self.fixes = fixes;
         self
