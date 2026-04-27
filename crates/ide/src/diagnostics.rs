@@ -793,6 +793,11 @@ pub(crate) trait FunctionCallLinter: Linter {
     ) -> Option<Vec<Assist>> {
         None
     }
+
+    /// Return an optional diagnostic tag (e.g. Deprecated, Unused) for the diagnostic.
+    fn diagnostic_tag(&self, _ctx: &Self::Context) -> Option<DiagnosticTag> {
+        None
+    }
 }
 
 // Instances of the FunctionCallLinter trait can specify a custom `Context` type,
@@ -877,6 +882,9 @@ impl<T: FunctionCallLinter> FunctionCallDiagnostics for T {
                                 .with_fixes(fixes)
                                 .with_severity(effective_severity)
                                 .with_cli_severity(effective_cli_severity);
+                            if let Some(tag) = self.diagnostic_tag(extra) {
+                                diag.tag = Some(tag);
+                            }
                             if include_fixes && self.can_be_suppressed() {
                                 diag = diag.with_default_suppression_fixes(sema, def_fb.file_id());
                             };
@@ -1850,7 +1858,7 @@ pub fn native_diagnostics(
 }
 
 pub fn diagnostics_descriptors<'a>() -> Vec<&'a DiagnosticDescriptor<'a>> {
-    vec![&deprecated_function::DESCRIPTOR]
+    vec![]
 }
 
 pub fn diagnostics_from_descriptors(
@@ -1949,6 +1957,7 @@ const FUNCTION_CALL_LINTERS: &[&dyn FunctionCallDiagnostics] = &[
     &unexported_function::LINTER,
     &cross_node_eval::LINTER,
     &meck_restricted::LINTER,
+    &deprecated_function::LINTER,
 ];
 
 /// SSR pattern linters that use structural search and replace patterns
