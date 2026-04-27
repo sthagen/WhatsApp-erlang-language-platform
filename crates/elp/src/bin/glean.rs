@@ -45,6 +45,7 @@ use elp_syntax::ast::HasArity;
 use fxhash::FxHashMap;
 use hir::AsName;
 use hir::Body;
+use hir::BodyOrigin;
 use hir::CallTarget;
 use hir::DefMap;
 use hir::DefineId;
@@ -52,6 +53,7 @@ use hir::Expr;
 use hir::ExprId;
 use hir::ExprSource;
 use hir::File;
+use hir::FormIdx;
 use hir::InFile;
 use hir::Literal;
 use hir::MacroName;
@@ -65,11 +67,13 @@ use hir::Strategy;
 use hir::Term;
 use hir::TypeExpr;
 use hir::TypeExprId;
+use hir::Var;
 use hir::db::DefDatabase;
 use hir::fold;
 use hir::fold::AnyCallBackCtx;
 use hir::fold::MacroStrategy;
 use hir::fold::ParenStrategy;
+use hir::resolver::Resolver;
 use hir::sema::to_def::resolve_call_target;
 use hir::sema::to_def::resolve_type_target;
 use itertools::Itertools;
@@ -792,12 +796,14 @@ impl GleanIndexer {
                 let name = var.as_string();
                 let (_, range) = ctx.find_range(sema)?;
                 if range.file_id == file_id {
+                    let decl_span_start = Self::resolve_var_decl_span(sema, var, ctx);
                     Some(XRef {
                         source: range.range.into(),
                         target: XRefTarget::Var(
                             VarTarget {
                                 file_id: file_id.into(),
                                 name,
+                                decl_span_start,
                             }
                             .into(),
                         ),
@@ -859,6 +865,25 @@ impl GleanIndexer {
         };
         acc.push(target?);
         None
+    }
+
+    fn resolve_var_decl_span(sema: &Semantic, var: &Var, ctx: &AnyCallBackCtx) -> Option<u32> {
+        match &ctx.body_origin {
+            BodyOrigin::FormIdx {
+                file_id,
+                form_id: FormIdx::FunctionClause(clause_id),
+            } => {
+                let clause = InFile::new(*file_id, *clause_id);
+                let scopes = sema.db.function_clause_scopes(clause);
+                let resolver = Resolver::new(scopes);
+                let pat_ids = resolver.resolve_any_expr_id(var, ctx.item_id)?;
+                let first_pat = pat_ids.first()?;
+                let (_, source_map) = sema.db.function_clause_body_with_source(clause);
+                let expr_source = source_map.pat(*first_pat)?;
+                Some(u32::from(expr_source.range().range.start()))
+            }
+            _ => None,
+        }
     }
 
     fn types(

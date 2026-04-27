@@ -592,7 +592,8 @@ impl IndexedFacts {
                         });
                     }
                     XRefTarget::Var(v) => {
-                        let key = (v.key.name.clone(), xref.source.start);
+                        let span_start = v.key.decl_span_start.unwrap_or(xref.source.start);
+                        let key = (v.key.name.clone(), span_start);
                         var_map.entry(key).or_default().push(xref.source);
                     }
                 }

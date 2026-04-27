@@ -329,6 +329,8 @@ pub(crate) struct VarTarget {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) name: String,
+    #[serde(skip)]
+    pub(crate) decl_span_start: Option<u32>,
 }
 
 #[derive(Serialize, Debug, Clone)]

@@ -702,6 +702,41 @@ fn module_fact_no_oncall_test() {
     assert!(module_fact.module_doc.is_none());
 }
 
+#[test]
+fn var_xref_decl_span_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/var_span.erl
+    -module(var_span).
+    foo(Queues, Table) ->
+    %%  ^^^^^^ var_span.erl/var/Queues/23
+    %%          ^^^^^ var_span.erl/var/Table/31
+        use(Queues),
+    %%      ^^^^^^ var_span.erl/var/Queues/23
+        use(Table),
+    %%      ^^^^^ var_span.erl/var/Table/31
+        use(Queues).
+    %%      ^^^^^^ var_span.erl/var/Queues/23
+    use(_) -> ok.
+    "#;
+    var_xref_check(spec);
+}
+
+#[test]
+fn var_xref_multiple_clauses_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/var_clause.erl
+    -module(var_clause).
+    bar(X) -> X.
+    %%  ^ var_clause.erl/var/X/25
+    %%        ^ var_clause.erl/var/X/25
+    bar(Y, Y) -> Y.
+    %%  ^ var_clause.erl/var/Y/38
+    %%     ^ var_clause.erl/var/Y/38
+    %%           ^ var_clause.erl/var/Y/38
+    "#;
+    var_xref_check(spec);
+}
+
 #[allow(clippy::type_complexity)]
 pub(crate) fn facts_with_annotations(
     spec: &str,
@@ -793,6 +828,47 @@ pub(crate) fn xref_check(spec: &str) {
                     )
                 });
             annotations.remove(idx);
+        }
+        assert_eq!(annotations, vec![], "Expected no more annotations");
+    }
+    assert_eq!(
+        expected_by_file,
+        HashMap::new(),
+        "Expected no more annotations"
+    );
+}
+
+#[track_caller]
+fn var_xref_check(spec: &str) {
+    let (facts, mut expected_by_file, file_names, _d, _) = facts_with_annotations(spec);
+    for xref_fact in facts.xrefs {
+        let file_id = xref_fact.file_id;
+        let mut annotations = expected_by_file
+            .remove(&file_id)
+            .expect("Annotations should be present");
+        for xref in xref_fact.xrefs {
+            if let XRefTarget::Var(v) = &xref.target {
+                let span = match v.key.decl_span_start {
+                    Some(s) => s.to_string(),
+                    None => continue,
+                };
+                let range: TextRange = xref.source.clone().into();
+                let file_name = file_names
+                    .get(xref.target.file_id())
+                    .expect("must be present");
+                let label = format!("{file_name}/var/{}/{span}", v.key.name);
+                let tuple = (range, label);
+                let idx = annotations
+                    .iter()
+                    .position(|a| a == &tuple)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Got computed value {:?}, annotations {:?}",
+                            &tuple, &annotations
+                        )
+                    });
+                annotations.remove(idx);
+            }
         }
         assert_eq!(annotations, vec![], "Expected no more annotations");
     }
