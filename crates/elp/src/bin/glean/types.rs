@@ -87,6 +87,8 @@ pub(crate) struct ModuleFact {
     pub(crate) compile_options: Vec<String>,
     #[serde(skip)]
     pub(crate) on_load_fns: Vec<String>,
+    #[serde(skip)]
+    pub(crate) nif_fns: Vec<(String, u32)>,
 }
 
 #[derive(Debug, Clone)]

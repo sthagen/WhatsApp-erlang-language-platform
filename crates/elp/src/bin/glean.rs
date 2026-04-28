@@ -502,6 +502,28 @@ impl GleanIndexer {
             })
             .collect();
 
+        let nif_fns: Vec<(String, u32)> = form_list
+            .attributes()
+            .filter(|(_, attr)| attr.name == hir::known::nifs)
+            .flat_map(|(_, attr)| {
+                let attr_ast = attr.form_id.get(&source.tree());
+                let text = attr_ast
+                    .value()
+                    .map(|v| v.syntax().text().to_string())
+                    .unwrap_or_default();
+                text.split([',', '[', ']'])
+                    .filter_map(|s| {
+                        let s = s.trim();
+                        let (name, arity) = s.split_once('/')?;
+                        Some((
+                            name.trim().trim_matches('\'').to_string(),
+                            arity.trim().parse::<u32>().ok()?,
+                        ))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
         ModuleFact {
             file_id: file_id.into(),
             name,
@@ -513,6 +535,7 @@ impl GleanIndexer {
             callbacks,
             compile_options,
             on_load_fns,
+            nif_fns,
         }
     }
 

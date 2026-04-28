@@ -309,6 +309,7 @@ pub mod known {
         compile,
         doc,
         moduledoc,
+        nifs,
         on_load,
         oncall,
         // Dialyzer options

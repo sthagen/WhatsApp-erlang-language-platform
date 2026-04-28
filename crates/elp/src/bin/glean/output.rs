@@ -340,12 +340,19 @@ impl IndexedFacts {
             .filter(|mf| !mf.on_load_fns.is_empty())
             .map(|mf| (mf.file_id.clone(), mf.on_load_fns.clone()))
             .collect();
+        let nif_by_file: FxHashMap<GleanFileId, Vec<(String, u32)>> = self
+            .module_facts
+            .iter()
+            .filter(|mf| !mf.nif_fns.is_empty())
+            .map(|mf| (mf.file_id.clone(), mf.nif_fns.clone()))
+            .collect();
 
         let file_declarations = mem::take(&mut self.file_declarations);
         for file_decl in file_declarations {
             let module = modules.get(&file_decl.file_id).unwrap_or(&unknown);
             let app = apps.get(&file_decl.file_id).unwrap_or(&unknown);
             let module_on_load_fns = on_load_by_file.get(&file_decl.file_id);
+            let module_nif_fns = nif_by_file.get(&file_decl.file_id);
             let mut file_schema2_decls: Vec<Schema2Declaration> = vec![];
 
             for d in file_decl.declarations {
@@ -380,7 +387,11 @@ impl IndexedFacts {
                                     None
                                 },
                                 is_on_load,
-                                is_nif: false,
+                                is_nif: module_nif_fns.is_some_and(|fns| {
+                                    fns.iter().any(|(name, arity)| {
+                                        name == &f.key.name && *arity == f.key.arity
+                                    })
+                                }),
                                 spec_text: None,
                             }
                             .into(),
