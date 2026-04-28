@@ -96,6 +96,14 @@ pub(crate) struct ModuleFact {
     pub(crate) record_fields: Vec<RecordFieldInfo>,
     #[serde(skip)]
     pub(crate) all_macros: Vec<MacroInfo>,
+    #[serde(skip)]
+    pub(crate) record_def_texts: Vec<RecordDefText>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RecordDefText {
+    pub(crate) name: String,
+    pub(crate) definition_text: String,
 }
 
 #[derive(Debug, Clone)]

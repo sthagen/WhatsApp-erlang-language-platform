@@ -496,6 +496,18 @@ impl GleanIndexer {
             })
             .collect();
 
+        let record_def_texts: Vec<types::RecordDefText> = def_map
+            .get_records()
+            .iter()
+            .map(|(name, rec_def)| {
+                let text = rec_def.source(db).syntax().text().to_string();
+                types::RecordDefText {
+                    name: name.to_string(),
+                    definition_text: text,
+                }
+            })
+            .collect();
+
         let record_fields: Vec<types::RecordFieldInfo> = def_map
             .get_records()
             .iter()
@@ -589,6 +601,7 @@ impl GleanIndexer {
             included_files,
             record_fields,
             all_macros,
+            record_def_texts,
         }
     }
 

@@ -93,6 +93,7 @@ fn serialization_test() {
         included_files: vec![],
         record_fields: vec![],
         all_macros: vec![],
+        record_def_texts: vec![],
     };
 
     let facts = IndexedFacts {

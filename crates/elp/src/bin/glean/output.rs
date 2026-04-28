@@ -327,7 +327,7 @@ impl IndexedFacts {
         let mut var_decls: Vec<Key<Schema2VarDecl>> = vec![];
         let mut func_defs: Vec<Key<Schema2FuncDef>> = vec![];
         let mut macro_defs: Vec<Key<Schema2MacroDef>> = vec![];
-        let record_defs: Vec<Key<Schema2RecordDef>> = vec![]; // TODO: populate with definition_text
+        let mut record_defs: Vec<Key<Schema2RecordDef>> = vec![];
         let mut type_defs: Vec<Key<Schema2TypeDef>> = vec![];
         let mut callback_defs: Vec<Key<Schema2CallbackDef>> = vec![];
         let mut decl_locations: Vec<Key<Schema2DeclLocation>> = vec![];
@@ -704,6 +704,18 @@ impl IndexedFacts {
                 .unzip();
             macro_defs.extend(mc_defs);
             macro_decls.extend(mc_decls);
+            record_defs.extend(mf.record_def_texts.iter().map(|rd| {
+                Schema2RecordDef {
+                    declaration: Schema2RecordDecl {
+                        name: rd.name.clone(),
+                        module: mf.name.clone(),
+                        app: app.clone(),
+                    }
+                    .into(),
+                    definition_text: Some(rd.definition_text.clone()),
+                }
+                .into()
+            }));
             record_field_decls.extend(mf.record_fields.iter().map(|rf| {
                 Schema2RecordFieldDecl {
                     record_name: rf.record_name.clone(),
