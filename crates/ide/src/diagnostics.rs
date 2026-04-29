@@ -108,6 +108,7 @@ mod deprecated_function;
 mod duplicate_include;
 mod duplicate_module;
 mod effect_free_statement;
+mod elp_ci_test_diagnostic;
 mod encode_hex_with_case;
 mod equality_check_with_unnecessary_operator;
 mod eqwalizer_assists;
@@ -1875,6 +1876,7 @@ const FUNCTION_CALL_LINTERS: &[&dyn FunctionCallDiagnostics] = &[
     &cross_node_eval::LINTER,
     &meck_restricted::LINTER,
     &deprecated_function::LINTER,
+    &elp_ci_test_diagnostic::LINTER,
 ];
 
 /// SSR pattern linters that use structural search and replace patterns

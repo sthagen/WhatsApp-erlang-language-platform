@@ -203,6 +203,8 @@ pub enum DiagnosticCode {
     UnusedExportedFunction,
     #[strum(props(code = "W0078"))]
     DuplicateInclude,
+    #[strum(props(code = "W0079"))]
+    ElpCiTestDiagnostic,
 
     // Wrapper for erlang service diagnostic codes
     ErlangService(String),
