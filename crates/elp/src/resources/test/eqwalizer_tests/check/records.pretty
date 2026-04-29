@@ -494,7 +494,7 @@ error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types
     │
 523 │ narrow5_neg({X, X}) -> X.
     │                        ^ X.
-Expression has type:   #two_ref{b :: boolean(), a :: atom()}
+Expression has type:   #two_ref{a :: atom(), b :: boolean()}
 Context expected type: 'ok'
 
 error: incompatible_types (See https://fb.me/eqwalizer_errors#incompatible_types)
