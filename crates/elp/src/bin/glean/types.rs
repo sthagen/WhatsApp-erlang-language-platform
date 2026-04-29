@@ -187,10 +187,6 @@ impl Serialize for ModuleDocComment {
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "predicate")]
-#[expect(
-    dead_code,
-    reason = "erlang.2 variants used once into_schema2_facts() lands"
-)]
 pub(crate) enum Fact {
     #[serde(rename = "src.File")]
     File { facts: Vec<FileFact> },

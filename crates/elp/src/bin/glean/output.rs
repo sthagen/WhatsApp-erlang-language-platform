@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::mem;
 
 use fxhash::FxHashMap;
@@ -39,6 +41,8 @@ use super::types::Schema2FuncDef;
 use super::types::Schema2HeaderDecl;
 use super::types::Schema2MacroDecl;
 use super::types::Schema2MacroDef;
+use super::types::Schema2MacroUsage;
+use super::types::Schema2MacroUsageLocation;
 use super::types::Schema2ModuleDecl;
 use super::types::Schema2ModuleDef;
 use super::types::Schema2RecordDecl;
@@ -338,6 +342,8 @@ impl IndexedFacts {
         let mut var_locations: Vec<Key<Schema2VarLocation>> = vec![];
         let mut comments: Vec<Key<Schema2CommentFact>> = vec![];
         let mut file_decls_list: Vec<Key<Schema2FileDeclarations>> = vec![];
+        let mut macro_usages: Vec<Key<Schema2MacroUsage>> = vec![];
+        let mut macro_usage_locations: Vec<Key<Schema2MacroUsageLocation>> = vec![];
 
         let on_load_by_file: FxHashMap<GleanFileId, Vec<String>> = self
             .module_facts
@@ -570,8 +576,42 @@ impl IndexedFacts {
                                 }
                                 .into(),
                             ),
-                            source: xref.source,
+                            source: xref.source.clone(),
                         });
+
+                        let mut hasher = fxhash::FxHasher::default();
+                        m.key.expansion.hash(&mut hasher);
+                        let content_hash = format!("{}", hasher.finish());
+                        let links: Vec<String> = m
+                            .key
+                            .tagged_urls
+                            .iter()
+                            .map(|u| {
+                                if u.url.is_empty() {
+                                    u.display_name.clone()
+                                } else {
+                                    format!("[{}]({})", u.display_name, u.url)
+                                }
+                            })
+                            .collect();
+                        let usage = Schema2MacroUsage {
+                            name: m.key.name.clone(),
+                            module: target_module.clone(),
+                            arity: m.key.arity,
+                            app: target_app.clone(),
+                            expansion: m.key.expansion.clone(),
+                            links,
+                            content_hash,
+                        };
+                        macro_usage_locations.push(
+                            Schema2MacroUsageLocation {
+                                usage: usage.clone().into(),
+                                file_id: xref_file.file_id.clone(),
+                                span: xref.source,
+                            }
+                            .into(),
+                        );
+                        macro_usages.push(usage.into());
                     }
                     XRefTarget::Header(h) => {
                         let target_app = apps.get(&h.key.file_id).unwrap_or(&unknown);
@@ -840,6 +880,12 @@ impl IndexedFacts {
             Fact::DeclComment2 { facts: comments },
             Fact::FileIncludes2 {
                 facts: file_includes,
+            },
+            Fact::MacroUsage2 {
+                facts: macro_usages,
+            },
+            Fact::MacroUsageLocation2 {
+                facts: macro_usage_locations,
             },
         ]);
         result
