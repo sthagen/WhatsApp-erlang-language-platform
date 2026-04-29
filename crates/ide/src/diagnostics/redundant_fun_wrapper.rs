@@ -106,9 +106,8 @@ impl GenericLinter for RedundantFunWrapperLinter {
         let mut res = Vec::new();
 
         ctx.sema
-            .def_map(ctx.file_id)
+            .def_map_local(ctx.file_id)
             .get_function_clauses()
-            .filter(|(_, def)| def.file.file_id == ctx.file_id)
             .for_each(|(_, def)| {
                 let in_clause = def.in_clause(ctx.sema, def);
                 in_clause.fold_clause(

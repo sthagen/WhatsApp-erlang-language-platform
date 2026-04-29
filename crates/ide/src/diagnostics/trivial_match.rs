@@ -76,57 +76,52 @@ impl GenericLinter for TrivialMatchLinter {
         let sema = ctx.sema;
         let file_id = ctx.file_id;
         let mut res = Vec::new();
-        sema.def_map(file_id)
+        sema.def_map_local(file_id)
             .get_function_clauses()
             .for_each(|(_, def)| {
-                if def.file.file_id == file_id {
-                    let in_clause = def.in_clause(sema, def);
-                    let body_map = in_clause.get_body_map();
-                    let source_file = sema.parse(def.file.file_id);
+                let in_clause = def.in_clause(sema, def);
+                let body_map = in_clause.get_body_map();
+                let source_file = sema.parse(def.file.file_id);
 
-                    in_clause.fold_clause(
-                        Strategy {
-                            macros: MacroStrategy::Expand,
-                            parens: ParenStrategy::InvisibleParens,
-                        },
-                        (),
-                        &mut |_acc, ctx| {
-                            if let AnyExpr::Expr(Expr::Match { lhs, rhs }) = ctx.item {
-                                let rhs = &rhs.clone();
-                                if matches_trivially(sema, &in_clause, &lhs, rhs) {
-                                    let maybe_lhs_range =
-                                        &in_clause.range_for_any(AnyExprId::Pat(lhs));
-                                    let maybe_full_range = &in_clause.range_for_any(ctx.item_id);
-                                    if let (Some(lhs_range), Some(full_range)) =
-                                        (maybe_lhs_range, maybe_full_range)
+                in_clause.fold_clause(
+                    Strategy {
+                        macros: MacroStrategy::Expand,
+                        parens: ParenStrategy::InvisibleParens,
+                    },
+                    (),
+                    &mut |_acc, ctx| {
+                        if let AnyExpr::Expr(Expr::Match { lhs, rhs }) = ctx.item {
+                            let rhs = &rhs.clone();
+                            if matches_trivially(sema, &in_clause, &lhs, rhs) {
+                                let maybe_lhs_range = &in_clause.range_for_any(AnyExprId::Pat(lhs));
+                                let maybe_full_range = &in_clause.range_for_any(ctx.item_id);
+                                if let (Some(lhs_range), Some(full_range)) =
+                                    (maybe_lhs_range, maybe_full_range)
+                                {
+                                    let rhs_ast = body_map.expr(*rhs).and_then(|infile_ast_ptr| {
+                                        infile_ast_ptr.to_node(&source_file)
+                                    });
+                                    let file_id = def.file.file_id;
+                                    if lhs_range.file_id == file_id && full_range.file_id == file_id
                                     {
-                                        let rhs_ast =
-                                            body_map.expr(*rhs).and_then(|infile_ast_ptr| {
-                                                infile_ast_ptr.to_node(&source_file)
-                                            });
-                                        let file_id = def.file.file_id;
-                                        if lhs_range.file_id == file_id
-                                            && full_range.file_id == file_id
-                                        {
-                                            let replacement = rhs_ast
-                                                .map(|replacement_ast| replacement_ast.to_string());
-                                            res.push(GenericLinterMatchContext {
-                                                range: FileRange {
-                                                    file_id: lhs_range.file_id,
-                                                    range: lhs_range.range,
-                                                },
-                                                context: Context {
-                                                    full_range: full_range.range,
-                                                    replacement,
-                                                },
-                                            });
-                                        }
+                                        let replacement = rhs_ast
+                                            .map(|replacement_ast| replacement_ast.to_string());
+                                        res.push(GenericLinterMatchContext {
+                                            range: FileRange {
+                                                file_id: lhs_range.file_id,
+                                                range: lhs_range.range,
+                                            },
+                                            context: Context {
+                                                full_range: full_range.range,
+                                                replacement,
+                                            },
+                                        });
                                     }
                                 }
                             }
-                        },
-                    );
-                }
+                        }
+                    },
+                );
             });
         Some(res)
     }

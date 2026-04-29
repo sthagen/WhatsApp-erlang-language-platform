@@ -61,39 +61,34 @@ impl GenericLinter for UnusedRecordFieldLinter {
         let sema = ctx.sema;
         let file_id = ctx.file_id;
         let mut res = Vec::new();
-        let def_map = sema.def_map(file_id);
+        let def_map = sema.def_map_local(file_id);
         for (name, def) in def_map.get_records() {
-            // Only run the check for records defined in the local module,
-            // not in the included files.
-            if def.file.file_id == file_id {
-                // If the record itself is unused, there's little point in showing
-                // warnings for each field
-                if SymbolDefinition::Record(def.clone())
-                    .usages(sema)
-                    .at_least_one()
-                {
-                    for (field_name, field_def) in def.fields(sema.db) {
-                        if !SymbolDefinition::RecordField(field_def.clone())
-                            .usages(sema)
-                            .at_least_one()
-                        {
-                            let combined_name = format!("{name}.{field_name}");
-                            let source = field_def.source(sema.db.upcast());
-                            let range = match source.name() {
-                                Some(name) => name.syntax().text_range(),
-                                None => source.syntax().text_range(),
-                            };
-                            let delete_range =
-                                compute_comma_separated_delete_range(source.syntax());
-                            let context = Context {
-                                name: combined_name,
-                                delete_range,
-                            };
-                            res.push(GenericLinterMatchContext {
-                                range: FileRange { file_id, range },
-                                context,
-                            });
-                        }
+            // If the record itself is unused, there's little point in showing
+            // warnings for each field
+            if SymbolDefinition::Record(def.clone())
+                .usages(sema)
+                .at_least_one()
+            {
+                for (field_name, field_def) in def.fields(sema.db) {
+                    if !SymbolDefinition::RecordField(field_def.clone())
+                        .usages(sema)
+                        .at_least_one()
+                    {
+                        let combined_name = format!("{name}.{field_name}");
+                        let source = field_def.source(sema.db.upcast());
+                        let range = match source.name() {
+                            Some(name) => name.syntax().text_range(),
+                            None => source.syntax().text_range(),
+                        };
+                        let delete_range = compute_comma_separated_delete_range(source.syntax());
+                        let context = Context {
+                            name: combined_name,
+                            delete_range,
+                        };
+                        res.push(GenericLinterMatchContext {
+                            range: FileRange { file_id, range },
+                            context,
+                        });
                     }
                 }
             }

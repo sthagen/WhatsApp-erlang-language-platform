@@ -70,12 +70,9 @@ impl GenericLinter for UnusedFunctionArgsLinter {
         let sema = ctx.sema;
         let file_id = ctx.file_id;
         let mut res = Vec::new();
-        sema.def_map(file_id)
+        sema.def_map_local(file_id)
             .get_function_clauses()
             .for_each(|(_, def)| {
-                if def.file.file_id != file_id {
-                    return;
-                }
                 process_clause(&mut res, sema, def);
             });
         Some(res)

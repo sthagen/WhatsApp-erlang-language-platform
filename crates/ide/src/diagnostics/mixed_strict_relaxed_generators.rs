@@ -82,36 +82,33 @@ impl GenericLinter for MixedStrictRelaxedGeneratorsLinter {
         let mut res = Vec::new();
 
         ctx.sema
-            .def_map(ctx.file_id)
+            .def_map_local(ctx.file_id)
             .get_function_clauses()
             .for_each(|(_, def)| {
-                if def.file.file_id == ctx.file_id {
-                    let in_clause = def.in_clause(ctx.sema, def);
-                    in_clause.fold_clause(
-                        Strategy {
-                            macros: MacroStrategy::Expand,
-                            parens: ParenStrategy::InvisibleParens,
-                        },
-                        (),
-                        &mut |acc, fold_ctx| {
-                            if let AnyExpr::Expr(Expr::Comprehension { exprs, .. }) = fold_ctx.item
-                            {
-                                // Check each expression in the comprehension for Zip variants
-                                for comp_expr in exprs {
-                                    if let ComprehensionExpr::Zip(zip_exprs) = comp_expr
-                                        && zip_has_mixed_strictness(zip_exprs.as_slice())
-                                        && let hir::AnyExprId::Expr(expr_id) = fold_ctx.item_id
-                                        && let Some(range) = in_clause.range_for_expr(expr_id)
-                                        && fold_ctx.in_macro.is_none()
-                                    {
-                                        res.push(GenericLinterMatchContext { range, context: () });
-                                    }
+                let in_clause = def.in_clause(ctx.sema, def);
+                in_clause.fold_clause(
+                    Strategy {
+                        macros: MacroStrategy::Expand,
+                        parens: ParenStrategy::InvisibleParens,
+                    },
+                    (),
+                    &mut |acc, fold_ctx| {
+                        if let AnyExpr::Expr(Expr::Comprehension { exprs, .. }) = fold_ctx.item {
+                            // Check each expression in the comprehension for Zip variants
+                            for comp_expr in exprs {
+                                if let ComprehensionExpr::Zip(zip_exprs) = comp_expr
+                                    && zip_has_mixed_strictness(zip_exprs.as_slice())
+                                    && let hir::AnyExprId::Expr(expr_id) = fold_ctx.item_id
+                                    && let Some(range) = in_clause.range_for_expr(expr_id)
+                                    && fold_ctx.in_macro.is_none()
+                                {
+                                    res.push(GenericLinterMatchContext { range, context: () });
                                 }
-                            };
-                            acc
-                        },
-                    );
-                }
+                            }
+                        };
+                        acc
+                    },
+                );
             });
 
         if res.is_empty() { None } else { Some(res) }

@@ -48,12 +48,10 @@ impl GenericLinter for BoundVariableLinter {
         let file_id = ctx.file_id;
         let bound_vars_by_function = sema.bound_vars_by_function(file_id);
         let mut res = Vec::new();
-        sema.def_map(file_id)
+        sema.def_map_local(file_id)
             .get_function_clauses()
             .for_each(|(_, def)| {
-                if def.file.file_id == file_id
-                    && let Some(bound_vars) = bound_vars_by_function.get(&def.function_clause_id)
-                {
+                if let Some(bound_vars) = bound_vars_by_function.get(&def.function_clause_id) {
                     let in_clause = def.in_clause(sema, def);
                     in_clause.fold_clause(
                         Strategy {
