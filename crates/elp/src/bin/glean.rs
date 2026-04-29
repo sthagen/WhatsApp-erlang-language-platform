@@ -1091,10 +1091,12 @@ impl GleanIndexer {
                     let range: TextRange = range.clone().into();
                     let range: Location = range.into();
                     if let Some(name) = vars.get(&range) {
-                        let text = format!("```erlang\n{name} :: {ty}\n```");
+                        let type_str = format!("{name} :: {ty}");
+                        let text = format!("```erlang\n{type_str}\n```");
                         let decl = VarDecl {
                             name: name.to_string(),
                             doc: text,
+                            type_text: Some(type_str),
                             span: range,
                         };
                         result.push(decl);

@@ -498,7 +498,7 @@ impl IndexedFacts {
                             module: module.clone(),
                             app: app.clone(),
                             span_start: v.key.span.start,
-                            type_text: None,
+                            type_text: v.key.type_text.clone(),
                         };
                         var_locations.push(
                             Schema2VarLocation {

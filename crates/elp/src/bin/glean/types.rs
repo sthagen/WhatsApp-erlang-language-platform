@@ -457,6 +457,7 @@ pub(crate) struct RecordDecl {
 pub(crate) struct VarDecl {
     pub(crate) name: String,
     pub(crate) doc: String,
+    pub(crate) type_text: Option<String>,
     pub(crate) span: Location,
 }
 
