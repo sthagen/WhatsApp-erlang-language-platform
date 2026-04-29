@@ -427,6 +427,8 @@ pub(crate) struct FuncDecl {
     pub(crate) span: Location,
     pub(crate) exported: bool,
     pub(crate) deprecated: bool,
+    #[serde(skip)]
+    pub(crate) spec_text: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]

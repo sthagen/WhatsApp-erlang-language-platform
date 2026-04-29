@@ -397,7 +397,7 @@ impl IndexedFacts {
                                         name == &f.key.name && *arity == f.key.arity
                                     })
                                 }),
-                                spec_text: None,
+                                spec_text: f.key.spec_text.clone(),
                             }
                             .into(),
                         );

@@ -818,6 +818,10 @@ impl GleanIndexer {
             let range = def.range(db);
             if let Some(range) = range {
                 let span = range.into();
+                let spec_text = def
+                    .spec
+                    .as_ref()
+                    .map(|s| s.source(db).syntax().text().to_string());
                 let decl = Declaration::FunctionDeclaration(
                     FuncDecl {
                         name: fun.name().to_string(),
@@ -825,6 +829,7 @@ impl GleanIndexer {
                         span,
                         exported: def.exported,
                         deprecated: def.deprecated,
+                        spec_text,
                     }
                     .into(),
                 );
