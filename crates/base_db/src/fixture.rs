@@ -324,6 +324,7 @@ impl ChangeFixture {
         project.add_apps(apps_with_includes);
         project.project_build_data = ProjectBuildData::Rebar(rebar_project);
         project.include_mapping = project_include_mapping;
+        project.eqwalizer_config.enable_all = diagnostics_enabled.use_eqwalizer;
 
         let projects = [project.clone()];
 
@@ -741,7 +742,7 @@ bar() -> ?FOO.
                                 },
                             },
                             eqwalizer_config: EqwalizerConfig {
-                                enable_all: true,
+                                enable_all: false,
                                 max_tasks: 4,
                                 ignore_modules: [],
                                 ignore_modules_compiled_patterns: [],
@@ -908,7 +909,7 @@ foo() -> ?BAR.
                                 },
                             },
                             eqwalizer_config: EqwalizerConfig {
-                                enable_all: true,
+                                enable_all: false,
                                 max_tasks: 4,
                                 ignore_modules: [],
                                 ignore_modules_compiled_patterns: [],

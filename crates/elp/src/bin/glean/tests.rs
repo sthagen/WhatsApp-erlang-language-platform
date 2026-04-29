@@ -251,6 +251,7 @@ fn line_fact_without_new_line_test() {
 fn declaration_test() {
     if otp_supported_by_eqwalizer() {
         let spec = r#"
+    //- eqwalizer
     //- /app_glean/src/glean_module5.erl app:app_glean
         -module(glean_module5).
         -export([foo/0, doc_foo/1, depr_foo/1]).
