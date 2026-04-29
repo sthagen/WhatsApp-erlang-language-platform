@@ -1,4 +1,5 @@
 enabled_lints = ["ad-hoc: ssr-match"]
+disabled_lints = ["W0018"]
 
 [[ad_hoc_lints.lints]]
 type = "LintMatchSsr"

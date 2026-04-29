@@ -163,6 +163,7 @@ mod undefined_macro;
 mod undefined_record;
 mod undocumented_function;
 mod undocumented_module;
+mod unexpected_separator;
 mod unexported_function;
 mod unnecessary_fold_to_build_map;
 mod unnecessary_map_from_list_around_comprehension;
@@ -1814,10 +1815,9 @@ pub fn native_diagnostics(
                 elp_syntax::SyntaxError::Error(_) => {
                     (DiagnosticCode::SyntaxError, "Syntax Error".to_string())
                 }
-                elp_syntax::SyntaxError::Missing(m, _) => (
-                    DiagnosticCode::Missing("missing".to_string()),
-                    format!("Missing '{m}'"),
-                ),
+                elp_syntax::SyntaxError::Missing(m, _) => {
+                    (DiagnosticCode::MissingSeparator, format!("Missing '{m}'"))
+                }
             };
             Diagnostic::error(code, widen_range(err.range()), message)
         });
@@ -1934,6 +1934,7 @@ const GENERIC_LINTERS: &[&dyn GenericDiagnostics] = &[
     &missing_ms_transform_include::LINTER,
     &redundant_fun_wrapper::LINTER,
     &missing_separator::LINTER,
+    &unexpected_separator::LINTER,
     &eqwalizer_escape_hatches::EQWALIZER_FIXME_LINTER,
     &eqwalizer_escape_hatches::EQWALIZER_IGNORE_LINTER,
     &mutable_variable::LINTER,
@@ -2275,17 +2276,17 @@ fn form_missing_separator_diagnostics(parse: &Parse<ast::SourceFile>) -> Vec<Dia
         .forms()
         .flat_map(|form: ast::Form| match form {
             ast::Form::ExportAttribute(f) => {
-                check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",", "missing_comma")
+                check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",")
             }
             ast::Form::ExportTypeAttribute(f) => {
-                check_missing_sep(f.types(), SyntaxKind::ANON_COMMA, ",", "missing_comma")
+                check_missing_sep(f.types(), SyntaxKind::ANON_COMMA, ",")
             }
             ast::Form::ImportAttribute(f) => {
-                check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",", "missing_comma")
+                check_missing_sep(f.funs(), SyntaxKind::ANON_COMMA, ",")
             }
             ast::Form::ImportRecordAttribute(f) => {
                 let names = f.records().into_iter().flat_map(|r| r.names());
-                check_missing_sep(names, SyntaxKind::ANON_COMMA, ",", "missing_comma")
+                check_missing_sep(names, SyntaxKind::ANON_COMMA, ",")
             }
             ast::Form::RecordDecl(f) => record_decl_check_missing_comma(f),
             ast::Form::TypeAlias(f) => {
@@ -2294,7 +2295,7 @@ fn form_missing_separator_diagnostics(parse: &Parse<ast::SourceFile>) -> Vec<Dia
                     .and_then(|name| name.args())
                     .into_iter()
                     .flat_map(|args| args.args());
-                check_missing_sep(args, SyntaxKind::ANON_COMMA, ",", "missing_comma")
+                check_missing_sep(args, SyntaxKind::ANON_COMMA, ",")
             }
             ast::Form::Opaque(f) => {
                 let args = f
@@ -2302,7 +2303,7 @@ fn form_missing_separator_diagnostics(parse: &Parse<ast::SourceFile>) -> Vec<Dia
                     .and_then(|name| name.args())
                     .into_iter()
                     .flat_map(|args| args.args());
-                check_missing_sep(args, SyntaxKind::ANON_COMMA, ",", "missing_comma")
+                check_missing_sep(args, SyntaxKind::ANON_COMMA, ",")
             }
             _ => vec![],
         })
@@ -2313,7 +2314,6 @@ fn check_missing_sep<Node: AstNode + std::fmt::Debug>(
     nodes: impl Iterator<Item = Node>,
     separator: SyntaxKind,
     item: &'static str,
-    code: &'static str,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -2322,11 +2322,7 @@ fn check_missing_sep<Node: AstNode + std::fmt::Debug>(
         if let Some(previous) = non_whitespace_prev_token(syntax)
             && previous.kind() != separator
         {
-            diagnostics.push(make_missing_diagnostic(
-                previous.text_range(),
-                item,
-                code.to_string(),
-            ))
+            diagnostics.push(make_missing_diagnostic(previous.text_range(), item))
         }
     }
 
@@ -2338,11 +2334,7 @@ fn record_decl_check_missing_comma(record: ast::RecordDecl) -> Vec<Diagnostic> {
         && let Some(next) = non_whitespace_next_token(name.syntax())
         && next.kind() != SyntaxKind::ANON_COMMA
     {
-        return vec![make_missing_diagnostic(
-            name.syntax().text_range(),
-            ",",
-            "missing_comma".to_string(),
-        )];
+        return vec![make_missing_diagnostic(name.syntax().text_range(), ",")];
     }
 
     vec![]
@@ -2372,13 +2364,10 @@ fn non_whitespace_prev_token(node: &SyntaxNode) -> Option<NodeOrToken> {
     r.map(NodeOrToken::Token)
 }
 
-pub(crate) fn make_missing_diagnostic(
-    range: TextRange,
-    item: &'static str,
-    code: String,
-) -> Diagnostic {
+pub(crate) fn make_missing_diagnostic(range: TextRange, item: &'static str) -> Diagnostic {
     let message = format!("Missing '{item}'");
-    Diagnostic::new(DiagnosticCode::Missing(code), message, range).with_severity(Severity::Warning)
+    Diagnostic::new(DiagnosticCode::MissingSeparator, message, range)
+        .with_severity(Severity::Warning)
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -54,7 +54,7 @@ pub enum DiagnosticCode {
     #[strum(props(code = "W0003"))]
     UnusedRecordField,
     #[strum(props(code = "W0004"))]
-    Missing(String),
+    MissingSeparator,
     #[strum(props(code = "W0005"), serialize = "mutable_variable_bug")]
     MutableVarBug,
     #[strum(props(code = "W0006"))]
@@ -82,7 +82,7 @@ pub enum DiagnosticCode {
     #[strum(props(code = "W0017"))]
     UndefinedFunction,
     #[strum(props(code = "W0018"))]
-    Unexpected(String),
+    UnexpectedSeparator,
     #[strum(props(code = "W0019"))]
     ExpressionCanBeSimplified,
     #[strum(props(code = "W0020"))]
@@ -304,8 +304,6 @@ impl serde::Serialize for DiagnosticCode {
 impl DiagnosticCode {
     pub fn as_code(&self) -> String {
         match self {
-            DiagnosticCode::Missing(_) => "W0004".to_string(),
-            DiagnosticCode::Unexpected(_) => "W0018".to_string(),
             DiagnosticCode::ErlangService(c) => c.to_string(),
             DiagnosticCode::Eqwalizer(c) => format!("eqwalizer: {c}"),
             DiagnosticCode::AdHoc(c) => format!("ad-hoc: {c}"),
@@ -319,8 +317,6 @@ impl DiagnosticCode {
 
     pub fn as_label(&self) -> String {
         match self {
-            DiagnosticCode::Missing(_) => "missing_comma_or_parenthesis".to_string(),
-            DiagnosticCode::Unexpected(_) => "unexpected_semi_or_dot".to_string(),
             DiagnosticCode::ErlangService(c) => c.to_string(),
             DiagnosticCode::Eqwalizer(c) => c.to_string(),
             DiagnosticCode::AdHoc(c) => format!("ad-hoc: {c}"),
@@ -430,7 +426,8 @@ impl DiagnosticCode {
     pub fn is_syntax_error(&self) -> bool {
         match self {
             DiagnosticCode::SyntaxError => true,
-            DiagnosticCode::Missing(_) => true,
+            DiagnosticCode::MissingSeparator => true,
+            DiagnosticCode::UnexpectedSeparator => true,
             DiagnosticCode::ErlangService(s) => s == "P1711",
             _ => false,
         }
@@ -645,9 +642,7 @@ mod tests {
         let mut missing = Vec::new();
         for variant in DiagnosticCode::iter() {
             match &variant {
-                DiagnosticCode::Missing(_)
-                | DiagnosticCode::Unexpected(_)
-                | DiagnosticCode::ErlangService(_)
+                DiagnosticCode::ErlangService(_)
                 | DiagnosticCode::Eqwalizer(_)
                 | DiagnosticCode::AdHoc(_)
                 // @fb-only: | DiagnosticCode::MetaOnly(_)

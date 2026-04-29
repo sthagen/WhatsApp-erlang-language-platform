@@ -12,27 +12,27 @@
 //
 // Diagnostic for separators missing in function clauses.
 
-// TODO: combine with head_mismatch?
+use std::borrow::Cow;
 
-use elp_ide_db::DiagnosticCode;
+use elp_ide_db::elp_base_db::FileRange;
 use elp_syntax::ast::AstNode;
 use elp_syntax::ast::ClauseSeparator;
 
-use crate::Diagnostic;
-use crate::diagnostics::GenericDiagnostics;
-use crate::diagnostics::Linter;
-use crate::diagnostics::LinterContext;
-use crate::diagnostics::Severity;
+use super::DiagnosticCode;
+use super::GenericLinter;
+use super::GenericLinterMatchContext;
+use super::Linter;
+use super::LinterContext;
 
 pub(crate) struct MissingSeparatorLinter;
 
 impl Linter for MissingSeparatorLinter {
     fn id(&self) -> DiagnosticCode {
-        DiagnosticCode::Missing("missing_separator".to_string())
+        DiagnosticCode::MissingSeparator
     }
 
     fn description(&self) -> &'static str {
-        "Missing or unexpected separator in function clauses."
+        "Missing separator in function clauses."
     }
 
     fn can_be_suppressed(&self) -> bool {
@@ -44,16 +44,16 @@ impl Linter for MissingSeparatorLinter {
     }
 }
 
-impl GenericDiagnostics for MissingSeparatorLinter {
-    fn diagnostics(
+impl GenericLinter for MissingSeparatorLinter {
+    type Context = &'static str;
+
+    fn matches(
         &self,
         ctx: &LinterContext,
-        severity: Severity,
-        cli_severity: Severity,
-        _include_fixes: bool,
-    ) -> Vec<Diagnostic> {
-        let mut diagnostics = Vec::new();
-        let def_map = ctx.sema.def_map(ctx.file_id);
+    ) -> Option<Vec<GenericLinterMatchContext<Self::Context>>> {
+        let mut res = Vec::new();
+        let file_id = ctx.file_id;
+        let def_map = ctx.sema.def_map(file_id);
 
         def_map.get_functions().for_each(|(_, fun_def)| {
             let n = fun_def.function_clauses.len();
@@ -63,86 +63,60 @@ impl GenericDiagnostics for MissingSeparatorLinter {
                 .enumerate()
                 .for_each(|(i, fun)| {
                     if i + 1 != n {
+                        // Non-last clause: expect ';'
                         match fun.separator {
                             Some((ClauseSeparator::Missing, range)) => {
-                                let d = Diagnostic::new(
-                                    DiagnosticCode::Missing("missing_semi".to_string()),
-                                    "Missing ';'",
-                                    range,
-                                )
-                                .with_severity(severity)
-                                .with_cli_severity(cli_severity);
-                                diagnostics.push(d);
-                            }
-                            Some((ClauseSeparator::Semi, _range)) => {}
-                            Some((ClauseSeparator::Dot, range)) => {
-                                let d = Diagnostic::new(
-                                    DiagnosticCode::Unexpected("unexpected_dot".to_string()),
-                                    "Unexpected '.'",
-                                    range,
-                                )
-                                .with_severity(severity)
-                                .with_cli_severity(cli_severity);
-                                diagnostics.push(d);
+                                res.push(GenericLinterMatchContext {
+                                    range: FileRange { file_id, range },
+                                    context: "Missing ';'",
+                                });
                             }
                             None => {
-                                let ast_fun = fun.form_id.get_ast(ctx.sema.db, ctx.file_id);
+                                let ast_fun = fun.form_id.get_ast(ctx.sema.db, file_id);
                                 if let Some(last_tok) = ast_fun.syntax().last_token() {
-                                    let range = last_tok.text_range();
-                                    let d = Diagnostic::new(
-                                        DiagnosticCode::Missing("missing_semi".to_string()),
-                                        "Missing ';'",
-                                        range,
-                                    )
-                                    .with_severity(severity)
-                                    .with_cli_severity(cli_severity);
-                                    diagnostics.push(d);
+                                    res.push(GenericLinterMatchContext {
+                                        range: FileRange {
+                                            file_id,
+                                            range: last_tok.text_range(),
+                                        },
+                                        context: "Missing ';'",
+                                    });
                                 }
                             }
+                            _ => {}
                         }
                     } else {
+                        // Last clause: expect '.'
                         match fun.separator {
                             Some((ClauseSeparator::Missing, range)) => {
-                                let d = Diagnostic::new(
-                                    DiagnosticCode::Missing("missing_dot".to_string()),
-                                    "Missing '.'",
-                                    range,
-                                )
-                                .with_severity(severity)
-                                .with_cli_severity(cli_severity);
-                                diagnostics.push(d);
+                                res.push(GenericLinterMatchContext {
+                                    range: FileRange { file_id, range },
+                                    context: "Missing '.'",
+                                });
                             }
-                            Some((ClauseSeparator::Semi, range)) => {
-                                let d = Diagnostic::new(
-                                    DiagnosticCode::Unexpected("unexpected_semi".to_string()),
-                                    "Unexpected ';'",
-                                    range,
-                                )
-                                .with_severity(severity)
-                                .with_cli_severity(cli_severity);
-                                diagnostics.push(d);
-                            }
-                            Some((ClauseSeparator::Dot, _range)) => {}
                             None => {
-                                let ast_fun = fun.form_id.get_ast(ctx.sema.db, ctx.file_id);
+                                let ast_fun = fun.form_id.get_ast(ctx.sema.db, file_id);
                                 if let Some(last_tok) = ast_fun.syntax().last_token() {
-                                    let range = last_tok.text_range();
-                                    let d = Diagnostic::new(
-                                        DiagnosticCode::Missing("missing_dot".to_string()),
-                                        "Missing '.'",
-                                        range,
-                                    )
-                                    .with_severity(severity)
-                                    .with_cli_severity(cli_severity);
-                                    diagnostics.push(d);
+                                    res.push(GenericLinterMatchContext {
+                                        range: FileRange {
+                                            file_id,
+                                            range: last_tok.text_range(),
+                                        },
+                                        context: "Missing '.'",
+                                    });
                                 }
                             }
+                            _ => {}
                         }
                     }
                 })
         });
 
-        diagnostics
+        Some(res)
+    }
+
+    fn match_description(&self, context: &Self::Context) -> Cow<'_, str> {
+        Cow::Borrowed(context)
     }
 }
 
@@ -211,31 +185,6 @@ mod tests {
    foo(1)->2;
    foo(2)->3
         %% ^ warning: W0004: Missing '.'
-"#,
-        );
-    }
-
-    #[test]
-    fn fun_decl_misplaced_dot() {
-        check_diagnostics(
-            r#"
-   -module(main).
-   foo(1)->2;
-   foo(2)->3.
-         %% ^ warning: W0018: Unexpected '.'
-   foo(3)->4.
-"#,
-        );
-    }
-
-    #[test]
-    fn fun_decl_misplaced_semi() {
-        check_diagnostics(
-            r#"
-   -module(main).
-   foo(1)->2;
-   foo(2)->3;
-         %% ^ warning: W0018: Unexpected ';'
 "#,
         );
     }

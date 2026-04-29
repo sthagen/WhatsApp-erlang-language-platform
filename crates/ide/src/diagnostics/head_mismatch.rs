@@ -407,17 +407,13 @@ mod tests {
 
     #[track_caller]
     fn check_diagnostics(fixture: &str) {
-        let config = DiagnosticsConfig::default()
-            .disable(DiagnosticCode::Unexpected("unexpected_semi".to_string()))
-            .disable(DiagnosticCode::Unexpected("unexpected_dot".to_string()));
+        let config = DiagnosticsConfig::default().disable(DiagnosticCode::UnexpectedSeparator);
         check_diagnostics_with_config(config, fixture)
     }
 
     #[track_caller]
     fn check_fix(fixture_before: &str, fixture_after: Expect) {
-        let config = DiagnosticsConfig::default()
-            .disable(DiagnosticCode::Unexpected("unexpected_semi".to_string()))
-            .disable(DiagnosticCode::Unexpected("unexpected_dot".to_string()));
+        let config = DiagnosticsConfig::default().disable(DiagnosticCode::UnexpectedSeparator);
         check_nth_fix(
             0,
             fixture_before,
