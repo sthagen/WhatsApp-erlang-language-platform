@@ -1120,7 +1120,7 @@ pub(crate) trait GenericLinter: Linter {
 // which is passed around in callbacks.
 // To be able to keep a registry of all linters we define a blanket implementation for all the methods using the `Context`,
 // to keep the code generic while allowing individual linters to specify their own context type.
-pub(crate) trait GenericDiagnostics: Linter {
+trait GenericDiagnostics: Linter {
     fn diagnostics(
         &self,
         ctx: &LinterContext,
@@ -1846,7 +1846,7 @@ pub fn native_diagnostics(
 }
 
 /// Enum to represent either type of linter for unified processing
-pub(crate) enum DiagnosticLinter {
+enum DiagnosticLinter {
     FunctionCall(&'static dyn FunctionCallDiagnostics),
     SsrPatterns(&'static dyn SsrPatternsDiagnostics),
     Generic(&'static dyn GenericDiagnostics),
@@ -1955,7 +1955,7 @@ const GENERIC_LINTERS: &[&dyn GenericDiagnostics] = &[
 ];
 
 /// Unified registry for all types of linters
-pub(crate) fn linters() -> Vec<DiagnosticLinter> {
+fn linters() -> Vec<DiagnosticLinter> {
     let mut all_linters = Vec::new();
 
     // Add function call linters
