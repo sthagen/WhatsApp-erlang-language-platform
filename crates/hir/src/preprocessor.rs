@@ -381,8 +381,19 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
     file_id: FileId,
     env: Arc<MacroEnvironment>,
 ) -> (Arc<PreprocessorAnalysis>, Arc<ConditionDiagnosticsMap>) {
+    let (analysis, diagnostics_map) = file_preprocessor_analysis_impl(db, file_id, &env);
+    (Arc::new(analysis), Arc::new(diagnostics_map))
+}
+
+/// Core implementation of preprocessor analysis, shared between the
+/// Salsa-cached query and any on-demand callers.
+fn file_preprocessor_analysis_impl(
+    db: &dyn DefDatabase,
+    file_id: FileId,
+    env: &MacroEnvironment,
+) -> (PreprocessorAnalysis, ConditionDiagnosticsMap) {
     let form_list = db.file_form_list(file_id);
-    let mut state = PreprocessorState::new(&env);
+    let mut state = PreprocessorState::new(env);
     let mut analysis = PreprocessorAnalysis::new();
     let mut diagnostics_map = ConditionDiagnosticsMap::default();
 
@@ -471,7 +482,7 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
                     &form_list,
                     directive_id,
                     &mut state,
-                    &env,
+                    env,
                     &mut analysis.include_envs,
                 );
             }
@@ -482,7 +493,7 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
     }
 
     analysis.final_state = Some(state.snapshot());
-    (Arc::new(analysis), Arc::new(diagnostics_map))
+    (analysis, diagnostics_map)
 }
 
 /// Outcome of processing a single `-ifdef`/`-ifndef`/`-if`/`-elif`/`-else`/
