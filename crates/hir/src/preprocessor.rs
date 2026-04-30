@@ -355,7 +355,9 @@ impl PreprocessorAnalysis {
     }
 
     /// Get the macro definitions snapshot for a specific `-if`/`-elif` condition.
-    /// Returns `None` if the condition was not found (e.g. ifdef/ifndef/else/endif).
+    /// Returns `None` if the condition was not found (e.g. ifdef/ifndef/else/endif),
+    /// or if the condition referenced no user-defined macros (empty snapshots are
+    /// not stored to reduce memory usage).
     pub fn condition_macro_defs(
         &self,
         cond_id: PPConditionId,
@@ -440,9 +442,12 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
                             .filter(|(name, _)| processed.referenced_macros.contains(name.name()))
                             .map(|(k, v)| (k.clone(), *v))
                             .collect();
-                        analysis
-                            .condition_macro_defs
-                            .insert(cond_id, Arc::new(trimmed));
+                        // Only store non-empty snapshots to reduce memory usage
+                        if !trimmed.is_empty() {
+                            analysis
+                                .condition_macro_defs
+                                .insert(cond_id, Arc::new(trimmed));
+                        }
                     }
                     // Record diagnostics if any
                     if !processed.diagnostics.is_empty() {
