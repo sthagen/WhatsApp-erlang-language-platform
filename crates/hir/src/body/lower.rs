@@ -89,6 +89,7 @@ use crate::known;
 use crate::macro_exp;
 use crate::macro_exp::BuiltInMacro;
 use crate::name::AsName;
+use crate::preprocessor::compute_file_macro_defs;
 
 #[derive(Debug, Clone)]
 pub(crate) struct MacroStackEntry {
@@ -228,9 +229,9 @@ impl<'a> Ctx<'a> {
         if !env.ifdef {
             return;
         }
-        let analysis = self.db.file_preprocessor_analysis(file_id, env);
-        if let Some(macro_defs) = analysis.macro_defs_for_env(env_id) {
-            self.local_macro_defs = Some(Arc::clone(macro_defs));
+        let macro_defs = compute_file_macro_defs(self.db, file_id, env);
+        if let Some(defs) = macro_defs.macro_defs_for_env(env_id) {
+            self.local_macro_defs = Some(Arc::clone(defs));
         }
     }
 

@@ -129,6 +129,11 @@ pub struct PreprocessorSnapshot {
 }
 
 /// Result of preprocessor analysis for a file.
+///
+/// This struct is cached by Salsa and intentionally kept small. The large
+/// per-env and per-condition macro definition snapshots live in
+/// `PreprocessorMacroDefs`, which is computed on demand via
+/// `compute_file_macro_defs` and NOT cached by Salsa.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PreprocessorAnalysis {
     condition_results: FxHashMap<PPConditionId, PPConditionResult>,
@@ -137,15 +142,6 @@ pub struct PreprocessorAnalysis {
     /// sequential processing. Allows callers to determine the exact
     /// macro state at each include point.
     include_envs: FxHashMap<IncludeAttributeId, Arc<MacroEnvironment>>,
-    /// Snapshot of `-define` macro definitions at the point each `-if`/`-elif`
-    /// condition was encountered. Keyed by condition ID so that downstream
-    /// Salsa queries can resolve user-defined macros with the correct
-    /// point-in-time state instead of falling back to `db.resolve_macro()`.
-    condition_macro_defs: FxHashMap<PPConditionId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
-    /// Snapshot of macro definitions at each ConditionEnvId point.
-    /// Body lowering uses this to resolve macros with the correct
-    /// point-in-file state instead of the end-of-file final_state.
-    env_macro_defs: FxHashMap<ConditionEnvId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
 }
 
 /// Point-in-time macro definition snapshots, computed on demand.
@@ -159,15 +155,22 @@ pub struct PreprocessorMacroDefs {
     /// Snapshot of macro definitions at each ConditionEnvId point.
     /// Body lowering uses this to resolve macros with the correct
     /// point-in-file state instead of the end-of-file final_state.
-    env_macro_defs: FxHashMap<ConditionEnvId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
+    pub(crate) env_macro_defs:
+        FxHashMap<ConditionEnvId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
     /// Snapshot of `-define` macro definitions at the point each `-if`/`-elif`
     /// condition was encountered. Keyed by condition ID so that downstream
     /// queries can resolve user-defined macros with the correct
     /// point-in-time state instead of falling back to `db.resolve_macro()`.
-    condition_macro_defs: FxHashMap<PPConditionId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
+    pub(crate) condition_macro_defs:
+        FxHashMap<PPConditionId, Arc<FxHashMap<MacroName, InFile<DefineId>>>>,
 }
 
 impl PreprocessorMacroDefs {
+    /// Returns true if both env and condition macro def maps are empty.
+    pub fn is_empty(&self) -> bool {
+        self.env_macro_defs.is_empty() && self.condition_macro_defs.is_empty()
+    }
+
     /// Get the macro definitions snapshot for a specific `ConditionEnvId`.
     /// Body lowering uses this to resolve macros with the correct point-in-file
     /// state instead of the end-of-file final_state.
@@ -393,27 +396,6 @@ impl PreprocessorAnalysis {
     pub fn include_env(&self, include_id: IncludeAttributeId) -> Option<&Arc<MacroEnvironment>> {
         self.include_envs.get(&include_id)
     }
-
-    /// Get the macro definitions snapshot for a specific `-if`/`-elif` condition.
-    /// Returns `None` if the condition was not found (e.g. ifdef/ifndef/else/endif),
-    /// or if the condition referenced no user-defined macros (empty snapshots are
-    /// not stored to reduce memory usage).
-    pub fn condition_macro_defs(
-        &self,
-        cond_id: PPConditionId,
-    ) -> Option<&Arc<FxHashMap<MacroName, InFile<DefineId>>>> {
-        self.condition_macro_defs.get(&cond_id)
-    }
-
-    /// Get the macro definitions snapshot for a specific `ConditionEnvId`.
-    /// Body lowering uses this to resolve macros with the correct point-in-file
-    /// state instead of the end-of-file final_state.
-    pub fn macro_defs_for_env(
-        &self,
-        env_id: ConditionEnvId,
-    ) -> Option<&Arc<FxHashMap<MacroName, InFile<DefineId>>>> {
-        self.env_macro_defs.get(&env_id)
-    }
 }
 
 pub fn file_preprocessor_analysis_with_diagnostics_query(
@@ -452,7 +434,7 @@ fn file_preprocessor_analysis_impl(
     db: &dyn DefDatabase,
     file_id: FileId,
     env: &MacroEnvironment,
-    _compute_macro_defs: bool,
+    compute_macro_defs: bool,
 ) -> (
     PreprocessorAnalysis,
     PreprocessorMacroDefs,
@@ -475,6 +457,7 @@ fn file_preprocessor_analysis_impl(
         // Only snapshot when ifdef is enabled — these snapshots are only
         // consumed by ifdef-aware code paths.
         if env.ifdef
+            && compute_macro_defs
             && let Some(pp_ctx) = form_list.get(form_idx).pp_ctx(&form_list)
             && recorded_envs.insert(pp_ctx.env)
         {
@@ -483,7 +466,7 @@ fn file_preprocessor_analysis_impl(
             // just those directly called in this file. Trimming here would
             // cause resolve_macro_name to miss macros that are only used
             // inside other macro bodies.
-            analysis
+            macro_defs
                 .env_macro_defs
                 .insert(pp_ctx.env, Arc::new(state.define_attr_macros.clone()));
         }
@@ -509,11 +492,13 @@ fn file_preprocessor_analysis_impl(
                     // condition — `referenced_macros` is empty for other
                     // condition types, so the match gate prevents storing
                     // empty snapshots for `-ifdef`/`-ifndef`/`-else`/`-endif`.
-                    if matches!(
-                        &form_list[cond_id],
-                        crate::form_list::PPCondition::If { .. }
-                            | crate::form_list::PPCondition::Elif { .. }
-                    ) {
+                    if compute_macro_defs
+                        && matches!(
+                            &form_list[cond_id],
+                            crate::form_list::PPCondition::If { .. }
+                                | crate::form_list::PPCondition::Elif { .. }
+                        )
+                    {
                         let trimmed: FxHashMap<_, _> = state
                             .define_attr_macros
                             .iter()
@@ -522,11 +507,9 @@ fn file_preprocessor_analysis_impl(
                             .collect();
                         // Only store non-empty snapshots to reduce memory usage
                         if !trimmed.is_empty() {
-                            let trimmed = Arc::new(trimmed);
-                            analysis
+                            macro_defs
                                 .condition_macro_defs
-                                .insert(cond_id, Arc::clone(&trimmed));
-                            macro_defs.condition_macro_defs.insert(cond_id, trimmed);
+                                .insert(cond_id, Arc::new(trimmed));
                         }
                     }
                     // Record diagnostics if any
@@ -763,6 +746,7 @@ mod tests {
     use crate::db::DefDatabase;
     use crate::preprocessor::MacroEnvironment;
     use crate::preprocessor::PreprocessorState;
+    use crate::preprocessor::compute_file_macro_defs;
     use crate::test_db::TestDB;
 
     fn name(s: &str) -> Name {
@@ -1709,13 +1693,14 @@ foo() -> prod.
         );
 
         let env = db.project_macro_environment(file_id);
-        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let analysis = db.file_preprocessor_analysis(file_id, Arc::clone(&env));
+        let macro_defs_result = compute_file_macro_defs(&db, file_id, env);
         let form_list = db.file_form_list(file_id);
 
         let if_cond_id = find_if_condition_id(&form_list);
 
         // Get the trimmed macro defs for this condition
-        let cond_macros = analysis
+        let cond_macros = macro_defs_result
             .condition_macro_defs(if_cond_id)
             .expect("should have condition macro defs");
 
@@ -1766,11 +1751,12 @@ my_func() ->
         );
 
         let env = db.project_macro_environment(file_id);
-        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let analysis = db.file_preprocessor_analysis(file_id, Arc::clone(&env));
+        let macro_defs_result = compute_file_macro_defs(&db, file_id, env);
 
         // env_macro_defs should exist
         assert!(
-            !analysis.env_macro_defs.is_empty(),
+            !macro_defs_result.env_macro_defs.is_empty(),
             "Should have env macro defs"
         );
 
@@ -1784,7 +1770,7 @@ my_func() ->
             .as_ref()
             .expect("should have final state");
 
-        for env_macros in analysis.env_macro_defs.values() {
+        for env_macros in macro_defs_result.env_macro_defs.values() {
             // All macros defined up to this point should be present
             assert!(
                 env_macros.len() <= final_state.define_attr_macros.len(),
@@ -1810,12 +1796,12 @@ my_func() ->
         );
 
         let env = db.project_macro_environment(file_id);
-        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let macro_defs_result = compute_file_macro_defs(&db, file_id, env);
         let form_list = db.file_form_list(file_id);
 
         let if_cond_id = find_if_condition_id(&form_list);
 
-        let cond_macros = analysis
+        let cond_macros = macro_defs_result
             .condition_macro_defs(if_cond_id)
             .expect("should have condition macro defs");
 
@@ -1888,12 +1874,12 @@ my_func() ->
         );
 
         let env = db.project_macro_environment(file_id);
-        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let macro_defs_result = compute_file_macro_defs(&db, file_id, env);
         let form_list = db.file_form_list(file_id);
 
         let if_cond_id = find_if_condition_id(&form_list);
 
-        let cond_macros = analysis
+        let cond_macros = macro_defs_result
             .condition_macro_defs(if_cond_id)
             .expect("should have condition macro defs for ?VERSION invocation");
 
