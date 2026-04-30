@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use elp_base_db::AppDataId;
 use elp_base_db::FileId;
+use elp_syntax::ast;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 
@@ -27,6 +28,8 @@ use crate::Name;
 use crate::PPConditionId;
 use crate::condition_expr::ConditionDiagnostic;
 use crate::condition_expr::ConditionExpr;
+use crate::condition_expr::ConditionLowerResult;
+use crate::condition_expr::lower_condition_expr;
 use crate::db::DefDatabase;
 use crate::form_list::ConditionEnvId;
 use crate::form_list::PPConditionResult;
@@ -395,6 +398,11 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
             && let Some(pp_ctx) = form_list.get(form_idx).pp_ctx(&form_list)
             && recorded_envs.insert(pp_ctx.env)
         {
+            // Store the full macro snapshot — body lowering needs all macros
+            // (including transitively-used ones from included headers), not
+            // just those directly called in this file. Trimming here would
+            // cause resolve_macro_name to miss macros that are only used
+            // inside other macro bodies.
             analysis
                 .env_macro_defs
                 .insert(pp_ctx.env, Arc::new(state.define_attr_macros.clone()));
@@ -409,26 +417,36 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
                 // condition_results remains empty — is_condition_active()
                 // defaults to Active for missing entries.
                 if env.ifdef {
+                    let processed =
+                        process_pp_condition(db, file_id, &form_list, cond_id, &mut state);
+
                     // Snapshot macro defs for -if/-elif conditions so that
                     // downstream Salsa queries can resolve user macros with
                     // the correct point-in-time state.
                     // Only consumed by condition_body_with_source_query when
                     // ifdef is active.
+                    // Trim to only the macros actually referenced by the
+                    // condition — `referenced_macros` is empty for other
+                    // condition types, so the match gate prevents storing
+                    // empty snapshots for `-ifdef`/`-ifndef`/`-else`/`-endif`.
                     if matches!(
                         &form_list[cond_id],
                         crate::form_list::PPCondition::If { .. }
                             | crate::form_list::PPCondition::Elif { .. }
                     ) {
+                        let trimmed: FxHashMap<_, _> = state
+                            .define_attr_macros
+                            .iter()
+                            .filter(|(name, _)| processed.referenced_macros.contains(name.name()))
+                            .map(|(k, v)| (k.clone(), *v))
+                            .collect();
                         analysis
                             .condition_macro_defs
-                            .insert(cond_id, Arc::new(state.define_attr_macros.clone()));
+                            .insert(cond_id, Arc::new(trimmed));
                     }
-
-                    let diagnostics =
-                        process_pp_condition(db, file_id, &form_list, cond_id, &mut state);
                     // Record diagnostics if any
-                    if !diagnostics.is_empty() {
-                        diagnostics_map.insert(cond_id, diagnostics);
+                    if !processed.diagnostics.is_empty() {
+                        diagnostics_map.insert(cond_id, processed.diagnostics);
                     }
                     // Record the condition result after processing
                     let result = if state.is_current_unknown() {
@@ -462,78 +480,94 @@ pub fn file_preprocessor_analysis_with_diagnostics_query(
     (Arc::new(analysis), Arc::new(diagnostics_map))
 }
 
+/// Outcome of processing a single `-ifdef`/`-ifndef`/`-if`/`-elif`/`-else`/
+/// `-endif` condition.
+#[derive(Default)]
+pub(crate) struct ProcessedCondition {
+    pub(crate) diagnostics: Vec<ConditionDiagnostic>,
+    /// Macros referenced by the condition's expression. Populated for
+    /// `-if`/`-elif` (both `defined(NAME)` args and `?MACRO` invocations);
+    /// empty for other condition types.
+    pub(crate) referenced_macros: BTreeSet<Name>,
+}
+
 /// Process a preprocessor condition (-ifdef, -ifndef, -if, -elif, -else, -endif).
-/// Returns any diagnostics generated during condition lowering.
+/// Returns any diagnostics generated during condition lowering together with
+/// the set of macros referenced by the condition expression.
 pub(crate) fn process_pp_condition(
     db: &dyn DefDatabase,
     file_id: FileId,
     form_list: &crate::form_list::FormList,
     cond_id: crate::PPConditionId,
     state: &mut PreprocessorState,
-) -> Vec<ConditionDiagnostic> {
+) -> ProcessedCondition {
     use crate::form_list::PPCondition;
+
+    // Lower the condition expression for `-if` / `-elif`. Shared between the
+    // two variants because they only differ in which form-id to resolve and
+    // which state transition to invoke after lowering.
+    // Pass the preprocessor's accumulated macro definitions so that
+    // macro resolution during lowering uses local state instead of
+    // calling db.resolve_macro(), breaking the Salsa cycle.
+    let lower_if_or_elif =
+        |state: &mut PreprocessorState, expr_ast: &ast::Expr| -> ConditionLowerResult {
+            lower_condition_expr(
+                db,
+                file_id,
+                cond_id,
+                expr_ast,
+                state.module_name().cloned(),
+                Some(&state.define_attr_macros),
+            )
+        };
 
     match &form_list[cond_id] {
         PPCondition::Ifdef { name, .. } => {
             let macro_name = MacroName::new(name.clone(), None);
             state.enter_ifdef(&macro_name);
-            vec![]
+            ProcessedCondition::default()
         }
         PPCondition::Ifndef { name, .. } => {
             let macro_name = MacroName::new(name.clone(), None);
             state.enter_ifndef(&macro_name);
-            vec![]
+            ProcessedCondition::default()
         }
         PPCondition::If { form_id, .. } => {
-            // Lower the condition expression and evaluate it.
-            // Pass the preprocessor's accumulated macro definitions so that
-            // macro resolution during lowering uses local state instead of
-            // calling db.resolve_macro(), breaking the Salsa cycle.
             let source = db.parse(file_id).tree();
             let pp_if = form_id.get(&source);
-            if let Some(expr_ast) = pp_if.cond() {
-                let lower_result = crate::condition_expr::lower_condition_expr(
-                    db,
-                    file_id,
-                    cond_id,
-                    &expr_ast,
-                    state.module_name().cloned(),
-                    Some(&state.define_attr_macros),
-                );
-                state.enter_if(&lower_result.expr);
-                lower_result.diagnostics
-            } else {
+            let Some(expr_ast) = pp_if.cond() else {
                 // No condition expression, treat as invalid (push inactive frame)
-                state.enter_if(&crate::condition_expr::ConditionExpr::Invalid);
-                vec![]
+                state.enter_if(&ConditionExpr::Invalid);
+                return ProcessedCondition::default();
+            };
+            let lower_result = lower_if_or_elif(state, &expr_ast);
+            state.enter_if(&lower_result.expr);
+            ProcessedCondition {
+                diagnostics: lower_result.diagnostics,
+                referenced_macros: lower_result.referenced_macros,
             }
         }
         PPCondition::Elif { form_id, .. } => {
             let source = db.parse(file_id).tree();
             let pp_elif = form_id.get(&source);
-            if let Some(expr_ast) = pp_elif.cond() {
-                let lower_result = crate::condition_expr::lower_condition_expr(
-                    db,
-                    file_id,
-                    cond_id,
-                    &expr_ast,
-                    state.module_name().cloned(),
-                    Some(&state.define_attr_macros),
-                );
-                state.enter_elif(&lower_result.expr);
-                lower_result.diagnostics
-            } else {
-                state.enter_elif(&crate::condition_expr::ConditionExpr::Invalid);
-                vec![]
+            let Some(expr_ast) = pp_elif.cond() else {
+                state.enter_elif(&ConditionExpr::Invalid);
+                return ProcessedCondition::default();
+            };
+            let lower_result = lower_if_or_elif(state, &expr_ast);
+            state.enter_elif(&lower_result.expr);
+            ProcessedCondition {
+                diagnostics: lower_result.diagnostics,
+                referenced_macros: lower_result.referenced_macros,
             }
         }
         PPCondition::Else { .. } => {
             state.enter_else();
-            vec![]
+            ProcessedCondition::default()
         }
         PPCondition::Endif { .. } => {
             state.exit_condition();
-            vec![]
+            ProcessedCondition::default()
         }
     }
 }
@@ -633,6 +667,7 @@ mod tests {
     use std::sync::Arc;
 
     use elp_base_db::SourceDatabase;
+    use elp_base_db::assert_eq_expected;
     use elp_base_db::fixture::WithFixture;
 
     use crate::FormIdx;
@@ -651,6 +686,23 @@ mod tests {
 
     fn macro_name(s: &str) -> MacroName {
         MacroName::new(name(s), None)
+    }
+
+    /// Find the first `-if` condition in a form list. Panics if none exists.
+    fn find_if_condition_id(form_list: &crate::form_list::FormList) -> crate::PPConditionId {
+        form_list
+            .forms()
+            .iter()
+            .find_map(|&form_idx| {
+                let FormIdx::PPCondition(cond_id) = form_idx else {
+                    return None;
+                };
+                match &form_list[cond_id] {
+                    crate::form_list::PPCondition::If { .. } => Some(cond_id),
+                    _ => None,
+                }
+            })
+            .expect("should find -if condition")
     }
 
     // ========================================================================
@@ -1553,6 +1605,220 @@ foo() -> prod.
                 .define_attr_macros
                 .contains_key(&macro_name("NORMAL_DEFINE")),
             "NORMAL_DEFINE should always be visible"
+        );
+    }
+
+    #[test]
+    fn test_condition_macro_defs_trimmed() {
+        // Verify that condition_macro_defs only stores macros referenced by the condition
+        let (db, file_id) = TestDB::with_single_file(
+            r#"
+-module(test).
+-define(USED_IN_COND, 1).
+-define(NOT_USED_IN_COND, 2).
+-define(ANOTHER_UNUSED, 3).
+-if(defined(USED_IN_COND)).
+-define(INSIDE_IF, ok).
+-endif.
+"#,
+        );
+
+        let env = db.project_macro_environment(file_id);
+        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let form_list = db.file_form_list(file_id);
+
+        let if_cond_id = find_if_condition_id(&form_list);
+
+        // Get the trimmed macro defs for this condition
+        let cond_macros = analysis
+            .condition_macro_defs(if_cond_id)
+            .expect("should have condition macro defs");
+
+        // Should only contain USED_IN_COND, not the others
+        assert!(
+            cond_macros.contains_key(&macro_name("USED_IN_COND")),
+            "Should contain macro referenced in condition"
+        );
+        assert!(
+            !cond_macros.contains_key(&macro_name("NOT_USED_IN_COND")),
+            "Should NOT contain macro not referenced in condition (trimmed for storage)"
+        );
+        assert!(
+            !cond_macros.contains_key(&macro_name("ANOTHER_UNUSED")),
+            "Should NOT contain other unused macros (trimmed for storage)"
+        );
+
+        // Verify trimming occurred - the map should be smaller than full state
+        let final_state = analysis
+            .final_state
+            .as_ref()
+            .expect("should have final state");
+        assert!(
+            cond_macros.len() < final_state.define_attr_macros.len(),
+            "Condition macro defs should be trimmed ({} < {})",
+            cond_macros.len(),
+            final_state.define_attr_macros.len()
+        );
+    }
+
+    #[test]
+    fn test_env_macro_defs_not_trimmed() {
+        // Verify that env_macro_defs stores the FULL macro state (not trimmed).
+        // Trimming env_macro_defs would break body lowering: macros used
+        // transitively (inside other macro bodies) would be missing from
+        // local_macro_defs, and resolve_macro_name would not fall back to
+        // db.resolve_macro(), causing silent macro expansion failures.
+        let (db, file_id) = TestDB::with_single_file(
+            r#"
+-module(test).
+-define(USED_MACRO, 1).
+-define(UNUSED_MACRO, 2).
+-define(ANOTHER_UNUSED, 3).
+
+my_func() ->
+    ?USED_MACRO.
+"#,
+        );
+
+        let env = db.project_macro_environment(file_id);
+        let analysis = db.file_preprocessor_analysis(file_id, env);
+
+        // env_macro_defs should exist
+        assert!(
+            !analysis.env_macro_defs.is_empty(),
+            "Should have env macro defs"
+        );
+
+        // env_macro_defs should store the full macro state, including
+        // macros that are not directly used in the current file. This is
+        // necessary because body lowering uses these snapshots to resolve
+        // macros, and macros may be transitively needed (e.g., a macro
+        // body in a header references another macro).
+        let final_state = analysis
+            .final_state
+            .as_ref()
+            .expect("should have final state");
+
+        for env_macros in analysis.env_macro_defs.values() {
+            // All macros defined up to this point should be present
+            assert!(
+                env_macros.len() <= final_state.define_attr_macros.len(),
+                "Env snapshot should not exceed final state"
+            );
+        }
+    }
+
+    #[test]
+    fn test_condition_with_multiple_macros() {
+        // Verify trimming works with complex conditions
+        let (db, file_id) = TestDB::with_single_file(
+            r#"
+-module(test).
+-define(MACRO_A, 1).
+-define(MACRO_B, 2).
+-define(MACRO_C, 3).
+-define(MACRO_D, 4).
+-if(defined(MACRO_A) andalso defined(MACRO_C)).
+-define(INSIDE, ok).
+-endif.
+"#,
+        );
+
+        let env = db.project_macro_environment(file_id);
+        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let form_list = db.file_form_list(file_id);
+
+        let if_cond_id = find_if_condition_id(&form_list);
+
+        let cond_macros = analysis
+            .condition_macro_defs(if_cond_id)
+            .expect("should have condition macro defs");
+
+        // Should contain MACRO_A and MACRO_C (used in condition)
+        assert!(cond_macros.contains_key(&macro_name("MACRO_A")));
+        assert!(cond_macros.contains_key(&macro_name("MACRO_C")));
+
+        // Should NOT contain MACRO_B and MACRO_D (not in condition)
+        assert!(!cond_macros.contains_key(&macro_name("MACRO_B")));
+        assert!(!cond_macros.contains_key(&macro_name("MACRO_D")));
+
+        // Verify exactly 2 macros stored
+        assert_eq_expected!(
+            2,
+            cond_macros.len(),
+            "Should store exactly the 2 macros referenced in condition"
+        );
+    }
+
+    #[test]
+    fn test_defined_names_extraction() {
+        // Test the defined_names() method directly
+        use crate::Name;
+        use crate::condition_expr::ConditionExpr;
+
+        // Test: defined(FOO) andalso defined(BAR)
+        let expr = ConditionExpr::AndAlso(
+            Box::new(ConditionExpr::Defined(Name::from_erlang_service("FOO"))),
+            Box::new(ConditionExpr::Defined(Name::from_erlang_service("BAR"))),
+        );
+
+        let refs = expr.defined_names();
+        assert_eq_expected!(2, refs.len());
+        assert!(refs.contains(&Name::from_erlang_service("FOO")));
+        assert!(refs.contains(&Name::from_erlang_service("BAR")));
+
+        // Test: not defined(BAZ)
+        let expr = ConditionExpr::Not(Box::new(ConditionExpr::Defined(Name::from_erlang_service(
+            "BAZ",
+        ))));
+
+        let refs = expr.defined_names();
+        assert_eq_expected!(1, refs.len());
+        assert!(refs.contains(&Name::from_erlang_service("BAZ")));
+
+        // Test: literal (no macros)
+        let expr = ConditionExpr::LiteralBool(true);
+        let refs = expr.defined_names();
+        assert_eq_expected!(0, refs.len());
+    }
+
+    #[test]
+    fn test_condition_macro_defs_captures_macro_call_in_condition() {
+        // Regression test: a condition that invokes a macro directly
+        // (`-if(?VERSION >= 2)`) must still capture `VERSION` in the
+        // trimmed snapshot. The macro call is expanded away during
+        // condition lowering, so walking only the post-expansion
+        // `ConditionExpr` would miss it and leave the snapshot empty,
+        // causing downstream `condition_body_with_source_query` to
+        // produce `Expr::Missing` when it re-lowers the condition.
+        let (db, file_id) = TestDB::with_single_file(
+            r#"
+-module(test).
+-define(VERSION, 2).
+-define(OTHER, 99).
+-if(?VERSION >= 2).
+-define(INSIDE, ok).
+-endif.
+"#,
+        );
+
+        let env = db.project_macro_environment(file_id);
+        let analysis = db.file_preprocessor_analysis(file_id, env);
+        let form_list = db.file_form_list(file_id);
+
+        let if_cond_id = find_if_condition_id(&form_list);
+
+        let cond_macros = analysis
+            .condition_macro_defs(if_cond_id)
+            .expect("should have condition macro defs for ?VERSION invocation");
+
+        assert!(
+            cond_macros.contains_key(&macro_name("VERSION")),
+            "?VERSION invocation must be captured even though it was expanded"
+        );
+        assert!(
+            !cond_macros.contains_key(&macro_name("OTHER")),
+            "unrelated macro should still be trimmed"
         );
     }
 }
