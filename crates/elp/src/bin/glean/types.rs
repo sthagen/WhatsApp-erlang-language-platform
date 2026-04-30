@@ -265,6 +265,10 @@ pub(crate) enum Fact {
     FileIncludes2 {
         facts: Vec<Key<Schema2FileIncludes>>,
     },
+    #[serde(rename = "erlang.DeclarationTarget.2")]
+    DeclTarget2 {
+        facts: Vec<Key<Schema2DeclarationTarget>>,
+    },
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -278,6 +282,8 @@ pub(crate) struct XRefFile {
 pub(crate) struct XRef {
     pub(crate) source: Location,
     pub(crate) target: XRefTarget,
+    #[serde(skip)]
+    pub(crate) caller: Option<(GleanFileId, String, u32)>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -633,6 +639,12 @@ pub(crate) struct Schema2FileIncludes {
     #[serde(rename = "file")]
     pub(crate) file_id: GleanFileId,
     pub(crate) included: GleanFileId,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Schema2DeclarationTarget {
+    pub(crate) source: Schema2Declaration,
+    pub(crate) target: Schema2Declaration,
 }
 
 // ── Location types ──

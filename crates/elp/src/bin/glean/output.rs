@@ -33,6 +33,7 @@ use super::types::Schema2CallbackDef;
 use super::types::Schema2CommentFact;
 use super::types::Schema2DeclLocation;
 use super::types::Schema2Declaration;
+use super::types::Schema2DeclarationTarget;
 use super::types::Schema2FileDeclarations;
 use super::types::Schema2FileIncludes;
 use super::types::Schema2Fqn;
@@ -580,16 +581,18 @@ impl IndexedFacts {
             );
         }
 
-        // Convert xrefs to typed xrefs
+        // Convert xrefs to typed xrefs + collect DeclarationTarget facts
         let xref_files = mem::take(&mut self.xrefs);
         let mut typed_xrefs: Vec<Key<Schema2XRefsByFile>> = vec![];
         let mut var_xrefs: Vec<Key<Schema2VarXRefsByFile>> = vec![];
+        let mut decl_targets: Vec<Key<Schema2DeclarationTarget>> = vec![];
         let mut xref_count = 0usize;
         for xref_file in xref_files {
             let mut file_typed: Vec<Schema2XRef> = vec![];
             let mut var_map: FxHashMap<(String, u32), Vec<Location>> = FxHashMap::default();
             for xref in xref_file.xrefs {
                 xref_count += 1;
+                let caller = xref.caller;
                 match &xref.target {
                     XRefTarget::Function(f) => {
                         let target_module = modules.get(&f.key.file_id).unwrap_or(&unknown);
@@ -707,6 +710,32 @@ impl IndexedFacts {
                         let span_start = v.key.decl_span_start.unwrap_or(xref.source.start);
                         let key = (v.key.name.clone(), span_start);
                         var_map.entry(key).or_default().push(xref.source);
+                    }
+                }
+                if let Some((caller_file_id, caller_name, caller_arity)) = caller {
+                    let caller_module = modules.get(&caller_file_id).unwrap_or(&unknown).clone();
+                    let caller_app = apps.get(&caller_file_id).unwrap_or(&unknown).clone();
+                    let source_decl = Schema2Declaration::Func(
+                        Schema2FuncDecl {
+                            fqn: Schema2Fqn {
+                                module: caller_module,
+                                name: caller_name,
+                                arity: caller_arity,
+                            },
+                            app: caller_app,
+                        }
+                        .into(),
+                    );
+                    if let Some(target_decl) =
+                        Self::xref_target_to_decl(&xref.target, modules, apps, &unknown)
+                    {
+                        decl_targets.push(
+                            Schema2DeclarationTarget {
+                                source: source_decl,
+                                target: target_decl,
+                            }
+                            .into(),
+                        );
                     }
                 }
             }
@@ -950,6 +979,9 @@ impl IndexedFacts {
             Fact::MacroUsageLocation2 {
                 facts: macro_usage_locations,
             },
+            Fact::DeclTarget2 {
+                facts: decl_targets,
+            },
         ]);
         (result, counts)
     }
@@ -1007,6 +1039,80 @@ impl IndexedFacts {
                 .into(),
             )),
             _ => None,
+        }
+    }
+
+    fn xref_target_to_decl(
+        target: &XRefTarget,
+        modules: &FxHashMap<GleanFileId, String>,
+        apps: &FxHashMap<GleanFileId, String>,
+        unknown: &String,
+    ) -> Option<Schema2Declaration> {
+        match target {
+            XRefTarget::Function(f) => {
+                let module = modules.get(&f.key.file_id).unwrap_or(unknown);
+                let app = apps.get(&f.key.file_id).unwrap_or(unknown);
+                Some(Schema2Declaration::Func(
+                    Schema2FuncDecl {
+                        fqn: Schema2Fqn {
+                            module: module.clone(),
+                            name: f.key.name.clone(),
+                            arity: f.key.arity,
+                        },
+                        app: app.clone(),
+                    }
+                    .into(),
+                ))
+            }
+            XRefTarget::Macro(m) => {
+                let module = modules.get(&m.key.file_id).unwrap_or(unknown);
+                let app = apps.get(&m.key.file_id).unwrap_or(unknown);
+                Some(Schema2Declaration::Macro(
+                    Schema2MacroDecl {
+                        name: m.key.name.clone(),
+                        arity: m.key.arity,
+                        module: module.clone(),
+                        app: app.clone(),
+                    }
+                    .into(),
+                ))
+            }
+            XRefTarget::Record(r) => {
+                let module = modules.get(&r.key.file_id).unwrap_or(unknown);
+                let app = apps.get(&r.key.file_id).unwrap_or(unknown);
+                Some(Schema2Declaration::Record(
+                    Schema2RecordDecl {
+                        name: r.key.name.clone(),
+                        module: module.clone(),
+                        app: app.clone(),
+                    }
+                    .into(),
+                ))
+            }
+            XRefTarget::Type(t) => {
+                let module = modules.get(&t.key.file_id).unwrap_or(unknown);
+                let app = apps.get(&t.key.file_id).unwrap_or(unknown);
+                Some(Schema2Declaration::Type(
+                    Schema2TypeDecl {
+                        name: t.key.name.clone(),
+                        arity: t.key.arity,
+                        module: module.clone(),
+                        app: app.clone(),
+                    }
+                    .into(),
+                ))
+            }
+            XRefTarget::Header(h) => {
+                let app = apps.get(&h.key.file_id).unwrap_or(unknown);
+                Some(Schema2Declaration::Header(
+                    Schema2HeaderDecl {
+                        name: h.key.name.clone(),
+                        app: app.clone(),
+                    }
+                    .into(),
+                ))
+            }
+            XRefTarget::Var(_) => None,
         }
     }
 }

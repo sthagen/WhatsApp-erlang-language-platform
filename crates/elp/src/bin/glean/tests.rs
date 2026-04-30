@@ -71,6 +71,7 @@ fn serialization_test() {
                 }
                 .into(),
             ),
+            caller: None,
         }],
     };
 
@@ -166,6 +167,38 @@ fn schema2_serialization_test() {
             "Expected {expected} in schema2 output, got: {predicates:?}",
         );
     }
+}
+
+#[test]
+fn declaration_target_test() {
+    let spec = r#"
+    //- /glean/app_glean/src/glean_module1.erl
+    -module(glean_module1).
+    -export([bar/1]).
+    foo(X) -> X + 1.
+    bar(X) -> foo(X).
+    "#;
+    let config = IndexConfig {
+        schema2: true,
+        ..Default::default()
+    };
+    let (facts, _, _, _, module_index) = facts_with_annotations_with_config(spec, config);
+    let app_index = FxHashMap::default();
+    let (schema2_facts, _) = facts.into_schema2_facts(&module_index, &app_index);
+
+    let target_json = schema2_facts
+        .iter()
+        .filter_map(|f| match f {
+            Fact::DeclTarget2 { facts } => Some(facts),
+            _ => None,
+        })
+        .flatten()
+        .map(|t| serde_json::to_value(t).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(target_json.len(), 1, "Expected 1 DeclarationTarget fact");
+    let fact = &target_json[0]["key"];
+    assert_eq!(fact["source"]["func"]["key"]["fqn"]["name"], "bar");
+    assert_eq!(fact["target"]["func"]["key"]["fqn"]["name"], "foo");
 }
 
 #[test]

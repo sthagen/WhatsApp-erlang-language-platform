@@ -1031,6 +1031,7 @@ impl GleanIndexer {
                             }
                             .into(),
                         ),
+                        caller: None,
                     })
                 } else {
                     None
@@ -1087,8 +1088,34 @@ impl GleanIndexer {
             }
             _ => None,
         };
-        acc.push(target?);
+        let mut xref = target?;
+        xref.caller = Self::resolve_caller(sema, file_id, ctx);
+        acc.push(xref);
         None
+    }
+
+    fn resolve_caller(
+        sema: &Semantic,
+        file_id: FileId,
+        ctx: &AnyCallBackCtx,
+    ) -> Option<(GleanFileId, String, u32)> {
+        if let BodyOrigin::FormIdx {
+            file_id: origin_file_id,
+            form_id: FormIdx::FunctionClause(clause_id),
+        } = &ctx.body_origin
+            && *origin_file_id == file_id
+        {
+            let def_map = sema.def_map(file_id);
+            let fn_def_id = def_map.function_def_id(&InFile::new(file_id, *clause_id))?;
+            let fn_def = def_map.get_by_function_id(&InFile::new(file_id, *fn_def_id))?;
+            Some((
+                file_id.into(),
+                fn_def.name.name().to_string(),
+                fn_def.name.arity(),
+            ))
+        } else {
+            None
+        }
     }
 
     fn resolve_var_decl_span(sema: &Semantic, var: &Var, ctx: &AnyCallBackCtx) -> Option<u32> {
@@ -1189,6 +1216,7 @@ impl GleanIndexer {
                             let xref = XRef {
                                 source: range,
                                 target: XRefTarget::Header(target.into()),
+                                caller: None,
                             };
                             acc.push(xref);
                         }
@@ -1211,6 +1239,7 @@ impl GleanIndexer {
                             let xref = XRef {
                                 source: range,
                                 target: XRefTarget::Function(target.into()),
+                                caller: None,
                             };
                             acc.push(xref);
                         }
@@ -1278,6 +1307,7 @@ impl GleanIndexer {
         let xref = XRef {
             source: range,
             target: XRefTarget::Function(target.into()),
+            caller: None,
         };
         Some(xref)
     }
@@ -1306,6 +1336,7 @@ impl GleanIndexer {
         Some(XRef {
             source: range.into(),
             target: XRefTarget::Function(target.into()),
+            caller: None,
         })
     }
 
@@ -1331,6 +1362,7 @@ impl GleanIndexer {
         Some(XRef {
             source: range.into(),
             target: XRefTarget::Macro(target.into()),
+            caller: None,
         })
     }
 
@@ -1368,6 +1400,7 @@ impl GleanIndexer {
                 }
                 .into(),
             ),
+            caller: None,
         })
     }
 
@@ -1397,6 +1430,7 @@ impl GleanIndexer {
                 }
                 .into(),
             ),
+            caller: None,
         })
     }
 
