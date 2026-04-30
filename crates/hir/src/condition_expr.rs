@@ -128,11 +128,6 @@ pub struct ConditionLowerResult {
     pub expr: ConditionExpr,
     /// Diagnostics generated during lowering
     pub diagnostics: Vec<ConditionDiagnostic>,
-    /// All macro names the condition references. Includes both `defined(NAME)`
-    /// arguments and `?MACRO` invocations that were expanded during body
-    /// lowering. Walking `expr` alone misses the latter, since expansion
-    /// replaces the call with its value and the name no longer appears.
-    pub referenced_macros: BTreeSet<Name>,
 }
 
 impl ConditionExpr {
@@ -145,54 +140,6 @@ impl ConditionExpr {
     pub fn evaluate(&self, defined_macros: &BTreeSet<MacroName>) -> Option<bool> {
         let value = evaluate(self, defined_macros)?;
         coerce_value_to_bool(&value)
-    }
-
-    /// Collect the names appearing in `defined(NAME)` calls in this expression.
-    ///
-    /// Note: this does NOT capture macros that were invoked directly as
-    /// `?MACRO` in the source — those are expanded during body lowering and
-    /// leave no trace in `ConditionExpr`. Callers that need the full set
-    /// should use `ConditionLowerResult::referenced_macros`.
-    pub fn defined_names(&self) -> BTreeSet<Name> {
-        let mut names = BTreeSet::new();
-        self.collect_defined_names(&mut names);
-        names
-    }
-
-    fn collect_defined_names(&self, names: &mut BTreeSet<Name>) {
-        match self {
-            ConditionExpr::Defined(name) => {
-                names.insert(name.clone());
-            }
-            ConditionExpr::Not(inner) => {
-                inner.collect_defined_names(names);
-            }
-            ConditionExpr::AndAlso(left, right)
-            | ConditionExpr::And(left, right)
-            | ConditionExpr::OrElse(left, right)
-            | ConditionExpr::Or(left, right) => {
-                left.collect_defined_names(names);
-                right.collect_defined_names(names);
-            }
-            ConditionExpr::Compare { left, right, .. } => {
-                left.collect_defined_names(names);
-                right.collect_defined_names(names);
-            }
-            ConditionExpr::Arithmetic { left, right, .. } => {
-                left.collect_defined_names(names);
-                right.collect_defined_names(names);
-            }
-            ConditionExpr::UnaryArithmetic { operand, .. } => {
-                operand.collect_defined_names(names);
-            }
-            ConditionExpr::LiteralBool(_)
-            | ConditionExpr::Integer(_)
-            | ConditionExpr::Atom(_)
-            | ConditionExpr::String(_)
-            | ConditionExpr::Invalid => {
-                // No macros referenced
-            }
-        }
     }
 }
 
@@ -501,6 +448,12 @@ fn apply_unary_arithmetic(op: UnaryOp, operand: i128) -> Option<i128> {
 ///
 /// The `module_name_override` allows specifying a module name to use for ?FILE, ?MODULE, etc.
 /// when evaluating conditions in included header files.
+///
+/// Returns the lowered result together with the set of macro names invoked as
+/// `?MACRO` inside the body. These invocations are expanded away during
+/// lowering and leave no trace in the resulting `ConditionExpr`, so callers
+/// that need the full reference set must combine this with their own walk
+/// over `ConditionExpr` for `defined(NAME)` arguments.
 pub fn lower_condition_expr(
     db: &dyn DefDatabase,
     file_id: FileId,
@@ -508,7 +461,7 @@ pub fn lower_condition_expr(
     ast_expr: &ast::Expr,
     module_name_override: Option<Name>,
     macro_defs: Option<&FxHashMap<MacroName, InFile<DefineId>>>,
-) -> ConditionLowerResult {
+) -> (ConditionLowerResult, BTreeSet<Name>) {
     // Create a body with macro expansion
     let (body, _source_map, root_id) = lower_condition_body(
         db,
@@ -521,27 +474,16 @@ pub fn lower_condition_expr(
     let mut diagnostics = Vec::new();
     let expr = hir_to_condition_expr(&body, root_id, &mut diagnostics);
 
-    // Capture every macro name the condition references. `?MACRO` invocations
-    // still live in `body.exprs` as `Expr::MacroCall { macro_name, .. }` even
-    // though `hir_to_condition_expr` follows them through to the expansion,
-    // so walking the body catches names that are invisible in the final
-    // `ConditionExpr`. The `defined(NAME)` args are only visible in
-    // `ConditionExpr::Defined`, so we union both sources.
-    let referenced_macros: BTreeSet<Name> = body
+    let macro_call_names: BTreeSet<Name> = body
         .exprs
         .iter()
         .filter_map(|(_, e)| match e {
             Expr::MacroCall { macro_name, .. } => Some(macro_name.as_name()),
             _ => None,
         })
-        .chain(expr.defined_names())
         .collect();
 
-    ConditionLowerResult {
-        expr,
-        diagnostics,
-        referenced_macros,
-    }
+    (ConditionLowerResult { expr, diagnostics }, macro_call_names)
 }
 
 /// Convert a HIR expression to a ConditionExpr, tracking diagnostics for unsupported constructs.
@@ -1820,7 +1762,7 @@ foo() -> ok.
             {
                 let pp_if = form_id.get_ast(&db, file_id);
                 if let Some(expr) = pp_if.cond() {
-                    let result = crate::condition_expr::lower_condition_expr(
+                    let (result, _macro_call_names) = crate::condition_expr::lower_condition_expr(
                         &db, file_id, cond_id, &expr, None, None,
                     );
                     return result.expr;

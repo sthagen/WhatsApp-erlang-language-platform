@@ -577,17 +577,18 @@ pub(crate) fn process_pp_condition(
     // Pass the preprocessor's accumulated macro definitions so that
     // macro resolution during lowering uses local state instead of
     // calling db.resolve_macro(), breaking the Salsa cycle.
-    let lower_if_or_elif =
-        |state: &mut PreprocessorState, expr_ast: &ast::Expr| -> ConditionLowerResult {
-            lower_condition_expr(
-                db,
-                file_id,
-                cond_id,
-                expr_ast,
-                state.module_name().cloned(),
-                Some(&state.define_attr_macros),
-            )
-        };
+    let lower_if_or_elif = |state: &mut PreprocessorState,
+                            expr_ast: &ast::Expr|
+     -> (ConditionLowerResult, BTreeSet<Name>) {
+        lower_condition_expr(
+            db,
+            file_id,
+            cond_id,
+            expr_ast,
+            state.module_name().cloned(),
+            Some(&state.define_attr_macros),
+        )
+    };
 
     match &form_list[cond_id] {
         PPCondition::Ifdef { name, .. } => {
@@ -608,11 +609,13 @@ pub(crate) fn process_pp_condition(
                 state.enter_if(&ConditionExpr::Invalid);
                 return ProcessedCondition::default();
             };
-            let lower_result = lower_if_or_elif(state, &expr_ast);
+            let (lower_result, macro_call_names) = lower_if_or_elif(state, &expr_ast);
+            let referenced_macros =
+                condition_referenced_macros(&lower_result.expr, macro_call_names);
             state.enter_if(&lower_result.expr);
             ProcessedCondition {
                 diagnostics: lower_result.diagnostics,
-                referenced_macros: lower_result.referenced_macros,
+                referenced_macros,
             }
         }
         PPCondition::Elif { form_id, .. } => {
@@ -622,11 +625,13 @@ pub(crate) fn process_pp_condition(
                 state.enter_elif(&ConditionExpr::Invalid);
                 return ProcessedCondition::default();
             };
-            let lower_result = lower_if_or_elif(state, &expr_ast);
+            let (lower_result, macro_call_names) = lower_if_or_elif(state, &expr_ast);
+            let referenced_macros =
+                condition_referenced_macros(&lower_result.expr, macro_call_names);
             state.enter_elif(&lower_result.expr);
             ProcessedCondition {
                 diagnostics: lower_result.diagnostics,
-                referenced_macros: lower_result.referenced_macros,
+                referenced_macros,
             }
         }
         PPCondition::Else { .. } => {
@@ -636,6 +641,57 @@ pub(crate) fn process_pp_condition(
         PPCondition::Endif { .. } => {
             state.exit_condition();
             ProcessedCondition::default()
+        }
+    }
+}
+
+/// Collect every macro name referenced by a `-if`/`-elif` condition.
+///
+/// `macro_call_names` covers `?MACRO` invocations from the body (which are
+/// expanded away during lowering and leave no trace in `ConditionExpr`).
+/// This function adds the `defined(NAME)` arguments which are only visible
+/// in `ConditionExpr::Defined`. Trimming `condition_macro_defs` to this
+/// union is purely a preprocessor-side storage optimization.
+fn condition_referenced_macros(
+    expr: &ConditionExpr,
+    mut macro_call_names: BTreeSet<Name>,
+) -> BTreeSet<Name> {
+    collect_defined_names(expr, &mut macro_call_names);
+    macro_call_names
+}
+
+fn collect_defined_names(expr: &ConditionExpr, names: &mut BTreeSet<Name>) {
+    match expr {
+        ConditionExpr::Defined(name) => {
+            names.insert(name.clone());
+        }
+        ConditionExpr::Not(inner) => {
+            collect_defined_names(inner, names);
+        }
+        ConditionExpr::AndAlso(left, right)
+        | ConditionExpr::And(left, right)
+        | ConditionExpr::OrElse(left, right)
+        | ConditionExpr::Or(left, right) => {
+            collect_defined_names(left, names);
+            collect_defined_names(right, names);
+        }
+        ConditionExpr::Compare { left, right, .. } => {
+            collect_defined_names(left, names);
+            collect_defined_names(right, names);
+        }
+        ConditionExpr::Arithmetic { left, right, .. } => {
+            collect_defined_names(left, names);
+            collect_defined_names(right, names);
+        }
+        ConditionExpr::UnaryArithmetic { operand, .. } => {
+            collect_defined_names(operand, names);
+        }
+        ConditionExpr::LiteralBool(_)
+        | ConditionExpr::Integer(_)
+        | ConditionExpr::Atom(_)
+        | ConditionExpr::String(_)
+        | ConditionExpr::Invalid => {
+            // No macros referenced
         }
     }
 }
@@ -732,6 +788,7 @@ pub(crate) fn recover_cycle(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::sync::Arc;
 
     use elp_base_db::SourceDatabase;
@@ -746,6 +803,7 @@ mod tests {
     use crate::db::DefDatabase;
     use crate::preprocessor::MacroEnvironment;
     use crate::preprocessor::PreprocessorState;
+    use crate::preprocessor::collect_defined_names;
     use crate::preprocessor::compute_file_macro_defs;
     use crate::test_db::TestDB;
 
@@ -1822,18 +1880,19 @@ my_func() ->
     }
 
     #[test]
-    fn test_defined_names_extraction() {
-        // Test the defined_names() method directly
-        use crate::Name;
-        use crate::condition_expr::ConditionExpr;
+    fn test_collect_defined_names() {
+        let extract = |expr: &ConditionExpr| -> BTreeSet<Name> {
+            let mut names = BTreeSet::new();
+            collect_defined_names(expr, &mut names);
+            names
+        };
 
         // Test: defined(FOO) andalso defined(BAR)
         let expr = ConditionExpr::AndAlso(
             Box::new(ConditionExpr::Defined(Name::from_erlang_service("FOO"))),
             Box::new(ConditionExpr::Defined(Name::from_erlang_service("BAR"))),
         );
-
-        let refs = expr.defined_names();
+        let refs = extract(&expr);
         assert_eq_expected!(2, refs.len());
         assert!(refs.contains(&Name::from_erlang_service("FOO")));
         assert!(refs.contains(&Name::from_erlang_service("BAR")));
@@ -1842,14 +1901,13 @@ my_func() ->
         let expr = ConditionExpr::Not(Box::new(ConditionExpr::Defined(Name::from_erlang_service(
             "BAZ",
         ))));
-
-        let refs = expr.defined_names();
+        let refs = extract(&expr);
         assert_eq_expected!(1, refs.len());
         assert!(refs.contains(&Name::from_erlang_service("BAZ")));
 
         // Test: literal (no macros)
         let expr = ConditionExpr::LiteralBool(true);
-        let refs = expr.defined_names();
+        let refs = extract(&expr);
         assert_eq_expected!(0, refs.len());
     }
 
