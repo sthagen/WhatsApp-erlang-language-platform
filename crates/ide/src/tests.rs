@@ -282,7 +282,9 @@ pub(crate) fn check_diagnostics(fixture: &str) {
     check_diagnostics_with_config(config, fixture)
 }
 
-fn convert_diagnostics_to_annotations(diagnostics: Vec<Diagnostic>) -> Vec<(TextRange, String)> {
+pub(crate) fn convert_diagnostics_to_annotations(
+    diagnostics: Vec<Diagnostic>,
+) -> Vec<(TextRange, String)> {
     let mut actual = diagnostics
         .into_iter()
         .map(|d| {

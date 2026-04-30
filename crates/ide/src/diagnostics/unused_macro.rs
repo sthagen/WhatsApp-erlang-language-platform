@@ -123,12 +123,19 @@ fn delete_unused_macro(file_id: FileId, range: TextRange, name: &str) -> Assist 
 #[cfg(test)]
 mod tests {
 
+    use elp_ide_db::RootDatabase;
+    use elp_ide_db::elp_base_db::SourceDatabase;
+    use elp_ide_db::elp_base_db::assert_eq_expected;
+    use elp_ide_db::elp_base_db::fixture::WithFixture;
     use expect_test::expect;
 
+    use crate::AnalysisHost;
     use crate::diagnostics::DiagnosticCode;
     use crate::diagnostics::DiagnosticsConfig;
+    use crate::fixture;
     use crate::tests::check_diagnostics_with_config;
     use crate::tests::check_fix;
+    use crate::tests::convert_diagnostics_to_annotations;
 
     #[track_caller]
     pub(crate) fn check_diagnostics(fixture: &str) {
@@ -136,6 +143,32 @@ mod tests {
             .disable(DiagnosticCode::UndefinedFunction)
             .disable(DiagnosticCode::HirUnresolvedMacro);
         check_diagnostics_with_config(config, fixture)
+    }
+
+    #[track_caller]
+    pub(crate) fn check_diagnostics_ifdef_disabled(elp_fixture: &str) {
+        let config = DiagnosticsConfig::default()
+            .disable(DiagnosticCode::UndefinedFunction)
+            .disable(DiagnosticCode::HirUnresolvedMacro);
+        let (mut db, fixture) = RootDatabase::with_fixture(elp_fixture);
+        db.set_ifdef_enabled(false);
+        let host = AnalysisHost { db };
+        let analysis = host.analysis();
+        for file_id in &fixture.files {
+            let file_id = *file_id;
+            let diagnostics = fixture::diagnostics_for(
+                &analysis,
+                file_id,
+                &config,
+                &vec![],
+                &fixture.diagnostics_enabled,
+            );
+            let diagnostics = diagnostics.diagnostics_for(file_id);
+
+            let expected = fixture.annotations_by_file_id(&file_id);
+            let actual = convert_diagnostics_to_annotations(diagnostics);
+            assert_eq_expected!(expected, actual);
+        }
     }
 
     #[test]
@@ -212,8 +245,161 @@ main() ->
     }
 
     #[test]
+    fn test_unused_macro_ifdef() {
+        check_diagnostics(
+            r#"
+-module(main).
+-define(GUARD, true).
+-ifdef(GUARD).
+main() -> ok.
+-endif.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_ifndef() {
+        check_diagnostics(
+            r#"
+-module(main).
+-define(GUARD, true).
+-ifndef(GUARD).
+main() -> ok.
+-endif.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_undef() {
+        check_diagnostics(
+            r#"
+-module(main).
+-define(TEMP, 42).
+-undef(TEMP).
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_arity_overload() {
+        check_diagnostics(
+            r#"
+-module(main).
+-define(FOO, foo_no_args).
+-define(FOO(X), X).
+     %% ^^^ 💡 warning: W0002: Unused macro (FOO/1)
+main() ->
+  ?FOO.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_arity_overload_across_include() {
+        // FOO/0 is defined in the module, FOO/1 in an included header.
+        // The only call site is `?FOO(x)`, which resolves to FOO/1 from
+        // the header — so FOO/0 in the module should be flagged unused.
+        // Regression test: a bare-name match for "FOO" in macro_usages
+        // is ambiguous when arity overloads come from included headers,
+        // so the preprocessor fast path must fall through to body-level
+        // DefineId resolution rather than declaring FOO/0 used.
+        check_diagnostics(
+            r#"
+//- /src/main.hrl
+-define(FOO(X), {foo, X}).
+//- /src/main.erl
+-module(main).
+-include("main.hrl").
+-define(FOO, foo_no_args).
+     %% ^^^ 💡 warning: W0002: Unused macro (FOO)
+main() ->
+  ?FOO(x).
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_arity_overload_across_ifdef_else() {
+        // Both -ifdef(TEST) and -else. branches define FOO/0 and FOO/1.
+        // TEST is externally defined, so the -ifdef(TEST) branch is active.
+        // The call sites exercise both arities and should resolve to the
+        // active-branch defines — neither should be flagged as unused.
+        check_diagnostics(
+            r#"
+//- /src/main.erl macros:[TEST]
+-module(main).
+-ifdef(TEST).
+-define(FOO(), test_foo_0).
+-define(FOO(X), X).
+-else.
+-define(FOO(), prod_foo_0).
+-define(FOO(X), {prod, X}).
+-endif.
+main() ->
+  ?FOO(),
+  ?FOO(42).
+            "#,
+        );
+    }
+
+    #[test]
     fn test_unused_macro_include() {
         check_diagnostics(
+            r#"
+//- /src/foo.hrl
+-define(A, a).
+-define(B, b).
+//- /src/foo.erl
+-module(foo).
+-include("foo.hrl").
+-define(BAR, 42).
+     %% ^^^ 💡 warning: W0002: Unused macro (BAR)
+main() ->
+  ?A.
+        "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_ifdef_disabled() {
+        check_diagnostics_ifdef_disabled(
+            r#"
+-module(main).
+-define(MEANING_OF_LIFE, 42).
+    %%  ^^^^^^^^^^^^^^^ 💡 warning: W0002: Unused macro (MEANING_OF_LIFE)
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_ifdef_disabled_not_applicable() {
+        check_diagnostics_ifdef_disabled(
+            r#"
+-module(main).
+-define(MEANING_OF_LIFE, 42).
+main() ->
+  ?MEANING_OF_LIFE.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_ifdef_disabled_with_ifdef() {
+        check_diagnostics_ifdef_disabled(
+            r#"
+-module(main).
+-define(GUARD, true).
+-ifdef(GUARD).
+main() -> ok.
+-endif.
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_unused_macro_ifdef_disabled_include() {
+        check_diagnostics_ifdef_disabled(
             r#"
 //- /src/foo.hrl
 -define(A, a).

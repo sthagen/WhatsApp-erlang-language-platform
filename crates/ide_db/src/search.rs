@@ -27,10 +27,22 @@ use elp_syntax::ast;
 use elp_syntax::match_ast;
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
+use hir::Body;
+use hir::DefineDef;
+use hir::DefineId;
+use hir::Expr;
 use hir::File;
 use hir::InFile;
+use hir::MacroName;
+use hir::Name;
+use hir::Pat;
 use hir::Semantic;
+use hir::Term;
+use hir::TypeExpr;
 use hir::db::DefDatabase;
+use hir::form_list::PPCondition;
+use hir::form_list::PPConditionResult;
+use hir::form_list::PPDirective;
 use memchr::memmem::Finder;
 use once_cell::unsync::Lazy;
 
@@ -240,6 +252,21 @@ impl<'a> FindUsages<'a> {
     }
 
     pub fn at_least_one(&self) -> bool {
+        // Fast path: when ifdef condition evaluation is enabled, finding any
+        // usage of a `-define` macro can be answered from preprocessor data
+        // collected during form-list lowering, avoiding a project-wide text
+        // search whose cost grows pathologically with short macro names.
+        // Only applies to the natural search scope (file + included files);
+        // when a custom scope or direct_only is requested, fall back to the
+        // text-based search.
+        if !self.direct_only
+            && self.scope.is_none()
+            && self.sema.db.ifdef_enabled()
+            && let SymbolDefinition::Define(def) = &self.def
+            && let Some(found) = define_has_usage_via_preprocessor(self.sema, def)
+        {
+            return found;
+        }
         self.at_least_n(1)
     }
 
@@ -334,6 +361,140 @@ impl<'a> FindUsages<'a> {
             }
         }
     }
+}
+
+/// Returns true when there is at least one usage of `def` reachable from its
+/// home file or any file it includes, using preprocessor data instead of a
+/// text-based search.
+///
+/// The search scope is the macro's home file plus its included headers, so
+/// this only applies when the home file is a module — for header-defined
+/// macros the natural scope is the set of includers, which the caller must
+/// pass explicitly via `set_scope` (which disables this fast path).
+///
+/// Strategy:
+///   1. If the macro's bare name appears in any `-ifdef`, `-ifndef`, or
+///      `-undef` directive in the scope, count that as a usage.
+///   2. Otherwise, if the bare name appears in any `?MACRO` / `??MACRO`
+///      reference cached on the form list, that is a usage — unless the
+///      macro is arity-overloaded in the active branch, in which case the
+///      name-level match is ambiguous and we fall through to body-level
+///      `DefineId` resolution to be precise.
+fn define_has_usage_via_preprocessor(sema: &Semantic, def: &DefineDef) -> Option<bool> {
+    let file_id = def.file.file_id;
+    match def.file.kind(sema.db.upcast()) {
+        FileKind::SrcModule | FileKind::TestModule => {}
+        _ => return None,
+    }
+    let macro_name = &def.define.name;
+    let bare_name = macro_name.name();
+
+    let scope_files: Vec<FileId> = std::iter::once(file_id)
+        .chain(sema.def_map(file_id).get_included_files())
+        .collect();
+
+    if scope_files
+        .iter()
+        .any(|&fid| pp_directive_references(sema, fid, bare_name))
+    {
+        return Some(true);
+    }
+
+    if !scope_files
+        .iter()
+        .any(|&fid| sema.form_list(fid).macro_usages().contains(bare_name))
+    {
+        return Some(false);
+    }
+
+    // Arity overloading must be checked across the whole scope, not just the
+    // home file: e.g. FOO/0 in the module and FOO/1 in an included header
+    // both contribute to the bare-name match in `macro_usages`, so the
+    // name-level match is ambiguous.
+    let total_with_bare_name: usize = scope_files
+        .iter()
+        .map(|&fid| count_active_defines_with_name(sema, fid, bare_name))
+        .sum();
+    if total_with_bare_name <= 1 {
+        // No arity overloading: the name-level match is sufficient.
+        // Body-level DefineId checks can miss usages in form-list
+        // positions (e.g. -record(?NAME, {})) and unresolved macro
+        // calls (macro_def is None).
+        return Some(true);
+    }
+
+    let Some(&target) = active_define_ids(sema, file_id).get(macro_name) else {
+        return Some(false);
+    };
+    let target = InFile::new(file_id, target);
+    Some(
+        scope_files
+            .iter()
+            .any(|&fid| has_macro_usage_in_bodies(sema, fid, target)),
+    )
+}
+
+fn pp_directive_references(sema: &Semantic, file_id: FileId, name: &Name) -> bool {
+    let form_list = sema.form_list(file_id);
+    form_list.pp_conditions().any(|(_, cond)| {
+        matches!(
+            cond,
+            PPCondition::Ifdef { name: n, .. } | PPCondition::Ifndef { name: n, .. } if n == name
+        )
+    }) || form_list
+        .pp_stack()
+        .iter()
+        .any(|(_, directive)| matches!(directive, PPDirective::Undef { name: n, .. } if n == name))
+}
+
+fn count_active_defines_with_name(sema: &Semantic, file_id: FileId, bare_name: &Name) -> usize {
+    let form_list = sema.form_list(file_id);
+    form_list
+        .define_attributes()
+        .filter(|(_, define)| {
+            form_list.is_form_active(sema.db, file_id, &define.pp_ctx, None)
+                != PPConditionResult::Inactive
+        })
+        .filter(|(_, define)| define.name.name() == bare_name)
+        .count()
+}
+
+fn active_define_ids(sema: &Semantic, file_id: FileId) -> FxHashMap<MacroName, DefineId> {
+    // Only include defines from active branches. The raw form_list contains
+    // every -define regardless of ifdef state, so a last-wins collect can
+    // pick an inactive DefineId (e.g. from -else when -ifdef is active).
+    // Body lowering resolves macro calls via the preprocessor's active-only
+    // state, so an inactive target here would never match and produce false
+    // positives.
+    let form_list = sema.form_list(file_id);
+    form_list
+        .define_attributes()
+        .filter(|(_, define)| {
+            form_list.is_form_active(sema.db, file_id, &define.pp_ctx, None)
+                != PPConditionResult::Inactive
+        })
+        .map(|(id, define)| (define.name.clone(), id))
+        .collect()
+}
+
+fn has_macro_usage_in_bodies(sema: &Semantic, file_id: FileId, target: InFile<DefineId>) -> bool {
+    let form_list = sema.form_list(file_id);
+    form_list.forms().iter().any(|&form_idx| {
+        sema.get_body_and_map(file_id, form_idx)
+            .is_some_and(|(body, _)| body_references_macro(&body, target))
+    })
+}
+
+fn body_references_macro(body: &Body, target: InFile<DefineId>) -> bool {
+    body.exprs.iter().any(
+        |(_, expr)| matches!(expr, Expr::MacroCall { macro_def: Some(def), .. } if *def == target),
+    ) || body.pats.iter().any(
+        |(_, pat)| matches!(pat, Pat::MacroCall { macro_def: Some(def), .. } if *def == target),
+    ) || body.type_exprs.iter().any(
+        |(_, te)| matches!(te, TypeExpr::MacroCall { macro_def: Some(def), .. } if *def == target),
+    ) || body.terms.iter().any(
+        |(_, term)| matches!(term, Term::MacroCall { macro_def: Some(def), .. } if *def == target),
+    )
 }
 
 /// Represents possible ast reference points -
