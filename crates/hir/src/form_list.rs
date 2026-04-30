@@ -48,6 +48,7 @@
 // file.  This allows us to speed up operations by caching a map from
 // the form `SyntaxNode` to the `Form` itself.
 
+use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::Deref;
 use std::ops::Index;
@@ -87,6 +88,7 @@ pub struct FormList {
     // Map from the range of a form to its index
     map_back: FxHashMap<AstPtr<ast::Form>, FormIdx>,
     define_id_map: FxHashMap<DefineId, FormIdx>,
+    macro_usages: BTreeSet<Name>,
 }
 
 impl FormList {
@@ -195,6 +197,13 @@ impl FormList {
     /// Returns an iterator over the -compile attributes in the file
     pub fn compile_attributes(&self) -> impl Iterator<Item = (CompileOptionId, &CompileOption)> {
         self.data.compile_options.iter()
+    }
+
+    /// Returns the set of macro names referenced via `?MACRO` or `??MACRO` syntax
+    /// in this file. This is used to trim macro environment snapshots in
+    /// preprocessor analysis.
+    pub fn macro_usages(&self) -> &BTreeSet<Name> {
+        &self.macro_usages
     }
 
     /// Returns an iterator over the -compile attributes in the file

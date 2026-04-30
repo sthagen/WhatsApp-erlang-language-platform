@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::collections::BTreeSet;
+
 use elp_base_db::FileId;
 use elp_base_db::IncludeCtx;
 use elp_syntax::AstNode;
@@ -193,12 +195,30 @@ impl<'a> Ctx<'a> {
         }
 
         self.data.shrink_to_fit();
+
+        // Collect macro usages from the syntax tree — both `?MACRO`
+        // invocations (`MacroCallExpr`) and `??MACRO` stringifications
+        // (`MacroString`). Both reference a macro by name and must be
+        // preserved when trimming macro environment snapshots.
+        let macro_usages: BTreeSet<Name> = self
+            .source_file
+            .syntax()
+            .descendants()
+            .filter_map(|node| {
+                ast::MacroCallExpr::cast(node.clone())
+                    .and_then(|mc| mc.name())
+                    .or_else(|| ast::MacroString::cast(node).and_then(|ms| ms.name()))
+            })
+            .map(|name| name.as_name())
+            .collect();
+
         FormList {
             data: self.data,
             forms,
             diagnostics: self.diagnostics,
             map_back: self.map_back,
             define_id_map: self.define_id_map,
+            macro_usages,
         }
     }
 
