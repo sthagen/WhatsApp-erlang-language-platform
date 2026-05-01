@@ -89,6 +89,7 @@ fn serialization_test() {
             },
         }),
         exdoc_link: Some("https://example.com/docs/test_module.html".to_string()),
+        module_span: None,
         callbacks: vec![],
         compile_options: vec![],
         on_load_fns: vec![],

@@ -779,6 +779,16 @@ impl IndexedFacts {
                 name: mf.name.clone(),
                 app: app.clone(),
             };
+            if let Some(span) = &mf.module_span {
+                decl_locations.push(
+                    Schema2DeclLocation {
+                        declaration: Schema2Declaration::Module(decl.clone().into()),
+                        file_id: mf.file_id.clone(),
+                        span: span.clone(),
+                    }
+                    .into(),
+                );
+            }
             let exports: Vec<Key<Schema2FuncDecl>> = mf
                 .exports
                 .unwrap_or_default()
@@ -835,15 +845,23 @@ impl IndexedFacts {
                 }
                 .into()
             }));
-            record_field_decls.extend(mf.record_fields.iter().map(|rf| {
-                Schema2RecordFieldDecl {
+            for rf in &mf.record_fields {
+                let rf_decl = Schema2RecordFieldDecl {
                     record_name: rf.record_name.clone(),
                     field_name: rf.field_name.clone(),
                     module: mf.name.clone(),
                     app: app.clone(),
-                }
-                .into()
-            }));
+                };
+                decl_locations.push(
+                    Schema2DeclLocation {
+                        declaration: Schema2Declaration::RecordField(rf_decl.clone().into()),
+                        file_id: mf.file_id.clone(),
+                        span: rf.span.clone(),
+                    }
+                    .into(),
+                );
+                record_field_decls.push(rf_decl.into());
+            }
             for (inc_id, inc_path) in &mf.included_files {
                 if !known_files.contains(inc_id) {
                     extra_file_facts.push(FileFact::new_from_glean_id(
@@ -860,26 +878,30 @@ impl IndexedFacts {
                     .into(),
                 );
             }
-            let (cb_defs, cb_decls): (Vec<_>, Vec<_>) = mf
-                .callbacks
-                .iter()
-                .map(|cb| {
-                    let cb_decl = Schema2CallbackDecl {
-                        name: cb.name.clone(),
-                        arity: cb.arity,
-                        module: mf.name.clone(),
-                        app: app.clone(),
-                    };
-                    let cb_def = Schema2CallbackDef {
+            for cb in &mf.callbacks {
+                let cb_decl = Schema2CallbackDecl {
+                    name: cb.name.clone(),
+                    arity: cb.arity,
+                    module: mf.name.clone(),
+                    app: app.clone(),
+                };
+                decl_locations.push(
+                    Schema2DeclLocation {
+                        declaration: Schema2Declaration::Callback(cb_decl.clone().into()),
+                        file_id: mf.file_id.clone(),
+                        span: cb.span.clone(),
+                    }
+                    .into(),
+                );
+                callback_defs.push(
+                    Schema2CallbackDef {
                         declaration: cb_decl.clone().into(),
                         optional_: cb.optional,
                     }
-                    .into();
-                    (cb_def, cb_decl.into())
-                })
-                .unzip();
-            callback_defs.extend(cb_defs);
-            callback_decls.extend(cb_decls);
+                    .into(),
+                );
+                callback_decls.push(cb_decl.into());
+            }
             if let Some(doc) = mf.module_doc {
                 comments.push(
                     Schema2CommentFact {

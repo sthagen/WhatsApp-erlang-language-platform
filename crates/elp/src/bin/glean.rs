@@ -551,12 +551,14 @@ impl GleanIndexer {
             .get_records()
             .iter()
             .flat_map(|(name, rec_def)| {
-                rec_def
-                    .fields(db)
-                    .map(move |(field_name, _)| types::RecordFieldInfo {
+                rec_def.fields(db).map(move |(field_name, field_def)| {
+                    let span = field_def.source(db).syntax().text_range().into();
+                    types::RecordFieldInfo {
                         record_name: name.to_string(),
                         field_name: field_name.to_string(),
-                    })
+                        span,
+                    }
+                })
             })
             .collect();
 
@@ -579,10 +581,14 @@ impl GleanIndexer {
         let callbacks: Vec<types::CallbackInfo> = def_map
             .get_callbacks()
             .iter()
-            .map(|(na, cb_def)| types::CallbackInfo {
-                name: na.name().to_string(),
-                arity: na.arity(),
-                optional: cb_def.optional,
+            .map(|(na, cb_def)| {
+                let span = cb_def.source(db).syntax().text_range().into();
+                types::CallbackInfo {
+                    name: na.name().to_string(),
+                    arity: na.arity(),
+                    optional: cb_def.optional,
+                    span,
+                }
             })
             .collect();
 
@@ -636,6 +642,10 @@ impl GleanIndexer {
             })
             .collect();
 
+        let module_span = module_attribute
+            .as_ref()
+            .map(|ma| ma.syntax().text_range().into());
+
         ModuleFact {
             file_id: file_id.into(),
             name,
@@ -644,6 +654,7 @@ impl GleanIndexer {
             behaviours: (!behaviours.is_empty()).then_some(behaviours),
             module_doc,
             exdoc_link,
+            module_span,
             callbacks,
             compile_options,
             on_load_fns,

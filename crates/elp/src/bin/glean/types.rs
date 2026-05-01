@@ -87,6 +87,8 @@ pub(crate) struct ModuleFact {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) exdoc_link: Option<String>,
     #[serde(skip)]
+    pub(crate) module_span: Option<Location>,
+    #[serde(skip)]
     pub(crate) callbacks: Vec<CallbackInfo>,
     #[serde(skip)]
     pub(crate) compile_options: Vec<String>,
@@ -121,6 +123,7 @@ pub(crate) struct MacroInfo {
 pub(crate) struct RecordFieldInfo {
     pub(crate) record_name: String,
     pub(crate) field_name: String,
+    pub(crate) span: Location,
 }
 
 #[derive(Debug, Clone)]
@@ -128,6 +131,7 @@ pub(crate) struct CallbackInfo {
     pub(crate) name: String,
     pub(crate) arity: u32,
     pub(crate) optional: bool,
+    pub(crate) span: Location,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -485,10 +489,6 @@ pub(crate) struct DocDecl {
 // ── erlang.2 output types ──────────────────────────────────────────
 
 #[derive(Serialize, Debug, Clone)]
-#[expect(
-    dead_code,
-    reason = "variants constructed in into_schema2_facts() (next diff)"
-)]
 pub(crate) enum Schema2Declaration {
     #[serde(rename = "func")]
     Func(Key<Schema2FuncDecl>),
