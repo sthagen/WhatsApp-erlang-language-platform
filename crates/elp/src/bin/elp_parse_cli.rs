@@ -218,7 +218,7 @@ pub fn parse_all(
             }
             if args.print_diags {
                 let line_index = db.file_line_index(diags.file_id);
-                combined.sort_by(|a, b| a.range.start().cmp(&b.range.start()));
+                combined.sort_by_key(|a| a.range.start());
                 for diag in combined {
                     if args.is_format_json() {
                         err_in_diag = true;

@@ -96,7 +96,7 @@ pub(crate) fn add_local(
         return false;
     };
     let def_map = sema.def_map(file_position.file_id);
-    let completions = def_map.get_types().iter().filter_map(|(name_arity, _)| {
+    let completions = def_map.get_types().keys().filter_map(|name_arity| {
         if name_arity.name().starts_with(&prefix) {
             Some(create_call_completion(name_arity))
         } else {

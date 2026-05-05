@@ -180,7 +180,7 @@ mod tests {
             "The amount of folds is different than the expected amount"
         );
 
-        for (folding_range, (range, attr)) in folding_ranges.iter().zip(ranges.into_iter()) {
+        for (folding_range, (range, attr)) in folding_ranges.iter().zip(ranges) {
             assert_eq!(
                 folding_range.range.start(),
                 range.start(),

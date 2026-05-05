@@ -411,7 +411,7 @@ impl FunctionBodyToExtract {
     /// Computes additional info that affects param type and mutability
     fn extracted_function_params(&self, free: FxHashSet<Resolution>) -> Vec<Param> {
         let mut params: Vec<_> = free.into_iter().map(|(var, _)| Param { var }).collect();
-        params.sort_by(|a, b| a.var.cmp(&b.var));
+        params.sort_by_key(|a| a.var);
         params
     }
 }

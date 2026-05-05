@@ -17,16 +17,14 @@ const OTP_BASE_URL: &str = "https://erlang.org";
 
 pub(crate) fn links(res: &mut Vec<DocLink>, sema: &Semantic, def: &SymbolDefinition) {
     match def {
-        SymbolDefinition::Module(module) => {
-            if module.is_in_otp(sema.db) {
-                let name = module.name(sema.db);
-                let uri = format!("{OTP_BASE_URL}/doc/man/{name}.html");
-                let link = DocLink {
-                    title: name.to_string(),
-                    uri,
-                };
-                res.push(link);
-            }
+        SymbolDefinition::Module(module) if module.is_in_otp(sema.db) => {
+            let name = module.name(sema.db);
+            let uri = format!("{OTP_BASE_URL}/doc/man/{name}.html");
+            let link = DocLink {
+                title: name.to_string(),
+                uri,
+            };
+            res.push(link);
         }
         SymbolDefinition::Function(function_def) => {
             if function_def.is_in_otp(sema.db)

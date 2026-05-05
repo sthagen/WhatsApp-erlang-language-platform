@@ -10,6 +10,8 @@
 
 //! Telemetry helpers for the LSP server.
 
+use std::cmp::Reverse;
+
 use elp_ide::elp_ide_db::elp_base_db::ProjectApps;
 use elp_ide::elp_ide_db::elp_base_db::ProjectId;
 use elp_log::telemetry;
@@ -68,7 +70,7 @@ pub(crate) fn send_project_size(
             let watch_count: usize = app_watch_counts.iter().map(|(_, c)| *c).sum::<usize>()
                 + project_root_watch_paths(&project.root()).len();
 
-            app_watch_counts.sort_by(|a, b| b.1.cmp(&a.1));
+            app_watch_counts.sort_by_key(|b| Reverse(b.1));
             let top_apps: Vec<_> = app_watch_counts
                 .into_iter()
                 .take(5)

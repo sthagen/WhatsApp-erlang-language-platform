@@ -744,9 +744,9 @@ impl GleanIndexer {
                         x.key.v1_arity = Some(xref.source.start);
                     }
                 }
-                XRefTarget::Record(x) => {
+                XRefTarget::Record(x)
                     // Add documentation for records that have tagged_urls
-                    if !x.key.tagged_urls.is_empty() {
+                    if !x.key.tagged_urls.is_empty() => {
                         let id: FileId = x.key.file_id.clone().into();
                         let def_map = db.def_map(id);
                         let record_name = Name::from_erlang_service(&x.key.name);
@@ -794,7 +794,6 @@ impl GleanIndexer {
                             x.key.v1_file_id = file_id.into();
                         }
                     }
-                }
                 _ => (),
             }
         }

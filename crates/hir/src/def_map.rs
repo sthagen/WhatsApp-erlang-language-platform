@@ -568,8 +568,8 @@ impl DefMap {
 
     pub fn get_functions(&self) -> impl Iterator<Item = (&NameArity, &FunctionDef)> {
         self.functions_by_fa
-            .iter()
-            .filter_map(|(k, _)| self.get_function(k).map(|def| (k, def)))
+            .keys()
+            .filter_map(|k| self.get_function(k).map(|def| (k, def)))
     }
 
     pub fn get_behaviours(&self) -> &FxHashSet<Name> {

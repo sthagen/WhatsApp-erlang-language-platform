@@ -649,20 +649,18 @@ impl Server {
 
         match self.status {
             Status::Initialising | Status::Loading(_)
-                if req.method != request::Shutdown::METHOD && !req.method.starts_with("elp/") =>
-            {
+                if req.method != request::Shutdown::METHOD && !req.method.starts_with("elp/")
                 // We can process document symbols while loading.
-                if !(self.status != Status::Initialising
-                    && req.method == request::DocumentSymbolRequest::METHOD)
-                {
-                    let id = req.id.clone();
-                    self.send_response(Response::new_err(
-                        id,
-                        ErrorCode::ContentModified as i32,
-                        "elp is still loading".to_string(),
-                    ));
-                    return Ok(());
-                }
+                && !(self.status != Status::Initialising
+                    && req.method == request::DocumentSymbolRequest::METHOD) =>
+            {
+                let id = req.id.clone();
+                self.send_response(Response::new_err(
+                    id,
+                    ErrorCode::ContentModified as i32,
+                    "elp is still loading".to_string(),
+                ));
+                return Ok(());
             }
             Status::ShuttingDown => {
                 self.send_response(Response::new_err(

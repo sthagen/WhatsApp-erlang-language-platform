@@ -399,8 +399,8 @@ impl TypedSemantic for RootDatabase {
         match &*diags {
             EqwalizerDiagnostics::Diagnostics { errors, .. } => Some(
                 errors
-                    .iter()
-                    .flat_map(|(_, diags)| diags.iter().cloned())
+                    .values()
+                    .flat_map(|diags| diags.iter().cloned())
                     .collect(),
             ),
             EqwalizerDiagnostics::NoAst { .. } => Some(vec![]),

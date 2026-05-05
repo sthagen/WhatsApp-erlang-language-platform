@@ -473,13 +473,13 @@ fn file_preprocessor_analysis_impl(
 
         // Process the form based on its type
         match form_idx {
-            FormIdx::PPCondition(cond_id) => {
+            FormIdx::PPCondition(cond_id)
                 // When ifdef is disabled, skip all condition processing.
                 // state.is_active() stays true, so all directives
                 // (defines, undefs, includes) are processed unconditionally.
                 // condition_results remains empty — is_condition_active()
                 // defaults to Active for missing entries.
-                if env.ifdef {
+                if env.ifdef => {
                     let processed =
                         process_pp_condition(db, file_id, &form_list, cond_id, &mut state);
 
@@ -526,7 +526,6 @@ fn file_preprocessor_analysis_impl(
                     };
                     analysis.condition_results.insert(cond_id, result);
                 }
-            }
             FormIdx::PPDirective(directive_id) => {
                 process_pp_directive(
                     db,

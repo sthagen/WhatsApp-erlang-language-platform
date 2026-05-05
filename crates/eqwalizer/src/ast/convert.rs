@@ -424,19 +424,17 @@ impl Converter {
                     ExternalOptionalCallbacks { pos, ids },
                 )));
             }
-            ("compile", Term::List(flags)) => {
-                if flags.elements.iter().any(|f| self.is_export_all(f)) {
-                    return Ok(Some(ExternalForm::CompileExportAll(CompileExportAllAttr {
-                        pos,
-                    })));
-                }
+            ("compile", Term::List(flags))
+                if flags.elements.iter().any(|f| self.is_export_all(f)) =>
+            {
+                return Ok(Some(ExternalForm::CompileExportAll(CompileExportAllAttr {
+                    pos,
+                })));
             }
-            ("compile", Term::Atom(flag)) => {
-                if flag.name == "export_all" {
-                    return Ok(Some(ExternalForm::CompileExportAll(CompileExportAllAttr {
-                        pos,
-                    })));
-                }
+            ("compile", Term::Atom(flag)) if flag.name == "export_all" => {
+                return Ok(Some(ExternalForm::CompileExportAll(CompileExportAllAttr {
+                    pos,
+                })));
             }
             ("typing", Term::List(elems)) => {
                 let names = elems
@@ -2075,10 +2073,11 @@ impl Converter {
                         }));
                     }
                 }
-                ("type", [Term::Atom(kind), Term::List(params)]) if kind.name == "binary" => {
-                    if params.elements.len() == 1 || params.elements.len() == 2 {
-                        return Ok(ExtType::binary_ext_type(pos));
-                    }
+                ("type", [Term::Atom(kind), Term::List(params)])
+                    if kind.name == "binary"
+                        && (params.elements.len() == 1 || params.elements.len() == 2) =>
+                {
+                    return Ok(ExtType::binary_ext_type(pos));
                 }
                 ("type", [Term::Atom(name), Term::List(params)]) => {
                     let arity = params.elements.len();

@@ -205,7 +205,7 @@ pub(crate) fn document_symbols(db: &RootDatabase, file_id: FileId) -> Vec<Docume
         }
     }
 
-    res.sort_by(|a, b| a.range.start().cmp(&b.range.start()));
+    res.sort_by_key(|a| a.range.start());
 
     res
 }

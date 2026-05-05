@@ -338,24 +338,23 @@ impl<'a> FindUsages<'a> {
                 if let Some(name) = algo::find_node_at_offset::<NameLike>(&tree, offset)
                     && let Some(token) = name.syntax().first_token()
                 {
-                    match SymbolClass::classify(sema, InFile::new(file_id, token)) {
-                        Some(SymbolClass::Definition(_)) => {}
-                        Some(SymbolClass::Reference {
-                            refs: _,
-                            typ: ReferenceType::Fuzzy,
-                        }) => {}
-                        Some(SymbolClass::Reference { refs, typ }) => {
-                            if refs.iter().any(|def| {
-                                def == self.def
-                                    && !(self.direct_only && typ != ReferenceType::Direct)
-                            }) {
-                                match sink(file_id, name) {
-                                    ControlFlow::Continue(()) => {}
-                                    ControlFlow::Break(()) => return,
-                                }
-                            }
-                        }
-                        None => {}
+                    let Some(SymbolClass::Reference { refs, typ }) =
+                        SymbolClass::classify(sema, InFile::new(file_id, token))
+                    else {
+                        continue;
+                    };
+                    if typ == ReferenceType::Fuzzy {
+                        continue;
+                    }
+                    let matches_def = refs.iter().any(|def| {
+                        def == self.def && !(self.direct_only && typ != ReferenceType::Direct)
+                    });
+                    if !matches_def {
+                        continue;
+                    }
+                    match sink(file_id, name) {
+                        ControlFlow::Continue(()) => {}
+                        ControlFlow::Break(()) => return,
                     }
                 }
             }
